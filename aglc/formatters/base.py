@@ -32,6 +32,10 @@ class Formatter(ABC):
     uses_n_reference: ClassVar[bool] = True
     #: Whether the short title is italicised in subsequent references
     italic_short_title: ClassVar[bool] = False
+    #: Whether a "('Short Title')" definition is appended to the first full citation
+    #: when the source is referred to again later (cases, legislation, treaties).
+    #: Secondary sources use author surnames instead and don't need one.
+    defines_short_title: ClassVar[bool] = False
     bibliography_category: ClassVar[str] = BIB_OTHER
 
     @abstractmethod
@@ -42,7 +46,9 @@ class Formatter(ABC):
 
     def short_title(self, citation: Citation) -> str:
         """Default short title used when the author hasn't supplied one
-        (eg the first party name for cases, the author surname for articles)."""
+        (eg the first party name for cases, the author surname for articles).
+        Returning "" means "no short form: repeat the full citation" (eg legislation
+        without an author-defined short title)."""
         return citation.short_title or ""
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
