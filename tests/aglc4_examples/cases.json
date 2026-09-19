@@ -1,0 +1,1326 @@
+[
+  {
+    "id": "2.1.1-a",
+    "rule": "2.1.1",
+    "page": 39,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Momentum Productions Pty Ltd v Lewarne",
+        "year": "2009",
+        "year_style": "round",
+        "volume": "174",
+        "report": "FCR",
+        "starting_page": "268"
+      }
+    },
+    "expected_full": "*Momentum Productions Pty Ltd v Lewarne* (2009) 174 FCR 268"
+  },
+  {
+    "id": "2.1.1-b",
+    "rule": "2.1.1",
+    "page": 40,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Hot Holdings Pty Ltd v Creasy",
+        "year": "1996",
+        "year_style": "round",
+        "volume": "185",
+        "report": "CLR",
+        "starting_page": "149"
+      }
+    },
+    "expected_full": "*Hot Holdings Pty Ltd v Creasy* (1996) 185 CLR 149"
+  },
+  {
+    "id": "2.1.1-c",
+    "rule": "2.1.1",
+    "page": 40,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Tame v New South Wales",
+        "year": "2002",
+        "year_style": "round",
+        "volume": "211",
+        "report": "CLR",
+        "starting_page": "317"
+      }
+    },
+    "expected_full": "*Tame v New South Wales* (2002) 211 CLR 317"
+  },
+  {
+    "id": "2.1.2-a",
+    "rule": "2.1.2",
+    "page": 40,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Andrew Shelton & Co Pty Ltd v Alpha Healthcare Ltd",
+        "year": "2002",
+        "year_style": "round",
+        "volume": "5",
+        "report": "VR",
+        "starting_page": "577"
+      }
+    },
+    "expected_full": "*Andrew Shelton & Co Pty Ltd v Alpha Healthcare Ltd* (2002) 5 VR 577"
+  },
+  {
+    "id": "2.1.2-b",
+    "rule": "2.1.2",
+    "page": 40,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Lumbers v W Cook Builders Pty Ltd (in liq)",
+        "year": "2008",
+        "year_style": "round",
+        "volume": "232",
+        "report": "CLR",
+        "starting_page": "635"
+      }
+    },
+    "expected_full": "*Lumbers v W Cook Builders Pty Ltd (in liq)* (2008) 232 CLR 635"
+  },
+  {
+    "id": "2.1.2-c",
+    "rule": "2.1.2",
+    "page": 40,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Olivaylle Pty Ltd v Flottweg GmbH & Co KGaA [No 3]",
+        "year": "2008",
+        "year_style": "round",
+        "volume": "76",
+        "report": "IPR",
+        "starting_page": "152"
+      }
+    },
+    "expected_full": "*Olivaylle Pty Ltd v Flottweg GmbH & Co KGaA [No 3]* (2008) 76 IPR 152"
+  },
+  {
+    "id": "2.1.3-a",
+    "rule": "2.1.3",
+    "page": 41,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "JT International SA v Commonwealth",
+        "year": "2012",
+        "year_style": "round",
+        "volume": "250",
+        "report": "CLR",
+        "starting_page": "1"
+      }
+    },
+    "expected_full": "*JT International SA v Commonwealth* (2012) 250 CLR 1"
+  },
+  {
+    "id": "2.1.3-b",
+    "rule": "2.1.3",
+    "page": 41,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Unions NSW v New South Wales",
+        "year": "2013",
+        "year_style": "round",
+        "volume": "252",
+        "report": "CLR",
+        "starting_page": "530"
+      }
+    },
+    "expected_full": "*Unions NSW v New South Wales* (2013) 252 CLR 530"
+  },
+  {
+    "id": "2.1.4-a",
+    "rule": "2.1.4",
+    "page": 41,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "R v Reid",
+        "year": "2007",
+        "year_style": "square",
+        "volume": "1",
+        "report": "Qd R",
+        "starting_page": "64"
+      }
+    },
+    "expected_full": "*R v Reid* [2007] 1 Qd R 64"
+  },
+  {
+    "id": "2.1.4-b",
+    "rule": "2.1.4",
+    "page": 41,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Honeysett v The Queen",
+        "year": "2014",
+        "year_style": "round",
+        "volume": "253",
+        "report": "CLR",
+        "starting_page": "122"
+      }
+    },
+    "expected_full": "*Honeysett v The Queen* (2014) 253 CLR 122"
+  },
+  {
+    "id": "2.1.5-a",
+    "rule": "2.1.5",
+    "page": 41,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "BP Refinery (Westernport) Pty Ltd v Shire of Hastings",
+        "year": "1977",
+        "year_style": "round",
+        "volume": "180",
+        "report": "CLR",
+        "starting_page": "266"
+      }
+    },
+    "expected_full": "*BP Refinery (Westernport) Pty Ltd v Shire of Hastings* (1977) 180 CLR 266"
+  },
+  {
+    "id": "2.1.5-b",
+    "rule": "2.1.5",
+    "page": 42,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Papua and New Guinea v Guba",
+        "year": "1973",
+        "year_style": "round",
+        "volume": "130",
+        "report": "CLR",
+        "starting_page": "353"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "369"
+        }
+      ],
+      "pinpoint_judges": "Barwick CJ"
+    },
+    "expected_full": "*Papua and New Guinea v Guba* (1973) 130 CLR 353, 369 (Barwick CJ)"
+  },
+  {
+    "id": "2.1.5-c",
+    "rule": "2.1.5",
+    "page": 42,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "O’Donoghue v Ireland",
+        "year": "2008",
+        "year_style": "round",
+        "volume": "234",
+        "report": "CLR",
+        "starting_page": "599"
+      }
+    },
+    "expected_full": "*O’Donoghue v Ireland* (2008) 234 CLR 599"
+  },
+  {
+    "id": "2.1.5-d",
+    "rule": "2.1.5",
+    "page": 42,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Zoeller v Federal Republic of Germany",
+        "year": "1989",
+        "year_style": "round",
+        "volume": "23",
+        "report": "FCR",
+        "starting_page": "282"
+      }
+    },
+    "expected_full": "*Zoeller v Federal Republic of Germany* (1989) 23 FCR 282"
+  },
+  {
+    "id": "2.1.6-a",
+    "rule": "2.1.6",
+    "page": 42,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "MacCormick v Federal Commissioner of Taxation",
+        "year": "1984",
+        "year_style": "round",
+        "volume": "158",
+        "report": "CLR",
+        "starting_page": "622"
+      }
+    },
+    "expected_full": "*MacCormick v Federal Commissioner of Taxation* (1984) 158 CLR 622"
+  },
+  {
+    "id": "2.1.6-b",
+    "rule": "2.1.6",
+    "page": 42,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "M238 of 2002 v Minister for Immigration and Multicultural and Indigenous Affairs",
+        "year": "2003",
+        "year_style": "square",
+        "court_id": "FCAFC",
+        "judgment_number": "260"
+      }
+    },
+    "expected_full": "*M238 of 2002 v Minister for Immigration and Multicultural and Indigenous Affairs* [2003] FCAFC 260"
+  },
+  {
+    "id": "2.1.6-c",
+    "rule": "2.1.6",
+    "page": 43,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Zhu v Treasurer (NSW)",
+        "year": "2004",
+        "year_style": "round",
+        "volume": "218",
+        "report": "CLR",
+        "starting_page": "530"
+      }
+    },
+    "expected_full": "*Zhu v Treasurer (NSW)* (2004) 218 CLR 530"
+  },
+  {
+    "id": "2.1.6-d",
+    "rule": "2.1.6",
+    "page": 43,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Houssein v Under Secretary, Department of Industrial Relations and Technology (NSW)",
+        "year": "1980",
+        "year_style": "square",
+        "volume": "2",
+        "report": "NSWLR",
+        "starting_page": "398"
+      }
+    },
+    "expected_full": "*Houssein v Under Secretary, Department of Industrial Relations and Technology (NSW)* [1980] 2 NSWLR 398"
+  },
+  {
+    "id": "2.1.7-a",
+    "rule": "2.1.7",
+    "page": 43,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "DPP (Vic) v Finn",
+        "year": "2008",
+        "year_style": "round",
+        "volume": "186",
+        "report": "A Crim R",
+        "starting_page": "235"
+      }
+    },
+    "expected_full": "*DPP (Vic) v Finn* (2008) 186 A Crim R 235"
+  },
+  {
+    "id": "2.1.7-b",
+    "rule": "2.1.7",
+    "page": 43,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Bradshaw v A-G (Qld)",
+        "year": "2000",
+        "year_style": "square",
+        "volume": "2",
+        "report": "Qd R",
+        "starting_page": "7"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "13"
+        }
+      ]
+    },
+    "expected_full": "*Bradshaw v A-G (Qld)* [2000] 2 Qd R 7, 13"
+  },
+  {
+    "id": "2.1.8-a",
+    "rule": "2.1.8",
+    "page": 43,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Re Judiciary and Navigation Acts",
+        "year": "1921",
+        "year_style": "round",
+        "volume": "29",
+        "report": "CLR",
+        "starting_page": "257"
+      }
+    },
+    "expected_full": "*Re Judiciary and Navigation Acts* (1921) 29 CLR 257"
+  },
+  {
+    "id": "2.1.8-b",
+    "rule": "2.1.8",
+    "page": 43,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Re Palmer; George v McIntyre",
+        "year": "1902",
+        "year_style": "round",
+        "volume": "2",
+        "report": "SR (NSW)",
+        "starting_page": "200"
+      }
+    },
+    "expected_full": "*Re Palmer; George v McIntyre* (1902) 2 SR (NSW) 200"
+  },
+  {
+    "id": "2.1.9-a",
+    "rule": "2.1.9",
+    "page": 44,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Re McBain; Ex parte Australian Catholic Bishops Conference",
+        "year": "2002",
+        "year_style": "round",
+        "volume": "209",
+        "report": "CLR",
+        "starting_page": "372"
+      }
+    },
+    "expected_full": "*Re McBain; Ex parte Australian Catholic Bishops Conference* (2002) 209 CLR 372"
+  },
+  {
+    "id": "2.1.9-b",
+    "rule": "2.1.9",
+    "page": 44,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "J Boag & Son Brewing Ltd v Cascade Brewery Co Pty Ltd; Ex parte Banks Paton Australia Pty Ltd",
+        "year": "1997",
+        "year_style": "round",
+        "volume": "7",
+        "report": "Tas R",
+        "starting_page": "119"
+      }
+    },
+    "expected_full": "*J Boag & Son Brewing Ltd v Cascade Brewery Co Pty Ltd; Ex parte Banks Paton Australia Pty Ltd* (1997) 7 Tas R 119"
+  },
+  {
+    "id": "2.1.9-c",
+    "rule": "2.1.9",
+    "page": 44,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "R v Kirby; Ex parte Boilermakers’ Society of Australia",
+        "year": "1956",
+        "year_style": "round",
+        "volume": "94",
+        "report": "CLR",
+        "starting_page": "254"
+      }
+    },
+    "expected_full": "*R v Kirby; Ex parte Boilermakers’ Society of Australia* (1956) 94 CLR 254"
+  },
+  {
+    "id": "2.1.10-a",
+    "rule": "2.1.10",
+    "page": 44,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "A-G (Vic) ex rel Dale v Commonwealth",
+        "year": "1945",
+        "year_style": "round",
+        "volume": "71",
+        "report": "CLR",
+        "starting_page": "237"
+      }
+    },
+    "expected_full": "*A-G (Vic) ex rel Dale v Commonwealth* (1945) 71 CLR 237"
+  },
+  {
+    "id": "2.1.11-a",
+    "rule": "2.1.11",
+    "page": 45,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "K-Generation Pty Ltd v Liquor Licensing Court",
+        "year": "2007",
+        "year_style": "round",
+        "volume": "99",
+        "report": "SASR",
+        "starting_page": "58"
+      }
+    },
+    "expected_full": "*K-Generation Pty Ltd v Liquor Licensing Court* (2007) 99 SASR 58"
+  },
+  {
+    "id": "2.1.11-b",
+    "rule": "2.1.11",
+    "page": 45,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Lam v Zeng",
+        "year": "2017",
+        "year_style": "square",
+        "court_id": "FamCA",
+        "judgment_number": "951"
+      }
+    },
+    "expected_full": "*Lam v Zeng* [2017] FamCA 951"
+  },
+  {
+    "id": "2.1.12-a",
+    "rule": "2.1.12",
+    "page": 45,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "The Maria Luisa [No 2]",
+        "year": "2003",
+        "year_style": "round",
+        "volume": "130",
+        "report": "FCR",
+        "starting_page": "12"
+      }
+    },
+    "expected_full": "*The Maria Luisa [No 2]* (2003) 130 FCR 12"
+  },
+  {
+    "id": "2.1.12-b",
+    "rule": "2.1.12",
+    "page": 45,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Great Peace Shipping Ltd v Tsavliris Salvage (International) Ltd",
+        "year": "2003",
+        "year_style": "square",
+        "report": "QB",
+        "starting_page": "679"
+      },
+      "short_title": "The Great Peace"
+    },
+    "expected_full": "*Great Peace Shipping Ltd v Tsavliris Salvage (International) Ltd* [2003] QB 679"
+  },
+  {
+    "id": "2.1.13-a",
+    "rule": "2.1.13",
+    "page": 46,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Bahr v Nicolay [No 2]",
+        "year": "1988",
+        "year_style": "round",
+        "volume": "164",
+        "report": "CLR",
+        "starting_page": "604"
+      }
+    },
+    "expected_full": "*Bahr v Nicolay [No 2]* (1988) 164 CLR 604"
+  },
+  {
+    "id": "2.1.13-b",
+    "rule": "2.1.13",
+    "page": 46,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Wentworth v Rogers [No 5]",
+        "year": "1986",
+        "year_style": "round",
+        "volume": "6",
+        "report": "NSWLR",
+        "starting_page": "534"
+      }
+    },
+    "expected_full": "*Wentworth v Rogers [No 5]* (1986) 6 NSWLR 534"
+  },
+  {
+    "id": "2.1.13-c",
+    "rule": "2.1.13",
+    "page": 46,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Kuwait Airlines Corporation v Iraqi Airways Co [Nos 4 and 5]",
+        "year": "2002",
+        "year_style": "square",
+        "volume": "2",
+        "report": "AC",
+        "starting_page": "883"
+      }
+    },
+    "expected_full": "*Kuwait Airlines Corporation v Iraqi Airways Co [Nos 4 and 5]* [2002] 2 AC 883"
+  },
+  {
+    "id": "2.1.14-a",
+    "rule": "2.1.14",
+    "page": 47,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "McGinty v Western Australia",
+        "year": "1996",
+        "year_style": "round",
+        "volume": "186",
+        "report": "CLR",
+        "starting_page": "140"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "232"
+        }
+      ],
+      "pinpoint_judges": "McHugh J",
+      "short_title": "McGinty",
+      "signal": "See, eg,"
+    },
+    "expected_full": "*McGinty v Western Australia* (1996) 186 CLR 140, 232 (McHugh J)"
+  },
+  {
+    "id": "2.1.14-b",
+    "rule": "2.1.14",
+    "page": 47,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Roxborough v Rothmans of Pall Mall Australia Ltd",
+        "year": "2001",
+        "year_style": "round",
+        "volume": "208",
+        "report": "CLR",
+        "starting_page": "516"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "544-5"
+        }
+      ],
+      "pinpoint_judges": "Gummow J",
+      "short_title": "Roxborough",
+      "signal": "See also"
+    },
+    "expected_full": "*Roxborough v Rothmans of Pall Mall Australia Ltd* (2001) 208 CLR 516, 544–5 (Gummow J)"
+  },
+  {
+    "id": "2.1.14-c",
+    "rule": "2.1.14",
+    "page": 47,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Commonwealth v Tasmania",
+        "year": "1983",
+        "year_style": "round",
+        "volume": "158",
+        "report": "CLR",
+        "starting_page": "1"
+      },
+      "short_title": "Tasmanian Dam Case"
+    },
+    "expected_full": "*Commonwealth v Tasmania* (1983) 158 CLR 1"
+  },
+  {
+    "id": "2.2.1-a",
+    "rule": "2.2.1",
+    "page": 49,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "R v Lester",
+        "year": "2008",
+        "year_style": "round",
+        "volume": "190",
+        "report": "A Crim R",
+        "starting_page": "468"
+      }
+    },
+    "expected_full": "*R v Lester* (2008) 190 A Crim R 468"
+  },
+  {
+    "id": "2.2.1-b",
+    "rule": "2.2.1",
+    "page": 49,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Sent v Andrews",
+        "year": "2002",
+        "year_style": "round",
+        "volume": "6",
+        "report": "VR",
+        "starting_page": "317"
+      }
+    },
+    "expected_full": "*Sent v Andrews* (2002) 6 VR 317"
+  },
+  {
+    "id": "2.2.1-c",
+    "rule": "2.2.1",
+    "page": 49,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "King v King",
+        "year": "1974",
+        "year_style": "square",
+        "report": "Qd R",
+        "starting_page": "253"
+      }
+    },
+    "expected_full": "*King v King* [1974] Qd R 253"
+  },
+  {
+    "id": "2.2.1-d",
+    "rule": "2.2.1",
+    "page": 49,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Rowe v McCartney",
+        "year": "1976",
+        "year_style": "square",
+        "volume": "2",
+        "report": "NSWLR",
+        "starting_page": "72"
+      }
+    },
+    "expected_full": "*Rowe v McCartney* [1976] 2 NSWLR 72"
+  },
+  {
+    "id": "2.2.2-a",
+    "rule": "2.2.2",
+    "page": 50,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Vo v The Queen",
+        "year": "2013",
+        "year_style": "round",
+        "volume": "33",
+        "report": "NTLR",
+        "starting_page": "65"
+      }
+    },
+    "expected_full": "*Vo v The Queen* (2013) 33 NTLR 65"
+  },
+  {
+    "id": "2.2.2-b",
+    "rule": "2.2.2",
+    "page": 50,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Plaintiff M68/2015 v Minister for Immigration and Border Protection",
+        "year": "2016",
+        "year_style": "round",
+        "volume": "257",
+        "report": "CLR",
+        "starting_page": "42"
+      }
+    },
+    "expected_full": "*Plaintiff M68/2015 v Minister for Immigration and Border Protection* (2016) 257 CLR 42"
+  },
+  {
+    "id": "2.2.2-c",
+    "rule": "2.2.2",
+    "page": 50,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Mar Mina (SA) Pty Ltd v City of Marion",
+        "year": "2008",
+        "year_style": "round",
+        "volume": "163",
+        "report": "LGERA",
+        "starting_page": "24"
+      }
+    },
+    "expected_full": "*Mar Mina (SA) Pty Ltd v City of Marion* (2008) 163 LGERA 24"
+  },
+  {
+    "id": "2.2.2-d",
+    "rule": "2.2.2",
+    "page": 50,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Qantas Airways Ltd v Edwards",
+        "year": "2016",
+        "year_style": "round",
+        "volume": "338",
+        "report": "ALR",
+        "starting_page": "134"
+      }
+    },
+    "expected_full": "*Qantas Airways Ltd v Edwards* (2016) 338 ALR 134"
+  },
+  {
+    "id": "2.2.2-e",
+    "rule": "2.2.2",
+    "page": 50,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Tobacco Control Coalition Inc v Philip Morris (Australia) Ltd",
+        "year": "2000",
+        "year_style": "square",
+        "court_id": "FCA",
+        "judgment_number": "1004"
+      },
+      "pinpoints": [
+        {
+          "kind": "paragraph",
+          "value": "69"
+        },
+        {
+          "kind": "paragraph",
+          "value": "74"
+        }
+      ],
+      "pinpoint_judges": "Wilcox J"
+    },
+    "expected_full": "*Tobacco Control Coalition Inc v Philip Morris (Australia) Ltd* [2000] FCA 1004, [69], [74] (Wilcox J)"
+  },
+  {
+    "id": "2.2.3-a",
+    "rule": "2.2.3",
+    "page": 51,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Arnold v Regent Press Pty Ltd",
+        "year": "1957",
+        "year_style": "square",
+        "report": "QSR",
+        "starting_page": "211"
+      }
+    },
+    "expected_full": "*Arnold v Regent Press Pty Ltd* [1957] QSR 211"
+  },
+  {
+    "id": "2.2.4-a",
+    "rule": "2.2.4",
+    "page": 52,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Theophanous v Herald & Weekly Times Ltd",
+        "year": "1994",
+        "year_style": "round",
+        "volume": "182",
+        "report": "CLR",
+        "starting_page": "104"
+      }
+    },
+    "expected_full": "*Theophanous v Herald & Weekly Times Ltd* (1994) 182 CLR 104"
+  },
+  {
+    "id": "2.2.4-b",
+    "rule": "2.2.4",
+    "page": 52,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Borg v Commissioner, Department of Corrective Services",
+        "year": "2002",
+        "year_style": "round",
+        "report": "EOC",
+        "starting_page": "¶93-198"
+      }
+    },
+    "expected_full": "*Borg v Commissioner, Department of Corrective Services* (2002) EOC ¶93-198"
+  },
+  {
+    "id": "2.2.4-c",
+    "rule": "2.2.4",
+    "page": 52,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Overlook v Foxtel",
+        "year": "2002",
+        "year_style": "round",
+        "report": "Aust Contract Reports",
+        "starting_page": "¶90-143"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "91,970"
+        },
+        {
+          "kind": "page",
+          "value": "91,972"
+        }
+      ],
+      "pinpoint_judges": "Barrett J"
+    },
+    "expected_full": "*Overlook v Foxtel* (2002) Aust Contract Reports ¶90-143, 91,970, 91,972 (Barrett J)"
+  },
+  {
+    "id": "2.2.5-a",
+    "rule": "2.2.5",
+    "page": 53,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Murphy v Overton Investments Pty Ltd",
+        "year": "2004",
+        "year_style": "round",
+        "volume": "216",
+        "report": "CLR",
+        "starting_page": "388"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "402"
+        },
+        {
+          "kind": "paragraph",
+          "value": "29"
+        }
+      ]
+    },
+    "expected_full": "*Murphy v Overton Investments Pty Ltd* (2004) 216 CLR 388, 402 [29]"
+  },
+  {
+    "id": "2.2.5-b",
+    "rule": "2.2.5",
+    "page": 53,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Re Mackenzie Grant & Co",
+        "year": "1899",
+        "year_style": "round",
+        "volume": "1",
+        "report": "WALR",
+        "starting_page": "116"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "116"
+        }
+      ]
+    },
+    "expected_full": "*Re Mackenzie Grant & Co* (1899) 1 WALR 116, 116"
+  },
+  {
+    "id": "2.2.5-c",
+    "rule": "2.2.5",
+    "page": 53,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "De L v Director-General, Department of Community Services (NSW) [No 2]",
+        "year": "1997",
+        "year_style": "round",
+        "volume": "190",
+        "report": "CLR",
+        "starting_page": "207"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "211"
+        },
+        {
+          "kind": "page",
+          "value": "221-2"
+        }
+      ]
+    },
+    "expected_full": "*De L v Director-General, Department of Community Services (NSW) [No 2]* (1997) 190 CLR 207, 211, 221–2"
+  },
+  {
+    "id": "2.3.1-example",
+    "rule": "2.3.1",
+    "page": 54,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Quarmby v Keating",
+        "year": "2009",
+        "year_style": "square",
+        "court_id": "TASCC",
+        "judgment_number": "80"
+      },
+      "pinpoints": [
+        {
+          "kind": "paragraph",
+          "value": "11"
+        }
+      ]
+    },
+    "expected_full": "*Quarmby v Keating* [2009] TASCC 80, [11]"
+  },
+  {
+    "id": "2.3.1-a",
+    "rule": "2.3.1",
+    "page": 56,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Hooper v Australian Electoral Commission",
+        "year": "2015",
+        "year_style": "square",
+        "court_id": "HCASL",
+        "judgment_number": "247"
+      }
+    },
+    "expected_full": "*Hooper v Australian Electoral Commission* [2015] HCASL 247"
+  },
+  {
+    "id": "2.3.1-b",
+    "rule": "2.3.1",
+    "page": 56,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Re Culleton [No 2]",
+        "year": "2017",
+        "year_style": "square",
+        "court_id": "HCA",
+        "judgment_number": "4"
+      },
+      "pinpoints": [
+        {
+          "kind": "paragraph",
+          "value": "57"
+        }
+      ],
+      "pinpoint_judges": "Nettle J"
+    },
+    "expected_full": "*Re Culleton [No 2]* [2017] HCA 4, [57] (Nettle J)"
+  },
+  {
+    "id": "2.3.1-c",
+    "rule": "2.3.1",
+    "page": 56,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "R v De Gruchy",
+        "year": "2006",
+        "year_style": "square",
+        "court_id": "VSCA",
+        "judgment_number": "10"
+      },
+      "pinpoints": [
+        {
+          "kind": "paragraph",
+          "value": "4-5"
+        }
+      ],
+      "pinpoint_judges": "Vincent JA"
+    },
+    "expected_full": "*R v De Gruchy* [2006] VSCA 10, [4]–[5] (Vincent JA)"
+  },
+  {
+    "id": "2.3.2-example",
+    "rule": "2.3.2",
+    "page": 56,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Barton v Chibber",
+        "court_name": "Supreme Court of Victoria",
+        "judges": "Hampel J",
+        "date": "29 June 1989"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "3"
+        }
+      ]
+    },
+    "expected_full": "*Barton v Chibber* (Supreme Court of Victoria, Hampel J, 29 June 1989) 3"
+  },
+  {
+    "id": "2.3.2-a",
+    "rule": "2.3.2",
+    "page": 57,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Ross v Chambers",
+        "court_name": "Supreme Court of the Northern Territory",
+        "judges": "Kriewaldt J",
+        "date": "5 April 1956"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "77-8"
+        }
+      ]
+    },
+    "expected_full": "*Ross v Chambers* (Supreme Court of the Northern Territory, Kriewaldt J, 5 April 1956) 77–8"
+  },
+  {
+    "id": "2.3.2-b",
+    "rule": "2.3.2",
+    "page": 61,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "R v Hoxha",
+        "court_name": "Victorian Court of Appeal",
+        "judges": "Charles, Callaway JJA and Vincent AJA",
+        "date": "1 November 1995"
+      }
+    },
+    "expected_full": "*R v Hoxha* (Victorian Court of Appeal, Charles, Callaway JJA and Vincent AJA, 1 November 1995)"
+  },
+  {
+    "id": "2.4.1-a",
+    "rule": "2.4.1",
+    "page": 59,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Ottobrino v Espinoza",
+        "year": "1995",
+        "year_style": "round",
+        "volume": "14",
+        "report": "WAR",
+        "starting_page": "373"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "377"
+        }
+      ],
+      "pinpoint_judges": "Commissioner Buss"
+    },
+    "expected_full": "*Ottobrino v Espinoza* (1995) 14 WAR 373, 377 (Commissioner Buss)"
+  },
+  {
+    "id": "2.4.1-b",
+    "rule": "2.4.1",
+    "page": 59,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "R v Merritt",
+        "year": "2004",
+        "year_style": "round",
+        "volume": "59",
+        "report": "NSWLR",
+        "starting_page": "557"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "567"
+        },
+        {
+          "kind": "paragraph",
+          "value": "35-38"
+        }
+      ],
+      "pinpoint_judges": "Wood CJ at CL"
+    },
+    "expected_full": "*R v Merritt* (2004) 59 NSWLR 557, 567 [35]–[38] (Wood CJ at CL)"
+  },
+  {
+    "id": "2.4.1-c",
+    "rule": "2.4.1",
+    "page": 60,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Re Zoudi",
+        "year": "2006",
+        "year_style": "round",
+        "volume": "14",
+        "report": "VR",
+        "starting_page": "580"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "587-9"
+        },
+        {
+          "kind": "paragraph",
+          "value": "24-28"
+        }
+      ],
+      "pinpoint_judges": "Maxwell P, Buchanan, Nettle, Neave and Redlich JJA"
+    },
+    "expected_full": "*Re Zoudi* (2006) 14 VR 580, 587–9 [24]–[28] (Maxwell P, Buchanan, Nettle, Neave and Redlich JJA)"
+  },
+  {
+    "id": "2.4.2-a",
+    "rule": "2.4.2",
+    "page": 61,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Guinea Airways Ltd v Federal Commissioner of Taxation",
+        "year": "1950",
+        "year_style": "round",
+        "volume": "83",
+        "report": "CLR",
+        "starting_page": "584"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "592-3"
+        }
+      ],
+      "pinpoint_judges": "Kitto J, Webb J agreeing at 591"
+    },
+    "expected_full": "*Guinea Airways Ltd v Federal Commissioner of Taxation* (1950) 83 CLR 584, 592–3 (Kitto J, Webb J agreeing at 591)"
+  },
+  {
+    "id": "2.4.2-b",
+    "rule": "2.4.2",
+    "page": 61,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Vakauta v Kelly",
+        "year": "1989",
+        "year_style": "round",
+        "volume": "167",
+        "report": "CLR",
+        "starting_page": "568"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "589"
+        }
+      ],
+      "pinpoint_judges": "Toohey J, Brennan, Deane and Gaudron JJ agreeing at 570"
+    },
+    "expected_full": "*Vakauta v Kelly* (1989) 167 CLR 568, 589 (Toohey J, Brennan, Deane and Gaudron JJ agreeing at 570)"
+  },
+  {
+    "id": "2.4.2-c",
+    "rule": "2.4.2",
+    "page": 61,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Grassby v The Queen",
+        "year": "1989",
+        "year_style": "round",
+        "volume": "168",
+        "report": "CLR",
+        "starting_page": "1"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "22"
+        }
+      ],
+      "pinpoint_judges": "Dawson J, Mason CJ agreeing at 4, Brennan J agreeing at 4"
+    },
+    "expected_full": "*Grassby v The Queen* (1989) 168 CLR 1, 22 (Dawson J, Mason CJ agreeing at 4, Brennan J agreeing at 4)"
+  },
+  {
+    "id": "2.4.2-d",
+    "rule": "2.4.2",
+    "page": 61,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "D’Arcy v Myriad Genetics Inc",
+        "year": "2015",
+        "year_style": "round",
+        "volume": "258",
+        "report": "CLR",
+        "starting_page": "334"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "373"
+        },
+        {
+          "kind": "paragraph",
+          "value": "96"
+        }
+      ],
+      "pinpoint_judges": "French CJ, Kiefel, Bell and Keane JJ, Gageler and Nettle JJ agreeing at 397 [172], Gordon J agreeing at 419 [285]"
+    },
+    "expected_full": "*D’Arcy v Myriad Genetics Inc* (2015) 258 CLR 334, 373 [96] (French CJ, Kiefel, Bell and Keane JJ, Gageler and Nettle JJ agreeing at 397 [172], Gordon J agreeing at 419 [285])"
+  },
+  {
+    "id": "2.4.3-a",
+    "rule": "2.4.3",
+    "page": 62,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Ewart v Fox",
+        "year": "1954",
+        "year_style": "square",
+        "report": "VLR",
+        "starting_page": "699"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "705"
+        }
+      ],
+      "pinpoint_judges": "Hudson AJ for the Court"
+    },
+    "expected_full": "*Ewart v Fox* [1954] VLR 699, 705 (Hudson AJ for the Court)"
+  },
+  {
+    "id": "2.4.3-b",
+    "rule": "2.4.3",
+    "page": 62,
+    "citation": {
+      "source": {
+        "type": "case",
+        "name": "Taylor v McQueen",
+        "year": "1954",
+        "year_style": "square",
+        "report": "VLR",
+        "starting_page": "661"
+      },
+      "pinpoints": [
+        {
+          "kind": "page",
+          "value": "666"
+        }
+      ],
+      "pinpoint_judges": "Hudson J for Gavan Duffy and Hudson JJ"
+    },
+    "expected_full": "*Taylor v McQueen* [1954] VLR 661, 666 (Hudson J for Gavan Duffy and Hudson JJ)"
+  }
+]

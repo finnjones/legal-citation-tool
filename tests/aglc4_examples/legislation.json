@@ -1,0 +1,808 @@
+[
+  {
+    "id": "3.1.1-example",
+    "rule": "3.1.1",
+    "page": 67,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Crimes Act",
+        "year": "1958",
+        "jurisdiction": "Vic"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "3"
+        }
+      ]
+    },
+    "expected_full": "*Crimes Act 1958* (Vic) s 3"
+  },
+  {
+    "id": "3.1.1-a",
+    "rule": "3.1.1",
+    "page": 67,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Evidence Act",
+        "year": "1995",
+        "jurisdiction": "NSW"
+      }
+    },
+    "expected_full": "*Evidence Act 1995* (NSW)"
+  },
+  {
+    "id": "3.1.1-b",
+    "rule": "3.1.1",
+    "page": 67,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Social Welfare Ordinance",
+        "year": "1964",
+        "jurisdiction": "NT"
+      }
+    },
+    "expected_full": "*Social Welfare Ordinance 1964* (NT)"
+  },
+  {
+    "id": "3.1.1-c",
+    "rule": "3.1.1",
+    "page": 67,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Financial Framework Legislation Amendment Act (No 2)",
+        "year": "2012",
+        "jurisdiction": "Cth"
+      }
+    },
+    "expected_full": "*Financial Framework Legislation Amendment Act (No 2) 2012* (Cth)"
+  },
+  {
+    "id": "3.1.1-d",
+    "rule": "3.1.1",
+    "page": 67,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Financial Framework Legislation Amendment Act (No 3)",
+        "year": "2012",
+        "jurisdiction": "Cth"
+      }
+    },
+    "expected_full": "*Financial Framework Legislation Amendment Act (No 3) 2012* (Cth)"
+  },
+  {
+    "id": "3.1.1-e",
+    "rule": "3.1.1",
+    "page": 67,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "A New Tax System (Family Assistance) (Consequential Related Measures) Act (No 1)",
+        "year": "1999",
+        "jurisdiction": "Cth"
+      }
+    },
+    "expected_full": "*A New Tax System (Family Assistance) (Consequential Related Measures) Act (No 1) 1999* (Cth)"
+  },
+  {
+    "id": "3.1.2-a",
+    "rule": "3.1.2",
+    "page": 68,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Meteorites Act",
+        "year": "1973",
+        "jurisdiction": "Tas"
+      }
+    },
+    "expected_full": "*Meteorites Act 1973* (Tas)"
+  },
+  {
+    "id": "3.1.3-a",
+    "rule": "3.1.3",
+    "page": 68,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Misrepresentation Act",
+        "year": "1972",
+        "jurisdiction": "SA"
+      }
+    },
+    "expected_full": "*Misrepresentation Act 1972* (SA)"
+  },
+  {
+    "id": "3.1.3-b",
+    "rule": "3.1.3",
+    "page": 68,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Charter of Human Rights and Responsibilities Act",
+        "year": "2006",
+        "jurisdiction": "Vic"
+      }
+    },
+    "expected_full": "*Charter of Human Rights and Responsibilities Act 2006* (Vic)"
+  },
+  {
+    "id": "3.1.4-a",
+    "rule": "3.1.4",
+    "page": 69,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Aboriginal and Torres Strait Islander Act",
+        "year": "2005",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "part",
+          "value": "3A"
+        },
+        {
+          "kind": "division",
+          "value": "2"
+        }
+      ]
+    },
+    "expected_full": "*Aboriginal and Torres Strait Islander Act 2005* (Cth) pt 3A div 2"
+  },
+  {
+    "id": "3.1.4-b",
+    "rule": "3.1.4",
+    "page": 69,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Civil Liability Act",
+        "year": "2003",
+        "jurisdiction": "Qld"
+      },
+      "pinpoints": [
+        {
+          "kind": "chapter",
+          "value": "2"
+        },
+        {
+          "kind": "part",
+          "value": "1"
+        },
+        {
+          "kind": "division",
+          "value": "4"
+        }
+      ]
+    },
+    "expected_full": "*Civil Liability Act 2003* (Qld) ch 2 pt 1 div 4"
+  },
+  {
+    "id": "3.1.4-c",
+    "rule": "3.1.4",
+    "page": 69,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Crimes at Sea Act",
+        "year": "1999",
+        "jurisdiction": "Vic"
+      },
+      "pinpoints": [
+        {
+          "kind": "schedule",
+          "value": "1"
+        },
+        {
+          "kind": "clause",
+          "value": "2"
+        }
+      ]
+    },
+    "expected_full": "*Crimes at Sea Act 1999* (Vic) sch 1 cl 2"
+  },
+  {
+    "id": "3.1.4-d",
+    "rule": "3.1.4",
+    "page": 69,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Aboriginal Land Rights (Northern Territory) Amendment Act",
+        "year": "2006",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "schedule",
+          "value": "1"
+        },
+        {
+          "kind": "other",
+          "value": "item 46"
+        }
+      ]
+    },
+    "expected_full": "*Aboriginal Land Rights (Northern Territory) Amendment Act 2006* (Cth) sch 1 item 46"
+  },
+  {
+    "id": "3.1.4-e",
+    "rule": "3.1.4",
+    "page": 69,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Income Tax Assessment Act",
+        "year": "1997",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "20-110(1)(a)"
+        }
+      ]
+    },
+    "expected_full": "*Income Tax Assessment Act 1997* (Cth) s 20-110(1)(a)"
+  },
+  {
+    "id": "3.1.4-f",
+    "rule": "3.1.4",
+    "page": 69,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Gambling Regulation Act",
+        "year": "2003",
+        "jurisdiction": "Vic"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "3.2.1"
+        }
+      ]
+    },
+    "expected_full": "*Gambling Regulation Act 2003* (Vic) s 3.2.1"
+  },
+  {
+    "id": "3.1.4-g",
+    "rule": "3.1.4",
+    "page": 69,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Succession Act",
+        "year": "2006",
+        "jurisdiction": "NSW"
+      },
+      "pinpoints": [
+        {
+          "kind": "part",
+          "value": "2.3"
+        }
+      ]
+    },
+    "expected_full": "*Succession Act 2006* (NSW) pt 2.3"
+  },
+  {
+    "id": "3.1.5-a",
+    "rule": "3.1.5",
+    "page": 72,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Juries Act",
+        "year": "2003",
+        "jurisdiction": "Tas"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "29(2)(a)-(b), (8)(b)",
+          "plural": true
+        }
+      ]
+    },
+    "expected_full": "*Juries Act 2003* (Tas) ss 29(2)(a)–(b), (8)(b)"
+  },
+  {
+    "id": "3.1.5-b",
+    "rule": "3.1.5",
+    "page": 72,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Unlawful Assemblies and Processions Act",
+        "year": "1958",
+        "jurisdiction": "Vic"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "5-6, 10-12, 26-9",
+          "plural": true
+        }
+      ]
+    },
+    "expected_full": "*Unlawful Assemblies and Processions Act 1958* (Vic) ss 5–6, 10–12, 26–9"
+  },
+  {
+    "id": "3.1.5-c",
+    "rule": "3.1.5",
+    "page": 72,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Wrongs Act",
+        "year": "1958",
+        "jurisdiction": "Vic"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "28F-28G",
+          "plural": true
+        }
+      ]
+    },
+    "expected_full": "*Wrongs Act 1958* (Vic) ss 28F–28G"
+  },
+  {
+    "id": "3.1.6-a",
+    "rule": "3.1.6",
+    "page": 72,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Property Law Act",
+        "year": "1958",
+        "jurisdiction": "Vic"
+      },
+      "pinpoints": [
+        {
+          "kind": "other",
+          "value": "s 3 (definition of ‘legal practitioner’)"
+        }
+      ]
+    },
+    "expected_full": "*Property Law Act 1958* (Vic) s 3 (definition of ‘legal practitioner’)"
+  },
+  {
+    "id": "3.1.6-b",
+    "rule": "3.1.6",
+    "page": 72,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Corporations Act",
+        "year": "2001",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "other",
+          "value": "s 9 (definition of ‘administrator’ para (a)(i))"
+        }
+      ]
+    },
+    "expected_full": "*Corporations Act 2001* (Cth) s 9 (definition of ‘administrator’ para (a)(i))"
+  },
+  {
+    "id": "3.1.6-c",
+    "rule": "3.1.6",
+    "page": 72,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Human Rights Act",
+        "year": "2004",
+        "jurisdiction": "ACT"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "5"
+        }
+      ]
+    },
+    "expected_full": "*Human Rights Act 2004* (ACT) s 5"
+  },
+  {
+    "id": "3.1.7-a",
+    "rule": "3.1.7",
+    "page": 73,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Criminal Code Act",
+        "year": "1995",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "schedule",
+          "value": "1"
+        }
+      ],
+      "short_title": "Criminal Code"
+    },
+    "expected_full": "*Criminal Code Act 1995* (Cth) sch 1"
+  },
+  {
+    "id": "3.1.7-b",
+    "rule": "3.1.7",
+    "page": 73,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Competition and Consumer Act",
+        "year": "2010",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "schedule",
+          "value": "2"
+        }
+      ],
+      "short_title": "Australian Consumer Law"
+    },
+    "expected_full": "*Competition and Consumer Act 2010* (Cth) sch 2"
+  },
+  {
+    "id": "3.2-a",
+    "rule": "3.2",
+    "page": 74,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "bill",
+        "title": "Corporations Amendment (Crowd-Sourced Funding) Bill",
+        "year": "2015",
+        "jurisdiction": "Cth"
+      }
+    },
+    "expected_full": "Corporations Amendment (Crowd-Sourced Funding) Bill 2015 (Cth)"
+  },
+  {
+    "id": "3.2-b",
+    "rule": "3.2",
+    "page": 74,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "bill",
+        "title": "Carbon Pollution Reduction Scheme Bill",
+        "year": "2009",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "clause",
+          "value": "83"
+        }
+      ]
+    },
+    "expected_full": "Carbon Pollution Reduction Scheme Bill 2009 (Cth) cl 83"
+  },
+  {
+    "id": "3.2-c",
+    "rule": "3.2",
+    "page": 74,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "bill",
+        "title": "Migration Amendment (Immigration Detention Reform) Bill",
+        "year": "2009",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "schedule",
+          "value": "1"
+        },
+        {
+          "kind": "other",
+          "value": "item 9"
+        }
+      ]
+    },
+    "expected_full": "Migration Amendment (Immigration Detention Reform) Bill 2009 (Cth) sch 1 item 9"
+  },
+  {
+    "id": "3.2-d",
+    "rule": "3.2",
+    "page": 74,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "bill",
+        "title": "Law and Justice Amendment Bill (No 2)",
+        "year": "1995",
+        "jurisdiction": "Cth"
+      }
+    },
+    "expected_full": "Law and Justice Amendment Bill (No 2) 1995 (Cth)"
+  },
+  {
+    "id": "3.4-a",
+    "rule": "3.4",
+    "page": 75,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "delegated",
+        "title": "Heritage Regulation",
+        "year": "2006",
+        "jurisdiction": "ACT"
+      },
+      "pinpoints": [
+        {
+          "kind": "regulation",
+          "value": "5(1)"
+        }
+      ]
+    },
+    "expected_full": "*Heritage Regulation 2006* (ACT) reg 5(1)"
+  },
+  {
+    "id": "3.4-b",
+    "rule": "3.4",
+    "page": 75,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "delegated",
+        "title": "Uniform Civil Procedure Rules",
+        "year": "2005",
+        "jurisdiction": "NSW"
+      },
+      "pinpoints": [
+        {
+          "kind": "rule",
+          "value": "6.2(1), (3A)(a)-(b)"
+        }
+      ]
+    },
+    "expected_full": "*Uniform Civil Procedure Rules 2005* (NSW) r 6.2(1), (3A)(a)–(b)"
+  },
+  {
+    "id": "3.4-c",
+    "rule": "3.4",
+    "page": 75,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "delegated",
+        "title": "Supreme Court (General Civil Procedure) Rules",
+        "year": "2015",
+        "jurisdiction": "Vic"
+      },
+      "pinpoints": [
+        {
+          "kind": "rule",
+          "value": "3.01"
+        }
+      ]
+    },
+    "expected_full": "*Supreme Court (General Civil Procedure) Rules 2015* (Vic) r 3.01"
+  },
+  {
+    "id": "3.4-d",
+    "rule": "3.4",
+    "page": 75,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "delegated",
+        "title": "Migration Regulations",
+        "year": "1994",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "regulation",
+          "value": "2.01-2.02",
+          "plural": true
+        }
+      ]
+    },
+    "expected_full": "*Migration Regulations 1994* (Cth) regs 2.01–2.02"
+  },
+  {
+    "id": "3.4-e",
+    "rule": "3.4",
+    "page": 75,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "delegated",
+        "title": "High Court Rules",
+        "year": "2004",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "rule",
+          "value": "42.02.2"
+        }
+      ]
+    },
+    "expected_full": "*High Court Rules 2004* (Cth) r 42.02.2"
+  },
+  {
+    "id": "3.5-a",
+    "rule": "3.5",
+    "page": 75,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Property Law Act",
+        "year": "1958",
+        "jurisdiction": "Vic"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "6"
+        }
+      ],
+      "short_title": "Property Act"
+    },
+    "expected_full": "*Property Law Act 1958* (Vic) s 6"
+  },
+  {
+    "id": "3.5-b",
+    "rule": "3.5",
+    "page": 76,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Administrative Decisions (Judicial Review) Act",
+        "year": "1977",
+        "jurisdiction": "Cth"
+      },
+      "short_title": "ADJR Act"
+    },
+    "expected_full": "*Administrative Decisions (Judicial Review) Act 1977* (Cth)"
+  },
+  {
+    "id": "3.5-c",
+    "rule": "3.5",
+    "page": 76,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Migration Act",
+        "year": "1958",
+        "jurisdiction": "Cth"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "198, 198AB",
+          "plural": true
+        }
+      ],
+      "short_title": "Migration Act"
+    },
+    "expected_full": "*Migration Act 1958* (Cth) ss 198, 198AB"
+  },
+  {
+    "id": "3.6-a",
+    "rule": "3.6",
+    "page": 77,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "constitution",
+        "title": "Australian Constitution"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "51(ii)"
+        }
+      ]
+    },
+    "expected_full": "*Australian Constitution* s 51(ii)"
+  },
+  {
+    "id": "3.6-b",
+    "rule": "3.6",
+    "page": 77,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Constitution Act",
+        "year": "1902",
+        "jurisdiction": "NSW"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "5"
+        }
+      ]
+    },
+    "expected_full": "*Constitution Act 1902* (NSW) s 5"
+  },
+  {
+    "id": "3.6-c",
+    "rule": "3.6",
+    "page": 77,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Constitution of Queensland",
+        "year": "2001",
+        "jurisdiction": "Qld"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "3"
+        }
+      ]
+    },
+    "expected_full": "*Constitution of Queensland 2001* (Qld) s 3"
+  },
+  {
+    "id": "3.6-d",
+    "rule": "3.6",
+    "page": 77,
+    "citation": {
+      "source": {
+        "type": "legislation",
+        "kind": "act",
+        "title": "Constitution Act",
+        "year": "1934",
+        "jurisdiction": "Tas"
+      },
+      "pinpoints": [
+        {
+          "kind": "section",
+          "value": "9(1)"
+        }
+      ]
+    },
+    "expected_full": "*Constitution Act 1934* (Tas) s 9(1)"
+  }
+]

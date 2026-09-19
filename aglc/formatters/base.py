@@ -10,7 +10,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
-from ..models import Citation, Pinpoint, RichText
+from ..models import Citation, Pinpoint, PinpointKind, RichText
 
 # AGLC4 r 1.13 bibliography categories
 BIB_SECONDARY = "A Articles/Books/Reports"
@@ -28,7 +28,8 @@ def missing(field: str) -> str:
 class Formatter(ABC):
     #: the Source.type this formatter handles
     source_type: ClassVar[str]
-    #: AGLC4 r 1.4.1: cases/secondary sources use "(n x)"; legislation and treaties do not
+    #: AGLC4 r 1.4.1, 8.8: subsequent references use "(n x)" (cases, legislation,
+    #: treaties and secondary sources alike); set False for types that don't
     uses_n_reference: ClassVar[bool] = True
     #: Whether the short title is italicised in subsequent references
     italic_short_title: ClassVar[bool] = False
@@ -89,7 +90,17 @@ class Formatter(ABC):
 
     @classmethod
     def pinpoints(cls, ps: list[Pinpoint]) -> str:
-        return ", ".join(cls.pinpoint(p) for p in ps)
+        """Same-kind pinpoints are separated by commas ('5, 9'); a change of kind
+        narrows the reference and takes a space ('15 [20]', 'pt 3A div 2')."""
+        out = ""
+        for i, p in enumerate(ps):
+            if i:
+                prev = ps[i - 1].kind
+                # 'vol 1, 339' - a volume/book is followed by a comma (r 6.5, 7.1.3)
+                same = p.kind == prev or prev in (PinpointKind.volume, PinpointKind.book)
+                out += ", " if same else " "
+            out += cls.pinpoint(p)
+        return out
 
 
 _REGISTRY: dict[str, Formatter] = {}

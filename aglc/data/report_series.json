@@ -1,0 +1,200 @@
+{
+  "series": [
+    {
+      "abbrev": "CLR",
+      "full_name": "Commonwealth Law Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["C.L.R.", "CLR.", "Comm LR", "Commonwealth Law Reports"]
+    },
+    {
+      "abbrev": "ALR",
+      "full_name": "Australian Law Reports",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["A.L.R.", "ALR.", "Australian Law Reports"]
+    },
+    {
+      "abbrev": "NSWLR",
+      "full_name": "New South Wales Law Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["N.S.W.L.R.", "NSWLR.", "New South Wales Law Reports"]
+    },
+    {
+      "abbrev": "VR",
+      "full_name": "Victorian Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["V.R.", "VR.", "Victorian Reports"]
+    },
+    {
+      "abbrev": "Qd R",
+      "full_name": "Queensland Reports",
+      "year_style": "square",
+      "authorised": true,
+      "variants": ["Qd.R.", "Qd R.", "QdR", "Q.R.", "Queensland Reports"]
+    },
+    {
+      "abbrev": "WAR",
+      "full_name": "Western Australian Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["W.A.R.", "WAR.", "Western Australian Reports"]
+    },
+    {
+      "abbrev": "SASR",
+      "full_name": "South Australian State Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["S.A.S.R.", "SASR.", "South Australian State Reports"]
+    },
+    {
+      "abbrev": "Tas R",
+      "full_name": "Tasmanian Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["Tas.R.", "Tas R.", "TasR", "Tasmanian Reports"]
+    },
+    {
+      "abbrev": "ACTR",
+      "full_name": "Australian Capital Territory Reports",
+      "year_style": "round",
+      "authorised": null,
+      "variants": ["A.C.T.R.", "ACTR.", "ACT R", "Australian Capital Territory Reports"]
+    },
+    {
+      "abbrev": "NTLR",
+      "full_name": "Northern Territory Law Reports",
+      "year_style": "round",
+      "authorised": null,
+      "variants": ["N.T.L.R.", "NTLR.", "NT LR", "Northern Territory Law Reports"]
+    },
+    {
+      "abbrev": "FCR",
+      "full_name": "Federal Court Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["F.C.R.", "FCR.", "Federal Court Reports"]
+    },
+    {
+      "abbrev": "ALJR",
+      "full_name": "Australian Law Journal Reports",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["A.L.J.R.", "ALJR.", "Australian Law Journal Reports"]
+    },
+    {
+      "abbrev": "FLR",
+      "full_name": "Federal Law Reports",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F.L.R.", "FLR.", "Federal Law Reports"]
+    },
+    {
+      "abbrev": "IR",
+      "full_name": "Industrial Reports",
+      "year_style": "round",
+      "authorised": null,
+      "variants": ["I.R.", "IR.", "Industrial Reports"]
+    },
+    {
+      "abbrev": "AC",
+      "full_name": "Law Reports, Appeal Cases",
+      "year_style": "square",
+      "authorised": true,
+      "variants": ["A.C.", "App Cas", "Appeal Cases"]
+    },
+    {
+      "abbrev": "QB",
+      "full_name": "Law Reports, Queen's Bench",
+      "year_style": "square",
+      "authorised": true,
+      "variants": ["Q.B.", "Queen's Bench", "Queens Bench"]
+    },
+    {
+      "abbrev": "KB",
+      "full_name": "Law Reports, King's Bench",
+      "year_style": "square",
+      "authorised": true,
+      "variants": ["K.B.", "King's Bench", "Kings Bench"]
+    },
+    {
+      "abbrev": "Ch",
+      "full_name": "Law Reports, Chancery Division",
+      "year_style": "square",
+      "authorised": true,
+      "variants": ["Ch.", "Chancery", "Chancery Division"]
+    },
+    {
+      "abbrev": "WLR",
+      "full_name": "Weekly Law Reports",
+      "year_style": "square",
+      "authorised": false,
+      "variants": ["W.L.R.", "WLR.", "Weekly Law Reports"]
+    },
+    {
+      "abbrev": "All ER",
+      "full_name": "All England Law Reports",
+      "year_style": "square",
+      "authorised": false,
+      "variants": ["All E.R.", "All ER.", "AllER", "All England Law Reports", "All England Reports"]
+    },
+    {
+      "abbrev": "US",
+      "full_name": "United States Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["U.S.", "US.", "United States Reports"]
+    },
+    {
+      "abbrev": "SCR",
+      "full_name": "Supreme Court Reports (Canada)",
+      "year_style": "square",
+      "authorised": true,
+      "variants": ["S.C.R.", "SCR.", "Canada Supreme Court Reports"]
+    },
+    {
+      "abbrev": "Ch D",
+      "full_name": "Law Reports, Chancery Division (old series)",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["Ch.D.", "Ch D.", "ChD"]
+    },
+    {
+      "abbrev": "NZLR",
+      "full_name": "New Zealand Law Reports",
+      "year_style": "square",
+      "authorised": true,
+      "variants": ["N.Z.L.R.", "NZLR.", "New Zealand Law Reports"]
+    },
+    {
+      "abbrev": "A Crim R",
+      "full_name": "Australian Criminal Reports",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["A.Crim.R.", "ACrimR", "Australian Criminal Reports"]
+    },
+    {
+      "abbrev": "ACSR",
+      "full_name": "Australian Corporations and Securities Reports",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["A.C.S.R.", "ACSR.", "Australian Corporations and Securities Reports"]
+    },
+    {
+      "abbrev": "FLC",
+      "full_name": "Family Law Cases",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F.L.C.", "FLC.", "Family Law Cases"]
+    },
+    {
+      "abbrev": "ER",
+      "full_name": "English Reports",
+      "year_style": "round",
+      "authorised": true,
+      "variants": ["E.R.", "English Reports"]
+    }
+  ]
+}

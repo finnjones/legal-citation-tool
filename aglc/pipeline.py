@@ -20,9 +20,10 @@ def process_footnotes(
 ) -> ProcessResult:
     if not isinstance(provider, LLMProvider):
         provider = get_provider(provider)
-    extracted = Extractor(provider).extract(footnotes)
+    extractor = Extractor(provider)
+    extracted = extractor.extract(footnotes)
 
-    warnings: list[Warning_] = []
+    warnings: list[Warning_] = [Warning_(message=m) for m in extractor.warnings]
     for fn in extracted:
         for seg in fn.segments:
             if isinstance(seg, CitationSegment):

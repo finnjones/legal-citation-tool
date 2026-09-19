@@ -1,0 +1,13 @@
+{
+  "Cth": {"name": "Commonwealth", "variants": ["Commonwealth", "C'th", "Cwlth", "Cth.", "Commonwealth of Australia"]},
+  "NSW": {"name": "New South Wales", "variants": ["N.S.W.", "New South Wales", "NSW."]},
+  "Vic": {"name": "Victoria", "variants": ["Vic.", "VIC", "Victoria"]},
+  "Qld": {"name": "Queensland", "variants": ["Qld.", "QLD", "Queensland"]},
+  "WA": {"name": "Western Australia", "variants": ["W.A.", "Western Australia"]},
+  "SA": {"name": "South Australia", "variants": ["S.A.", "South Australia"]},
+  "Tas": {"name": "Tasmania", "variants": ["Tas.", "TAS", "Tasmania"]},
+  "ACT": {"name": "Australian Capital Territory", "variants": ["A.C.T.", "Australian Capital Territory"]},
+  "NT": {"name": "Northern Territory", "variants": ["N.T.", "Northern Territory"]},
+  "NZ": {"name": "New Zealand", "variants": ["N.Z.", "New Zealand"]},
+  "UK": {"name": "United Kingdom", "variants": ["U.K.", "United Kingdom", "England", "Great Britain", "England and Wales"]}
+}

@@ -14,6 +14,9 @@ _LABELS: dict[PinpointKind, tuple[str, str]] = {
     PinpointKind.clause: ("cl", "cls"),
     PinpointKind.article: ("art", "arts"),
     PinpointKind.chapter: ("ch", "chs"),
+    PinpointKind.annex: ("annex", "annexes"),
+    PinpointKind.volume: ("vol", "vols"),
+    PinpointKind.book: ("bk", "bks"),
 }
 
 
@@ -34,4 +37,8 @@ def render_pinpoint(p: Pinpoint) -> str:
     if p.kind is PinpointKind.footnote:
         return v if " n " in v else f"n {v}"
     singular, plural = _LABELS[p.kind]
-    return f"{plural if p.plural else singular} {span(v)}"
+    label = plural if p.plural else singular
+    # A single provision can't be a range, so its hyphen is part of the number
+    # (eg ITAA 1997 's 20-110(1)(a)', r 3.1.4); only plural labels take en dashes.
+    value = span(v) if p.plural else v.replace(")-(", ")–(")
+    return f"{label} {value}" if v else label

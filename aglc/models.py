@@ -88,6 +88,9 @@ class PinpointKind(str, Enum):
     clause = "clause"        # cl 3
     article = "article"      # art 5
     chapter = "chapter"      # ch 4
+    annex = "annex"          # annex II (treaties, r 8.7)
+    volume = "volume"        # vol 1  (followed by ", " before a page: 'vol 1, 339 [7.7]')
+    book = "book"            # bk 2
     footnote = "footnote"    # 42 n 7
     other = "other"          # verbatim; value is emitted exactly as given
 
@@ -148,12 +151,21 @@ class JournalArticleSource(_SourceBase):
     type: Literal["journal_article"] = "journal_article"
     authors: list[str] = Field(default_factory=list)
     title: str
+    part: str | None = Field(default=None, description="Article published in parts (r 5.8): '1' -> '(Pt 1)'")
     year: str | None = None
+    year_style: Literal["round", "square"] | None = Field(
+        default=None,
+        description="Round when the journal has volume numbers; square when organised by year "
+        "(r 5.3), eg '[1995] (Spring) Public Law 57'. Default: round if volume present, else square.",
+    )
     volume: str | None = None
-    issue: str | None = None
+    issue: str | None = Field(default=None, description="Issue number or name, eg '3', '1–2', 'Spring'")
     journal: str | None = Field(default=None, description="Full journal name (AGLC does not abbreviate)")
-    starting_page: str | None = None
-    forthcoming: bool = False
+    starting_page: str | None = Field(
+        default=None, description="Starting page, or article number with page range for online journals (r 5.10), eg '416:1–19'"
+    )
+    forthcoming: bool = Field(default=False, description="'(forthcoming)' replaces the starting page (r 5.11)")
+    advance: bool = Field(default=False, description="'(advance)' replaces the starting page (r 5.11)")
 
 
 class BookSource(_SourceBase):
@@ -163,9 +175,10 @@ class BookSource(_SourceBase):
     authors: list[str] = Field(default_factory=list)
     editors: list[str] = Field(default_factory=list, description="Only when the book itself is edited (no authors)")
     title: str
+    translators: list[str] = Field(default_factory=list, description="r 6.7: ', tr Joan Riviere'")
     publisher: str | None = None
-    edition: str | None = Field(default=None, description="Edition number only, eg '5' -> '5th ed'")
-    year: str | None = None
+    edition: str | None = Field(default=None, description="Edition number, eg '5' -> '5th ed'; '3 rev' -> '3rd rev ed'; 'rev' -> 'rev ed'")
+    year: str | None = Field(default=None, description="Year, span ('1984–88', '1975–') or 'forthcoming'")
     volume: str | None = None
 
 
@@ -175,6 +188,7 @@ class BookChapterSource(_SourceBase):
     type: Literal["book_chapter"] = "book_chapter"
     authors: list[str] = Field(default_factory=list)
     chapter_title: str
+    translators: list[str] = Field(default_factory=list, description="Translators of the chapter (r 6.7)")
     editors: list[str] = Field(default_factory=list)
     book_title: str
     publisher: str | None = None
@@ -201,10 +215,16 @@ class NewspaperSource(_SourceBase):
     authors: list[str] = Field(default_factory=list)
     title: str
     newspaper: str
-    place: str | None = None
+    section: str | None = Field(default=None, description="Section/supplement, eg 'Epicure' -> '*Epicure*, *The Age*'")
+    periodical: bool = Field(
+        default=False,
+        description="r 7.11.3 periodicals/magazines: \"'Title' (27 March 2017) *The New Yorker* 66\"",
+    )
+    place: str | None = Field(default=None, description="Place of publication; omitted and replaced by 'online' when url is set and no page")
     date: str | None = Field(default=None, description="Full date, eg '14 March 2018'")
     page: str | None = None
     url: str | None = None
+    archived_url: str | None = Field(default=None, description="r 4.5: ', archived at <url>'")
 
 
 class WebsiteSource(_SourceBase):
@@ -214,8 +234,10 @@ class WebsiteSource(_SourceBase):
     authors: list[str] = Field(default_factory=list, description="Person or organisation author, if any")
     title: str
     website_name: str | None = None
+    document_type: str | None = Field(default="Web Page", description="r 7.15: 'Web Page', 'Blog Post', 'Forum Post', 'Podcast'...")
     date: str | None = Field(default=None, description="Full date of publication/last update, if any")
     url: str | None = None
+    archived_url: str | None = Field(default=None, description="r 4.5: ', archived at <url>'")
 
 
 class TreatySource(_SourceBase):
