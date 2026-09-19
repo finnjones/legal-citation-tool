@@ -16,7 +16,9 @@ and avoid asking a model to be its own database:
 
 from __future__ import annotations
 
+import logging
 import re
+import time
 from functools import lru_cache
 from importlib import resources
 from typing import Annotated, Literal, Union
@@ -34,6 +36,9 @@ from .models import (
     Source,
     TextSegment,
 )
+
+
+log = logging.getLogger("aglc")
 
 # --------------------------------------------------------------------------- #
 # LLM-facing schema. Kept small and flat: one discriminated union of two
@@ -216,14 +221,22 @@ class Extractor:
         for start in range(0, len(footnotes), self.batch_size):
             batch = footnotes[start : start + self.batch_size]
             user_prompt = self._build_user_prompt(batch, self._build_index(resolved))
+            n_batches = (len(footnotes) + self.batch_size - 1) // self.batch_size
+            log.info(
+                "asking %s for footnotes %d-%d (batch %d/%d)...",
+                self.provider, batch[0].number, batch[-1].number, start // self.batch_size + 1, n_batches,
+            )
+            t0 = time.monotonic()
             try:
                 response = self.provider.generate_json(
                     system=system_prompt, user=user_prompt, output_model=ExtractionBatch
                 )
             except LLMError as e:
                 numbers = ", ".join(str(fn.number) for fn in batch)
+                log.warning("extraction failed for footnotes [%s] after %.1fs: %s", numbers, time.monotonic() - t0, e)
                 self.warnings.append(f"extraction failed for footnotes [{numbers}]: {e}; left unchanged")
                 continue
+            log.info("  got %d footnotes back in %.1fs", len(response.footnotes), time.monotonic() - t0)
 
             by_number = {lf.number: lf for lf in response.footnotes}
             for fn in batch:

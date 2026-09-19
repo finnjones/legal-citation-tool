@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import tempfile
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Annotated
 
@@ -15,10 +17,28 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import pipeline
-from .llm.base import available_providers, default_spec, get_provider
+from .llm.base import LLMError, available_providers, default_spec, get_provider
 from .models import ProcessResult
 
 from .config import load_env
+
+log = logging.getLogger("aglc")
+
+
+def _status_for(e: Exception) -> int:
+    if isinstance(e, (zipfile.BadZipFile, KeyError, ValueError)):
+        return 400  # not a valid .docx, or a malformed model spec
+    if isinstance(e, LLMError) or type(e).__module__.split(".")[0] in ("openai", "anthropic", "google"):
+        return 502  # the AI provider failed (bad key, no credit, model unavailable...)
+    return 500
+
+
+def _describe(e: Exception) -> str:
+    if isinstance(e, (zipfile.BadZipFile, KeyError)):
+        return "That file isn't a valid Word (.docx) document."
+    if _status_for(e) == 502:
+        return f"The AI model request failed: {e}"
+    return f"Error processing document: {e}"
 
 load_env()
 
@@ -150,14 +170,11 @@ async def process_document(
 
     except Exception as e:
         # Clean up on error
-        try:
-            shutil.rmtree(session_dir)
-        except Exception:
-            pass
-
-        raise HTTPException(
-            status_code=500, detail=f"Error processing document: {str(e)}"
-        )
+        shutil.rmtree(session_dir, ignore_errors=True)
+        if isinstance(e, HTTPException):
+            raise
+        log.exception("processing %s failed", file.filename)
+        raise HTTPException(status_code=_status_for(e), detail=_describe(e)) from e
 
 
 @app.get("/api/download/{session_id}")

@@ -14,7 +14,7 @@ from rich.table import Table
 
 from . import pipeline
 from .formatters import formatter_for
-from .llm.base import DEFAULT_SPEC, available_providers, get_provider
+from .llm.base import DEFAULT_SPEC, available_providers, default_spec, get_provider
 from .models import Citation
 from .config import load_env
 
@@ -173,7 +173,11 @@ def serve(
 
         from . import api
 
+        import logging
+
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s", datefmt="%H:%M:%S")
         rprint(f"[blue]Starting server on http://{host}:{port}[/blue]")
+        rprint(f"[blue]Model: {default_spec()}[/blue]")
         uvicorn.run(api.app, host=host, port=port, log_level="info")
     except ImportError:
         rprint("[red]Error: FastAPI/uvicorn not installed. Run: uv sync[/red]")

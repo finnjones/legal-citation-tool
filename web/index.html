@@ -486,6 +486,9 @@
         let isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
         // Initialize
+        window.addEventListener("error", (e) => showError(`Unexpected error: ${e.message}`));
+        window.addEventListener("unhandledrejection", (e) => showError(`Unexpected error: ${e.reason?.message || e.reason}`));
+
         document.addEventListener("DOMContentLoaded", async () => {
             setupUpload();
             setupControls();
@@ -537,14 +540,20 @@
             });
 
             input.addEventListener("change", handleFileSelected);
+            // The input lives inside the drop zone, so clicking it must not re-open the picker
+            input.addEventListener("click", (e) => e.stopPropagation());
         }
 
+        let selectedFile = null;
+
         function handleFileSelected() {
-            const input = document.getElementById("fileInput");
-            const file = input.files[0];
+            const file = document.getElementById("fileInput").files[0];
             if (file) {
+                selectedFile = file;
                 currentFilename = file.name;
-                document.getElementById("uploadSection").textContent = `Selected: ${file.name}`;
+                // Only change the label: replacing the section's contents would delete the file input
+                document.querySelector("#uploadSection .upload-text").textContent = `Selected: ${file.name}`;
+                document.querySelector("#uploadSection .upload-subtext").textContent = "Click or drop to choose a different file";
             }
         }
 
@@ -556,7 +565,7 @@
 
         // Process document
         async function processDocument() {
-            const file = document.getElementById("fileInput").files[0];
+            const file = selectedFile;
             if (!file) {
                 showError("Please select a .docx file");
                 return;
@@ -699,9 +708,23 @@
         }
 
         // Utilities
+        let loadingTimer = null;
+
         function showLoading(show) {
-            document.getElementById("loading").style.display = show ? "block" : "none";
+            const loading = document.getElementById("loading");
+            loading.style.display = show ? "block" : "none";
             document.getElementById("processButton").disabled = show;
+            clearInterval(loadingTimer);
+            if (show) {
+                const started = Date.now();
+                const label = loading.querySelector("p");
+                const tick = () => {
+                    const secs = Math.round((Date.now() - started) / 1000);
+                    label.textContent = `Processing document... ${secs}s (the AI model is reading your footnotes; this can take a minute)`;
+                };
+                tick();
+                loadingTimer = setInterval(tick, 1000);
+            }
         }
 
         function showError(message) {
