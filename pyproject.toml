@@ -1,0 +1,36 @@
+[project]
+name = "aglc"
+version = "0.1.0"
+description = "Format legal citations in Word documents to the Australian Guide to Legal Citation (4th ed)"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+    "python-docx>=1.1",
+    "lxml>=5.0",
+    "typer>=0.12",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.60"]
+openai = ["openai>=1.40"]
+gemini = ["google-genai>=1.0"]
+all = ["anthropic>=0.60", "openai>=1.40", "google-genai>=1.0"]
+
+[project.scripts]
+aglc = "aglc.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["aglc"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
