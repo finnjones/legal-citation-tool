@@ -267,6 +267,15 @@ def _normalise_case(source: CaseSource) -> tuple[CaseSource, list[str]]:
 
     data["name"] = _clean_case_name(source.name)
 
+    if source.court_id and not source.report and not _canon_court(source.court_id)[1]:
+        abbrev, _, is_report = _canon_report(source.court_id)
+        if is_report:
+            # '[1932] A.C. 562' read as a medium neutral citation: 'A.C.' is a report
+            # series and '562' its starting page (r 2.2), not a court and judgment number.
+            data["report"], data["court_id"] = source.court_id, None
+            data["starting_page"], data["judgment_number"] = source.judgment_number, None
+            source = source.model_copy(update={"report": source.court_id, "court_id": None})
+
     for field in ("year", "volume", "starting_page", "judgment_number", "court_name", "judges", "date"):
         if data.get(field):
             data[field] = _clean_field(data[field])
@@ -327,7 +336,7 @@ def _normalise_legislation(source: LegislationSource) -> tuple[LegislationSource
     else:
         warnings.append("Legislation missing jurisdiction")
 
-    if not year:
+    if not year and data["kind"] != "constitution":
         warnings.append("Legislation missing year")
 
     return LegislationSource(**data), warnings
@@ -350,6 +359,15 @@ def _normalise_journal_article(source: JournalArticleSource) -> tuple[JournalArt
     return JournalArticleSource(**data), warnings
 
 
+_COMPANY_TERMS = re.compile(r"(?:,?\s+(?:Pty\.?|Ltd\.?|Limited|Co\.?|Company|Inc\.?|Incorporated|LLC|plc))+$", re.I)
+
+
+def _clean_publisher(name: str) -> str:
+    """r 6.3.1: 'Terms designating the publisher as a company (eg Pty, Ltd, Co, Inc)
+    should be omitted' ('Lawbook' [Not: 'Lawbook Co' nor 'Lawbook Company'])."""
+    return _COMPANY_TERMS.sub("", name).strip() or name
+
+
 def _normalise_book(source: BookSource) -> tuple[BookSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
@@ -359,6 +377,8 @@ def _normalise_book(source: BookSource) -> tuple[BookSource, list[str]]:
     for field in ("publisher", "edition", "year", "volume"):
         if data.get(field):
             data[field] = _clean_field(data[field])
+    if data.get("publisher"):
+        data["publisher"] = _clean_publisher(data["publisher"])
     if not data["authors"] and not data["editors"]:
         warnings.append("Book missing author(s)/editor(s)")
     return BookSource(**data), warnings
@@ -374,6 +394,8 @@ def _normalise_book_chapter(source: BookChapterSource) -> tuple[BookChapterSourc
     for field in ("publisher", "edition", "year", "starting_page"):
         if data.get(field):
             data[field] = _clean_field(data[field])
+    if data.get("publisher"):
+        data["publisher"] = _clean_publisher(data["publisher"])
     if not data["authors"]:
         warnings.append("Book chapter missing author(s)")
     return BookChapterSource(**data), warnings
@@ -386,8 +408,11 @@ def _normalise_report(source: ReportSource) -> tuple[ReportSource, list[str]]:
     for field in ("author", "document_type", "document_number", "date"):
         if data.get(field):
             data[field] = _clean_field(data[field])
-    if not data.get("author"):
-        warnings.append("Report missing author/body")
+    m = re.match(r"^(.*\S)\s*[:—–-]\s*((?:Final|Interim|Annual|Draft)?\s*Report)$", data["title"], re.I)
+    if m and (data.get("document_type") or "Report").lower() == "report" and not data.get("document_number"):
+        # r 7.1.1: '*Review of the Law of Negligence* (Final Report, September 2002)'
+        data["title"], data["document_type"] = m.group(1), m.group(2).strip()
+    # A report need not have an author (r 7.1.1 example 1), so no warning for that.
     return ReportSource(**data), warnings
 
 
@@ -405,6 +430,17 @@ def _normalise_newspaper(source: NewspaperSource) -> tuple[NewspaperSource, list
     return NewspaperSource(**data), warnings
 
 
+_BODY_WORDS = re.compile(
+    r"\b(Court|Commission|Council|Department|Institute|Association|Society|Committee|Office|"
+    r"Ministry|Agency|Authority|Tribunal|Parliament|Government|University|Bureau|Centre|Center|"
+    r"Foundation|Organisation|Organization|Board|Service|Services|Library|Network|Nations)\b"
+)
+
+
+def _looks_like_body(name: str) -> bool:
+    return bool(_BODY_WORDS.search(name))
+
+
 def _normalise_website(source: WebsiteSource) -> tuple[WebsiteSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
@@ -416,6 +452,11 @@ def _normalise_website(source: WebsiteSource) -> tuple[WebsiteSource, list[str]]
         data["date"] = _clean_field(data["date"])
     if source.url:
         data["url"] = source.url.strip()
+    if not data.get("website_name") and len(data["authors"]) == 1 and _looks_like_body(data["authors"][0]):
+        # A body that publishes its own site is cited as the website name, not the author
+        # (r 7.15: "'James Edelman', *High Court of Australia* (Web Page) <...>").
+        data["website_name"] = data["authors"][0]
+        data["authors"] = []
     return WebsiteSource(**data), warnings
 
 
@@ -427,6 +468,11 @@ def _normalise_treaty(source: TreatySource) -> tuple[TreatySource, list[str]]:
     for field in ("opened_for_signature", "treaty_series", "entry_into_force"):
         if data.get(field):
             data[field] = _clean_field(data[field])
+    if data.get("treaty_series"):
+        # r 8.4: series abbreviations take no full stops ('999 U.N.T.S. 171' -> '999 UNTS 171')
+        data["treaty_series"] = re.sub(
+            r"\b(?:[A-Z]\.){2,}", lambda m: m.group(0).replace(".", ""), data["treaty_series"]
+        )
     return TreatySource(**data), warnings
 
 
@@ -471,6 +517,25 @@ def normalise_citation(citation: Citation) -> tuple[Citation, list[str]]:
     warnings.extend(source_warnings)
 
     citation.pinpoints = [_clean_pinpoint(p) for p in citation.pinpoints]
+    src = citation.source
+    if (
+        isinstance(src, BookChapterSource)
+        and not src.starting_page
+        and len(citation.pinpoints) == 1
+        and citation.pinpoints[0].kind == PinpointKind.page
+        and "–" not in citation.pinpoints[0].value and "-" not in citation.pinpoints[0].value
+    ):
+        # A chapter must give its starting page (r 6.6.1); a lone page number in the
+        # source ('..., 2008, p. 38') is almost always that, not a pinpoint.
+        citation.source = src = src.model_copy(update={"starting_page": citation.pinpoints[0].value})
+        citation.pinpoints = []
+        warnings.append(f"Assumed page {src.starting_page} is the chapter's starting page")
+    if isinstance(src, CaseSource) and src.court_id and not src.report:
+        # r 2.3.1: a medium neutral citation has no pages, so pinpoints are paragraphs
+        citation.pinpoints = [
+            p.model_copy(update={"kind": PinpointKind.paragraph}) if p.kind == PinpointKind.page else p
+            for p in citation.pinpoints
+        ]
     if citation.pinpoint_judges:
         citation.pinpoint_judges = _strip_trailing_punct(citation.pinpoint_judges.strip()) or None
     if citation.short_title:

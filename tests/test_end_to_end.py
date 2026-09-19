@@ -24,7 +24,7 @@ EXPECTED = {
     4: "*Mabo* (n 1) 60.",
     5: "*Smith v Jones* (2005) 220 ALR 1; *Attorney-General (NSW) v X* (2001) 53 NSWLR 1.",
     6: "J Smith, ‘Native Title and the Common Law’ (1995) 19 *Melbourne University Law Review* 195.",
-    7: "P Butt, *Land Law* (Lawbook Co, 6th ed, 2010) 45.",
+    7: "P Butt, *Land Law* (Lawbook, 6th ed, 2010) 45.",  # r 6.3.1 drops "Co"
     8: "This principle was later confirmed by the Court: *Wik Peoples v Queensland* (1996) 187 CLR 1, 129 (Toohey J).",
     9: "‘Native Title Report 2017’, *Australian Human Rights Commission* (Web Page, 2017) "
     "<https://humanrights.gov.au/native-title-report-2017>.",

@@ -18,7 +18,9 @@ via `get_provider(spec)` or the AGLC_LLM environment variable.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Callable, TypeVar
 
@@ -27,6 +29,8 @@ from pydantic import BaseModel, ValidationError
 T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_SPEC = "anthropic:claude-opus-5"
+
+log = logging.getLogger("aglc")
 
 
 class LLMError(RuntimeError):
@@ -67,11 +71,17 @@ class LLMProvider(ABC):
         schema = output_model.model_json_schema()
         prompt = user
         last_error: Exception | None = None
-        for _ in range(max_attempts):
+        for attempt in range(1, max_attempts + 1):
+            t0 = time.monotonic()
             raw = self._complete_json(system=system, user=prompt, schema=schema, schema_name=output_model.__name__)
+            log.debug("%s attempt %d: %d chars in %.1fs", self, attempt, len(raw), time.monotonic() - t0)
             try:
                 return output_model.model_validate_json(_strip_fences(raw))
             except (ValidationError, json.JSONDecodeError, ValueError) as e:
+                log.warning(
+                    "%s attempt %d/%d returned invalid JSON after %.1fs (%s); retrying",
+                    self, attempt, max_attempts, time.monotonic() - t0, str(e).splitlines()[0],
+                )
                 last_error = e
                 prompt = (
                     f"{user}\n\nYour previous response was not valid for the required JSON schema.\n"

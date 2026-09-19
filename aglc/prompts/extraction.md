@@ -119,7 +119,7 @@ Map each pinpoint reference to a `Pinpoint`. `value` is the number/range only (n
 |---|---|---|---|
 | `42` or `at 42` or `p 42` (bare page after a citation) | `page` | `"42"` | `false` |
 | `pp 42-4` | `page` | `"42-4"` | `true` |
-| `[12]` | `paragraph` | `"12"` | `false` |
+| `[12]` / `para 12` / `at para 12` | `paragraph` | `"12"` | `false` |
 | `s 18` / `section 18` | `section` | `"18"` | `false` |
 | `ss 5-7` | `section` | `"5-7"` | `true` |
 | `pt 2` | `part` | `"2"` | `false` |
@@ -130,10 +130,22 @@ Map each pinpoint reference to a `Pinpoint`. `value` is the number/range only (n
 | `cl 3` | `clause` | `"3"` | `false` |
 | `art 5` | `article` | `"5"` | `false` |
 | `ch 4` | `chapter` | `"4"` | `false` |
+| `vol 1` (volume of a report or multi-volume book) | `volume` | `"1"` | `false` |
+| `bk 2` | `book` | `"2"` | `false` |
+| `annex II` | `annex` | `"II"` | `false` |
 | `n 7` (pinpoint to another footnote, eg `42 n 7`) | `footnote` | `"7"` | `false` |
 | anything else numeric-looking you can't classify | `other` | verbatim | `false` |
 
-A footnote can have more than one pinpoint (eg `s 18, sch 1`): list them in order.
+A footnote can have more than one pinpoint (eg `s 18, sch 1`, or `vol 1 at 339`): list them in
+order, and don't drop any (a `vol 1` before a page is a pinpoint too).
+
+**Each number in the source goes in exactly one field.** A starting page is not also a pinpoint:
+if a journal article, book chapter or newspaper article gives only one page number (eg
+`..., 2008, p. 38` or `The Age, 31 January 2017, p. 6`), it is the `starting_page` (or the
+newspaper's `page`) and there is no pinpoint. Only a second number (`393, at 400`) is a pinpoint.
+
+**Copy titles in full**, exactly as written, including possessives and subtitles (eg
+`Fleming's The Law of Torts`, not `The Law of Torts`).
 
 ## Signals
 

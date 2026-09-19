@@ -36,7 +36,7 @@ class LegislationFormatter(Formatter):
             # r 3.2: Bills are cited like Acts, but title and year are not italicised.
             out.append(title)
             out.append(" " + (src.year or missing("year")))
-        elif src.kind == "constitution" and not src.year and not src.jurisdiction:
+        elif src.kind == "constitution" and not src.year:
             # r 3.6: "the *Australian Constitution*" (or "*Commonwealth Constitution*",
             # "*Constitution*") cited by name alone, with no year or jurisdiction.
             # A state constitution "should be cited as normal statutes" (kind="act"),
@@ -47,9 +47,11 @@ class LegislationFormatter(Formatter):
             # italics, jurisdiction in roman following in parentheses.
             out.append(f"{title} {src.year or missing('year')}", italic=True)
 
-        if src.jurisdiction:
+        if src.kind == "constitution" and not src.year:
+            pass  # *Australian Constitution* s 51: no jurisdiction (the normaliser may set Cth)
+        elif src.jurisdiction:
             out.append(f" ({src.jurisdiction})")
-        elif not (src.kind == "constitution" and not src.year):
+        else:
             out.append(" " + missing("jurisdiction"))
 
         pin = self.pinpoints(citation.pinpoints)

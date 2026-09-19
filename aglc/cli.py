@@ -20,6 +20,12 @@ from .config import load_env
 
 load_env()
 
+
+def _setup_logging() -> None:
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s", datefmt="%H:%M:%S")
+
 app = typer.Typer(
     name="aglc",
     help="Format legal citations in Word documents to AGLC4 (Australian Guide to Legal Citation, 4th ed)",
@@ -49,6 +55,8 @@ def fix(
         if not input_path.suffix.lower() == ".docx":
             rprint(f"[red]Error: Input must be a .docx file, got {input_path.suffix}[/red]")
             raise typer.Exit(code=1)
+
+        _setup_logging()
 
         # Set default output
         if output_path is None:
@@ -173,9 +181,7 @@ def serve(
 
         from . import api
 
-        import logging
-
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s", datefmt="%H:%M:%S")
+        _setup_logging()
         rprint(f"[blue]Starting server on http://{host}:{port}[/blue]")
         rprint(f"[blue]Model: {default_spec()}[/blue]")
         uvicorn.run(api.app, host=host, port=port, log_level="info")

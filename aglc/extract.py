@@ -21,7 +21,7 @@ import re
 import time
 from functools import lru_cache
 from importlib import resources
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, Union, get_args
 
 from pydantic import BaseModel, Field
 
@@ -33,6 +33,7 @@ from .models import (
     OtherSource,
     RichText,
     Segment,
+    Signal,
     Source,
     TextSegment,
 )
@@ -104,6 +105,63 @@ def _display_name(source: Source) -> str:
     return getattr(source, "text", "") or ""
 
 
+_SIGNALS = {str(v).lower().rstrip(","): v for v in get_args(Signal)} | {"eg": "Eg,", "see eg": "See, eg,", "see, eg": "See, eg,"}
+
+
+def _split_leading_commentary(original: str, citation: Citation, out: list[Segment]) -> None:
+    """If the model put commentary inside the citation's original text ('For a strong
+    statement of this view, see Ronald Dworkin, ...') while also setting the signal, keep
+    the commentary as text so it isn't lost."""
+    if not citation.signal:
+        return
+    word = citation.signal.rstrip(",").lower()
+    m = re.search(rf"(?i)(?:^|\s){re.escape(word)}\b[:,]?\s", original)
+    if m and m.start() > 0:
+        prefix = original[: m.start()].rstrip() + " "
+        if out and isinstance(out[-1], TextSegment) and out[-1].text.text.strip():
+            return  # the model already gave the commentary as its own text segment
+        out.append(TextSegment(text=RichText.plain(prefix)))
+
+
+def _drop_repeated_start_page(citation: Citation, original: str) -> Citation:
+    """'..., 2008, p. 38' sometimes comes back as starting_page 38 *and* pinpoint 38, which
+    renders '38, 38'. If the number appears only once in the source, it can't be both."""
+    start = getattr(citation.source, "starting_page", None) or getattr(citation.source, "page", None)
+    pins = citation.pinpoints
+    if not start or len(pins) != 1 or pins[0].value.strip() != start.strip():
+        return citation
+    if len(re.findall(rf"(?<!\d){re.escape(start.strip())}(?!\d)", original)) <= 1:
+        return citation.model_copy(update={"pinpoints": []})
+    return citation
+
+
+def _dedupe_signal(citation: Citation, out: list[Segment]) -> Citation:
+    """If the model left the signal word at the end of the preceding text as well as in
+    `citation.signal` ('... this view, see ' + signal 'See'), drop it from the text."""
+    if not citation.signal or not out or not isinstance(out[-1], TextSegment):
+        return citation
+    prev = out[-1].text
+    word = citation.signal.rstrip(",").lower()
+    m = re.search(rf"(?i)\b{re.escape(word)}[:,]?\s*$", prev.text)
+    if m:
+        keep = RichText()
+        remaining = m.start()
+        for run in prev.runs:
+            if remaining <= 0:
+                break
+            keep.append(run.text[:remaining], run.italic)
+            remaining -= len(run.text)
+        out[-1] = TextSegment(text=keep)
+    return citation
+
+
+def _author_names(source: Source) -> list[str]:
+    names = list(getattr(source, "authors", None) or []) + list(getattr(source, "editors", None) or [])
+    if getattr(source, "author", None):
+        names.append(source.author)
+    return names
+
+
 def _match_citation(citations: list[Citation], short_title: str | None) -> tuple[Source, str | None] | None:
     """Find which of a footnote's citations a subsequent reference means.
 
@@ -123,6 +181,13 @@ def _match_citation(citations: list[Citation], short_title: str | None) -> tuple
                 name = _norm(_display_name(c.source))
                 if name and (target in name or name in target):
                     return c.source, c.short_title
+            # Secondary sources are referred to by author surname ('Luntz (n 11)')
+            for c in citations:
+                if any(target in _norm(a) for a in _author_names(c.source)):
+                    return c.source, c.short_title
+        # The model named this footnote explicitly; if it cites only one source, that's it
+        if len(citations) == 1:
+            return citations[0].source, citations[0].short_title
         return None
     if len(citations) == 1:
         return citations[0].source, citations[0].short_title
@@ -158,6 +223,8 @@ class _TextMapper:
             self._index.append(i)
         self._norm = "".join(norm)
         self.cursor: int = 0
+        #: text between the previous cursor and the start of the last match
+        self.skipped: RichText = RichText()
 
     def _find(self, text: str, start: int) -> tuple[int, int] | None:
         norm = "".join(_norm_char(c) for c in text)
@@ -181,6 +248,9 @@ class _TextMapper:
         if span is None:
             return RichText.plain(text)  # not found at all: fall back to plain, don't move cursor
         idx, end = span
+        self.skipped = RichText()
+        for ch, italic in self._chars[self.cursor : idx]:
+            self.skipped.append(ch, italic)
         out = RichText()
         for ch, italic in self._chars[idx:end]:
             out.append(ch, italic)
@@ -241,6 +311,9 @@ class Extractor:
             by_number = {lf.number: lf for lf in response.footnotes}
             for fn in batch:
                 llm_fn = by_number.get(fn.number)
+                if (llm_fn is None or not llm_fn.segments) and fn.original.text.strip():
+                    # Models occasionally skip a footnote in a long batch; ask again for it alone.
+                    llm_fn = self._retry_single(fn, resolved, system_prompt) or llm_fn
                 if llm_fn is None:
                     self.warnings.append(f"footnote {fn.number}: missing from LLM response; left unchanged")
                     continue
@@ -248,6 +321,19 @@ class Extractor:
                 resolved[fn.number] = results[fn.number]
 
         return [results[n] for n in order]
+
+    def _retry_single(self, fn: Footnote, resolved: dict[int, Footnote], system_prompt: str) -> LLMFootnote | None:
+        log.info("  footnote %d came back empty; asking for it on its own", fn.number)
+        try:
+            response = self.provider.generate_json(
+                system=system_prompt,
+                user=self._build_user_prompt([fn], self._build_index(resolved)),
+                output_model=ExtractionBatch,
+            )
+        except LLMError:
+            return None
+        match = next((lf for lf in response.footnotes if lf.number == fn.number), None)
+        return match if match and match.segments else None
 
     # ---- prompt construction ------------------------------------------------ #
 
@@ -291,9 +377,13 @@ class Extractor:
                 out.append(TextSegment(text=mapper.slice(seg.text)))
             else:
                 citation = self._resolve_citation(footnote.number, seg, resolved)
-                out.append(CitationSegment(citation=citation, original=seg.original))
                 if seg.original:
                     mapper.slice(seg.original)  # advance the cursor past this span too
+                    citation = self._recover_skipped(footnote.number, mapper.skipped, citation, out)
+                    _split_leading_commentary(seg.original, citation, out)
+                citation = _dedupe_signal(citation, out)
+                citation = _drop_repeated_start_page(citation, seg.original)
+                out.append(CitationSegment(citation=citation, original=seg.original))
 
         if mapper.cursor < len(mapper.plain):
             leftover = mapper.remainder()
@@ -305,6 +395,19 @@ class Extractor:
                 )
                 out.append(TextSegment(text=leftover))
         return out
+
+    def _recover_skipped(self, number: int, skipped: RichText, citation: Citation, out: list[Segment]) -> Citation:
+        """Text the model left out of every segment, just before a citation: a bare signal
+        ('See: ') becomes the citation's signal; anything else is kept as text."""
+        word = skipped.text.strip(" \t\n:;,")
+        if not word:
+            return citation
+        signal = _SIGNALS.get(word.lower().rstrip("."))
+        if signal:
+            return citation if citation.signal else citation.model_copy(update={"signal": signal})
+        out.append(TextSegment(text=skipped))
+        self.warnings.append(f"footnote {number}: kept text the extraction skipped: {skipped.text.strip()!r}")
+        return citation
 
     def _resolve_citation(self, footnote_number: int, seg: LLMCitationSegment, resolved: dict[int, Footnote]) -> Citation:
         citation = seg.citation
@@ -320,7 +423,10 @@ class Extractor:
                 f"{seg.refers_to_footnote} ({seg.original!r}); recorded as an unclassified source"
             )
             fallback_text = seg.original or citation.short_title or f"(n {seg.refers_to_footnote})"
-            return citation.model_copy(update={"source": OtherSource(text=fallback_text)})
+            # the original text already contains its pinpoint, so don't emit it twice
+            return citation.model_copy(
+                update={"source": OtherSource(text=fallback_text), "pinpoints": [], "pinpoint_judges": None}
+            )
 
         source, short_title = match
         return citation.model_copy(update={"source": source, "short_title": short_title})

@@ -111,7 +111,16 @@ class OpenRouterProvider(OpenAIProvider):
 
     def _extra_body(self, structured: bool) -> dict[str, Any] | None:
         # Only route to upstream hosts that honour response_format, so JSON mode is enforced.
-        return {"provider": {"require_parameters": True}}
+        body: dict[str, Any] = {"provider": {"require_parameters": True}}
+        # Extraction doesn't benefit from "thinking": on reasoning models like DeepSeek V4
+        # Flash it made a 3-footnote batch take ~90s instead of ~7s with equally valid output.
+        # AGLC_REASONING=off (default) | low | medium | high | default (the model's own setting)
+        reasoning = (self.options.get("reasoning") or os.environ.get("AGLC_REASONING") or "off").lower()
+        if reasoning == "off":
+            body["reasoning"] = {"enabled": False}
+        elif reasoning in ("low", "medium", "high"):
+            body["reasoning"] = {"effort": reasoning}
+        return body
 
 
 @register_provider("openai-compatible")

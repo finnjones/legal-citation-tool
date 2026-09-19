@@ -550,7 +550,7 @@ def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
     req = client.requests[0]
     assert req["model"] == "deepseek/deepseek-v4-flash"
     assert req["response_format"]["type"] == "json_schema"
-    assert req["extra_body"] == {"provider": {"require_parameters": True}}
+    assert req["extra_body"] == {"provider": {"require_parameters": True}, "reasoning": {"enabled": False}}
 
 
 def test_openrouter_without_key_gives_helpful_error(monkeypatch):

@@ -318,6 +318,9 @@ def _render_citation(
             out.extend(formatter.subsequent(citation, st, first_footnote[key]))
 
 
+_BARE_SEPARATORS = {"", ";", ".", ","}
+
+
 def _render_footnote(
     fn: Footnote,
     plans: dict[int, _Plan],
@@ -335,6 +338,11 @@ def _render_footnote(
 
     for seg in fn.segments:
         if isinstance(seg, TextSegment):
+            if prev_was_citation and seg.text.text.strip() in _BARE_SEPARATORS:
+                # A bare ';' / '.' between citations from extraction: the separator is
+                # decided below from the signals (r 1.1.3), and closing punctuation by
+                # _ensure_closing_punctuation, so drop the extracted one.
+                continue
             out.extend(seg.text)
             prev_was_citation = False
             prev_citation = None

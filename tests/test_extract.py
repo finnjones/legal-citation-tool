@@ -38,7 +38,8 @@ class CannedProvider(LLMProvider):
         self.calls.append({"system": system, "user": user, "schema_name": schema_name})
         if callable(self._responses):
             return self._responses(i, system, user)
-        return self._responses[i]
+        # repeat the last response if asked again (eg the single-footnote retry)
+        return self._responses[min(i, len(self._responses) - 1)]
 
 
 # --------------------------------------------------------------------------- #
