@@ -540,7 +540,7 @@ def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
         value: str
 
     monkeypatch.setattr(openai, "OpenAI", _RecordingOpenAI)
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
     provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
     assert provider.generate_json(system="s", user="u", output_model=Out).value == "ok"
 
@@ -562,4 +562,16 @@ def test_openrouter_without_key_gives_helpful_error(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
     with pytest.raises(LLMError, match="OPENROUTER_API_KEY"):
+        provider.generate_json(system="s", user="u", output_model=Out)
+
+
+def test_openrouter_rejects_non_openrouter_key(monkeypatch):
+    from pydantic import BaseModel
+
+    class Out(BaseModel):
+        value: str
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "gsk_notopenrouter")
+    provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
+    with pytest.raises(LLMError, match="Groq key"):
         provider.generate_json(system="s", user="u", output_model=Out)

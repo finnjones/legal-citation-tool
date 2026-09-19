@@ -96,8 +96,15 @@ class OpenRouterProvider(OpenAIProvider):
 
     def _client_kwargs(self) -> dict[str, Any]:
         kwargs = super()._client_kwargs()
-        if not kwargs["api_key"]:
+        key = kwargs["api_key"]
+        if not key:
             raise LLMError("OpenRouter needs an API key: set OPENROUTER_API_KEY (https://openrouter.ai/keys)")
+        if not key.startswith("sk-or-"):
+            hint = " (that looks like a Groq key)" if key.startswith("gsk_") else ""
+            raise LLMError(
+                f"OPENROUTER_API_KEY doesn't look like an OpenRouter key{hint}: OpenRouter keys start "
+                "with 'sk-or-'. Create one at https://openrouter.ai/keys"
+            )
         # Optional app attribution shown on openrouter.ai
         kwargs["default_headers"] = {"X-Title": "AGLC4 Citation Tool"}
         return kwargs
