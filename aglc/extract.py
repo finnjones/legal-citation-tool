@@ -25,6 +25,7 @@ from typing import Annotated, Literal, Union, get_args
 
 from pydantic import BaseModel, Field
 
+from . import validate
 from .llm.base import LLMError, LLMProvider
 from .models import (
     Citation,
@@ -271,9 +272,14 @@ class _TextMapper:
 
 
 class Extractor:
-    def __init__(self, provider: LLMProvider, batch_size: int = 15) -> None:
+    def __init__(self, provider: LLMProvider, batch_size: int = 15, strict: bool = True, verify: bool = True) -> None:
         self.provider = provider
         self.batch_size = batch_size
+        #: verify: run the deterministic coverage/grounding checks in aglc/validate.py
+        self.verify = verify
+        #: strict: a footnote whose extraction still drops content after a repair round is
+        #: left exactly as written (and flagged) rather than rewritten with gaps.
+        self.strict = strict
         #: human-readable warnings accumulated by the most recent `extract()` call
         self.warnings: list[str] = []
 
@@ -317,10 +323,64 @@ class Extractor:
                 if llm_fn is None:
                     self.warnings.append(f"footnote {fn.number}: missing from LLM response; left unchanged")
                     continue
-                results[fn.number].segments = self._convert_footnote(fn, llm_fn, resolved)
+                results[fn.number].segments = self._convert_verified(fn, llm_fn, resolved, system_prompt)
                 resolved[fn.number] = results[fn.number]
 
         return [results[n] for n in order]
+
+    # ---- verification (see aglc/validate.py) ------------------------------------ #
+
+    def _convert_verified(
+        self, fn: Footnote, llm_fn: LLMFootnote, resolved: dict[int, Footnote], system_prompt: str
+    ) -> list[Segment]:
+        """Convert, then check nothing in the footnote was dropped. If something was, ask the
+        model once more naming exactly what it missed; if it still can't account for it,
+        keep the footnote as written (strict) so no information is ever lost."""
+        segments, missing = self._convert_and_check(fn, llm_fn, resolved)
+        if not missing or not self.verify:
+            return segments
+
+        log.info("  footnote %d: extraction left out %s; asking again", fn.number, ", ".join(missing))
+        repaired = self._repair(fn, missing, resolved, system_prompt)
+        if repaired is not None:
+            segments2, missing2 = self._convert_and_check(fn, repaired, resolved)
+            if not missing2:
+                return segments2
+            segments, missing = segments2, missing2
+
+        gaps = ", ".join(repr(t) for t in missing)
+        if self.strict:
+            self.warnings.append(
+                f"footnote {fn.number}: left unchanged for manual review; the extraction kept dropping {gaps}"
+            )
+            return [TextSegment(text=fn.original.model_copy(deep=True))]
+        self.warnings.append(f"footnote {fn.number}: may have dropped {gaps}; check it")
+        return segments
+
+    def _convert_and_check(
+        self, fn: Footnote, llm_fn: LLMFootnote, resolved: dict[int, Footnote]
+    ) -> tuple[list[Segment], list[str]]:
+        segments = self._convert_footnote(fn, llm_fn, resolved)
+        # footnote numbers in '(n 4)' / 'above n 4' are captured as refers_to_footnote
+        refs = [str(s.refers_to_footnote) for s in llm_fn.segments
+                if isinstance(s, LLMCitationSegment) and s.refers_to_footnote is not None]
+        return segments, validate.missing_from_extraction(fn.original.text, segments, extra=refs)
+
+    def _repair(
+        self, fn: Footnote, missing: list[str], resolved: dict[int, Footnote], system_prompt: str
+    ) -> LLMFootnote | None:
+        user = (
+            self._build_user_prompt([fn], self._build_index(resolved))
+            + "\n\nYour previous extraction of this footnote left out these words/numbers from the "
+            f"original: {', '.join(repr(t) for t in missing)}. Every part of the footnote must be "
+            "captured: in a citation field, a pinpoint, pinpoint_judges, the signal, or a text "
+            "segment for commentary. Extract the footnote again."
+        )
+        try:
+            response = self.provider.generate_json(system=system_prompt, user=user, output_model=ExtractionBatch)
+        except LLMError:
+            return None
+        return next((lf for lf in response.footnotes if lf.number == fn.number and lf.segments), None)
 
     def _retry_single(self, fn: Footnote, resolved: dict[int, Footnote], system_prompt: str) -> LLMFootnote | None:
         log.info("  footnote %d came back empty; asking for it on its own", fn.number)
@@ -383,6 +443,9 @@ class Extractor:
                     _split_leading_commentary(seg.original, citation, out)
                 citation = _dedupe_signal(citation, out)
                 citation = _drop_repeated_start_page(citation, seg.original)
+                if self.verify and seg.refers_to_footnote is None:  # references carry earlier footnotes' data
+                    citation, notes = validate.remove_invented_numbers(citation, footnote.original.text)
+                    self.warnings += [f"footnote {footnote.number}: {n}" for n in notes]
                 out.append(CitationSegment(citation=citation, original=seg.original))
 
         if mapper.cursor < len(mapper.plain):

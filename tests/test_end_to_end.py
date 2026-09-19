@@ -77,7 +77,7 @@ def _extract(footnote: Footnote, segments: list[dict]) -> list:
     import json
 
     raw = json.dumps({"footnotes": [{"number": 1, "segments": segments}]})
-    return Extractor(get_provider("fake:x", responses=[raw])).extract([footnote])[0].segments
+    return Extractor(get_provider("fake:x", responses=[raw]), verify=False).extract([footnote])[0].segments
 
 
 def test_citation_matching_tolerates_tabs_newlines_and_quotes():

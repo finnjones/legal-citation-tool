@@ -11,7 +11,9 @@ from .docx_io import read_footnotes, write_document
 from .extract import Extractor
 from .llm.base import LLMProvider, get_provider
 from .models import CitationSegment, Footnote, ProcessResult, Warning_
+from .formatters import formatter_for
 from .normalise import normalise_citation
+from .validate import check_footnote_rendering
 
 log = logging.getLogger("aglc")
 
@@ -33,6 +35,10 @@ def process_footnotes(
             if isinstance(seg, CitationSegment):
                 seg.citation, msgs = normalise_citation(seg.citation)
                 warnings += [Warning_(footnote=fn.number, message=m) for m in msgs]
+
+    # Deterministic check that the formatter printed every field (aglc/validate.py)
+    for fn in extracted:
+        warnings += [Warning_(footnote=fn.number, message=m) for m in check_footnote_rendering(fn, formatter_for)]
 
     result = render_document(extracted, bibliography=bibliography)
     result.warnings = warnings + result.warnings

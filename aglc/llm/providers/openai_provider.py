@@ -25,7 +25,12 @@ class OpenAIProvider(LLMProvider):
 
     def _client_kwargs(self) -> dict[str, Any]:
         api_key = self.options.get("api_key") or (os.environ.get(self.api_key_env) if self.api_key_env else None)
-        return {"api_key": api_key, "base_url": self.options.get("base_url") or self.default_base_url}
+        return {
+            "api_key": api_key,
+            "base_url": self.options.get("base_url") or self.default_base_url,
+            # a stalled upstream host should fail (and be retried) rather than hang the run
+            "timeout": float(self.options.get("timeout") or os.environ.get("AGLC_TIMEOUT") or 120),
+        }
 
     def _extra_body(self, structured: bool) -> dict[str, Any] | None:
         """Vendor-specific request fields (see OpenRouterProvider)."""

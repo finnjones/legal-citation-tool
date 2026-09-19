@@ -33,7 +33,7 @@ def _full(c: Citation) -> str:
 
 def _extract(footnotes: list[Footnote], llm_footnotes: list[dict]) -> list[Footnote]:
     raw = json.dumps({"footnotes": llm_footnotes})
-    ex = Extractor(get_provider("fake:x", responses=[raw]))
+    ex = Extractor(get_provider("fake:x", responses=[raw]), verify=False)
     return ex.extract(footnotes)
 
 
@@ -170,7 +170,7 @@ def test_footnote_skipped_by_model_is_retried_alone():
     retry = {"footnotes": [{"number": 2, "segments": [{"kind": "citation", "original": "C v D (2001) 2 CLR 2",
                                                         "citation": {"source": {"type": "case", "name": "C v D"}}}]}]}
     provider = get_provider("fake:x", responses=[json.dumps(first), json.dumps(retry)])
-    out = Extractor(provider).extract(fns)
+    out = Extractor(provider, verify=False).extract(fns)
     assert out[1].segments[0].citation.source.name == "C v D"
     assert len(provider.calls) == 2
 

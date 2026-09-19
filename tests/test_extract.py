@@ -109,7 +109,7 @@ def test_simple_case_citation():
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     assert len(result) == 1
     segs = result[0].segments
     assert len(segs) == 2
@@ -124,7 +124,7 @@ def test_simple_case_citation():
 def test_pure_commentary_footnote_becomes_single_text_segment():
     footnotes = [fn(1, "This point is discussed further below.")]
     provider = CannedProvider([batch_json([{"number": 1, "segments": [text_seg("This point is discussed further below.")]}])])
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     segs = result[0].segments
     assert len(segs) == 1
     assert isinstance(segs[0], TextSegment)
@@ -151,7 +151,7 @@ def test_signal_mapped_into_citation_not_text():
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     segs = result[0].segments
     assert segs[0].citation.signal == "See"
     # "See" must not leak into any text segment
@@ -180,7 +180,7 @@ def test_semicolon_separator_is_its_own_text_segment():
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     segs = result[0].segments
     assert len(segs) == 4
     assert isinstance(segs[1], TextSegment)
@@ -211,7 +211,7 @@ def test_short_title_definition_captured():
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     assert result[0].segments[0].citation.short_title == "Mabo"
 
 
@@ -251,7 +251,7 @@ def test_ibid_resolves_source_from_immediately_preceding_footnote():
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     seg2 = result[1].segments[0]
     assert isinstance(seg2, CitationSegment)
     assert seg2.citation.source.type == "case"
@@ -289,7 +289,7 @@ def test_ibid_bare_has_no_new_pinpoint():
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     seg2 = result[1].segments[0]
     assert seg2.citation.source.name == "Mabo v Queensland [No 2]"
     assert seg2.citation.pinpoints == []
@@ -328,7 +328,7 @@ def test_n_x_reference_disambiguated_by_short_title():
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     seg = result[1].segments[0]
     assert seg.citation.source.type == "case"
     assert seg.citation.source.name == "Mabo v Queensland [No 2]"
@@ -367,7 +367,7 @@ def test_above_n_x_reference_resolves_same_as_n_x():
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     seg = result[1].segments[0]
     assert seg.citation.source.name == "Mabo v Queensland [No 2]"
     assert seg.citation.pinpoints[0].value == "60"
@@ -408,7 +408,7 @@ def test_reference_disambiguated_by_source_name_when_no_short_title_was_defined(
             )
         ]
     )
-    result = Extractor(provider).extract(footnotes)
+    result = Extractor(provider, verify=False).extract(footnotes)
     seg = result[1].segments[0]
     assert seg.citation.source.type == "case"
     assert seg.citation.source.name == "Smith v Jones"
@@ -449,7 +449,7 @@ def test_short_title_resolution_works_across_batches():
             ),
         ]
     )
-    result = Extractor(provider, batch_size=1).extract(footnotes)
+    result = Extractor(provider, batch_size=1, verify=False).extract(footnotes)
     seg = result[1].segments[0]
     assert seg.citation.source.name == "Mabo v Queensland [No 2]"
     assert seg.citation.source.type == "case"
@@ -480,7 +480,7 @@ def test_prompt_includes_prior_source_index_across_batches():
             ),
         ]
     )
-    Extractor(provider, batch_size=1).extract(footnotes)
+    Extractor(provider, batch_size=1, verify=False).extract(footnotes)
     assert len(provider.calls) == 2
     assert "this is the first batch" in provider.calls[0]["user"]
     assert "n1: case" in provider.calls[1]["user"]
@@ -490,7 +490,7 @@ def test_prompt_includes_prior_source_index_across_batches():
 def test_batching_splits_footnotes_into_correctly_sized_groups():
     footnotes = [fn(i, f"Footnote text {i}.") for i in range(1, 6)]
     provider = CannedProvider(echo_responses)
-    Extractor(provider, batch_size=2).extract(footnotes)
+    Extractor(provider, batch_size=2, verify=False).extract(footnotes)
     assert len(provider.calls) == 3  # 5 footnotes / batch_size 2 -> batches of 2, 2, 1
     assert "Footnote 1:" in provider.calls[0]["user"] and "Footnote 2:" in provider.calls[0]["user"]
     assert "Footnote 3:" not in provider.calls[0]["user"]
@@ -536,7 +536,7 @@ def test_unresolvable_reference_falls_back_to_other_source_and_warns():
             )
         ]
     )
-    extractor = Extractor(provider)
+    extractor = Extractor(provider, verify=False)
     result = extractor.extract(footnotes)
     seg = result[1].segments[0]
     assert isinstance(seg.citation.source, OtherSource)
@@ -561,7 +561,7 @@ def test_reference_to_nonexistent_footnote_falls_back_and_warns():
             )
         ]
     )
-    extractor = Extractor(provider)
+    extractor = Extractor(provider, verify=False)
     result = extractor.extract(footnotes)
     seg = result[0].segments[0]
     assert isinstance(seg.citation.source, OtherSource)
@@ -572,7 +572,7 @@ def test_batch_failure_leaves_footnotes_unchanged_and_records_warning():
     footnotes = [fn(1, "Mabo v Queensland [No 2] (1992) 175 CLR 1.")]
     # invalid JSON for every retry attempt inside generate_json (default max_attempts=3)
     provider = CannedProvider(["not valid json"] * 3)
-    extractor = Extractor(provider)
+    extractor = Extractor(provider, verify=False)
     result = extractor.extract(footnotes)
     assert result[0].segments == []
     assert len(provider.calls) == 3
@@ -594,7 +594,7 @@ def test_missing_footnote_in_response_left_unchanged_and_warns():
             )
         ]
     )
-    extractor = Extractor(provider)
+    extractor = Extractor(provider, verify=False)
     result = extractor.extract(footnotes)
     assert result[1].segments == []
     assert any("footnote 2" in w for w in extractor.warnings)
@@ -603,7 +603,7 @@ def test_missing_footnote_in_response_left_unchanged_and_warns():
 def test_llm_returns_empty_segments_for_nonempty_footnote_falls_back_to_original_text():
     footnotes = [fn(1, "This is pure commentary with no citation.")]
     provider = CannedProvider([batch_json([{"number": 1, "segments": []}])])
-    extractor = Extractor(provider)
+    extractor = Extractor(provider, verify=False)
     result = extractor.extract(footnotes)
     assert len(result[0].segments) == 1
     assert isinstance(result[0].segments[0], TextSegment)
@@ -631,7 +631,7 @@ def test_italics_preserved_in_text_segment():
             )
         ]
     )
-    result = Extractor(provider).extract([footnote])
+    result = Extractor(provider, verify=False).extract([footnote])
     segs = result[0].segments
     assert len(segs) == 3
     mabo_seg = segs[1]
@@ -659,7 +659,7 @@ def test_italics_fallback_to_plain_when_text_not_found_verbatim():
             )
         ]
     )
-    result = Extractor(provider).extract([footnote])
+    result = Extractor(provider, verify=False).extract([footnote])
     segs = result[0].segments
     assert segs[0].text.text == "Maboo"
     assert segs[0].text.runs[0].italic is False  # fell back to plain, not the original's italic run
@@ -682,7 +682,7 @@ def test_trailing_uncovered_text_is_appended_verbatim():
             )
         ]
     )
-    extractor = Extractor(provider)
+    extractor = Extractor(provider, verify=False)
     result = extractor.extract([footnote])
     segs = result[0].segments
     assert isinstance(segs[-1], TextSegment)
@@ -695,7 +695,7 @@ def test_system_prompt_is_loaded_and_nonempty():
     provider = CannedProvider(
         [batch_json([{"number": 1, "segments": [cite_seg("Mabo v Queensland [No 2] (1992) 175 CLR 1", {"source": case("Mabo v Queensland [No 2]", year="1992")})]}])]
     )
-    Extractor(provider).extract(footnotes)
+    Extractor(provider, verify=False).extract(footnotes)
     system_prompt = provider.calls[0]["system"]
     assert len(system_prompt) > 500
     assert "AGLC4" in system_prompt

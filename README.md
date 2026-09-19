@@ -52,6 +52,20 @@ AGLC_LLM=openai-compatible:llama3.1    # local Ollama / LM Studio / vLLM;
 You can also pick a model per run: `aglc fix essay.docx --model openrouter:deepseek/deepseek-v4-flash`,
 or type it into the Model field in the web app. `aglc providers` lists what's available.
 
+### Nothing dropped, nothing invented
+
+The AI model's output is checked deterministically (no second AI involved, see
+`aglc/validate.py`):
+
+1. **Coverage:** every meaningful word and number in the original footnote must be captured
+   somewhere in the extraction. If anything is missing, the model is asked once more with
+   the exact gaps named; if it still can't account for them, **that footnote is left exactly
+   as written** and listed in the warnings for you to fix by hand.
+2. **Grounding:** every number the model returns (year, volume, page, edition...) must
+   appear in the original; invented values are removed and show as `[MISSING: ...]`.
+3. **Rendering:** every field of a source must appear in its formatted citation; anything
+   the formatter omits is reported as a warning.
+
 ### Try it
 
 `examples/test_essay.docx` is a short essay with 24 deliberately messy footnotes
