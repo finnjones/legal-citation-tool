@@ -16,6 +16,9 @@ from . import pipeline
 from .formatters import formatter_for
 from .llm.base import DEFAULT_SPEC, available_providers, get_provider
 from .models import Citation
+from .config import load_env
+
+load_env()
 
 app = typer.Typer(
     name="aglc",

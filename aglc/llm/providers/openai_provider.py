@@ -10,12 +10,26 @@ from ._common import schema_instructions
 
 @register_provider("openai")
 class OpenAIProvider(LLMProvider):
-    """Uses OpenAI with json_schema structured outputs."""
+    """Uses OpenAI with json_schema structured outputs, falling back to json_object
+    mode with the schema in the prompt if the endpoint rejects json_schema."""
+
+    #: env var holding the API key (None -> the SDK's own OPENAI_API_KEY lookup)
+    api_key_env: str | None = None
+    #: default endpoint (None -> OpenAI)
+    default_base_url: str | None = None
 
     def __init__(self, model: str, **options: Any) -> None:
         super().__init__(model, **options)
         self._client = None
         self._use_fallback = False
+
+    def _client_kwargs(self) -> dict[str, Any]:
+        api_key = self.options.get("api_key") or (os.environ.get(self.api_key_env) if self.api_key_env else None)
+        return {"api_key": api_key, "base_url": self.options.get("base_url") or self.default_base_url}
+
+    def _extra_body(self, structured: bool) -> dict[str, Any] | None:
+        """Vendor-specific request fields (see OpenRouterProvider)."""
+        return None
 
     @property
     def client(self):
@@ -25,59 +39,72 @@ class OpenAIProvider(LLMProvider):
                 import openai
             except ImportError:
                 raise LLMError(
-                    'OpenAI provider requires the "openai" package. '
+                    f'The "{self.name}" provider requires the "openai" package. '
                     'Install with: pip install "aglc[openai]"'
                 )
-            self._client = openai.OpenAI(api_key=self.options.get("api_key"))
+            self._client = openai.OpenAI(**self._client_kwargs())
         return self._client
 
+    def _create(self, system: str, user: str, response_format: dict[str, Any], structured: bool):
+        kwargs: dict[str, Any] = dict(
+            model=self.model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            response_format=response_format,
+        )
+        extra = self._extra_body(structured)
+        if extra:
+            kwargs["extra_body"] = extra
+        return self.client.chat.completions.create(**kwargs)
+
     def _complete_json(self, *, system: str, user: str, schema: dict[str, Any], schema_name: str) -> str:
-        """Generate JSON using OpenAI's json_schema."""
         import openai
 
+        json_object = {"type": "json_object"}
+        prompted_system = system + "\n\n" + schema_instructions(schema)
         if self._use_fallback:
-            # Use json_object with schema instructions in the prompt
-            system = system + "\n\n" + schema_instructions(schema)
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                response_format={"type": "json_object"},
-            )
+            response = self._create(prompted_system, user, json_object, structured=False)
         else:
+            json_schema = {
+                "type": "json_schema",
+                "json_schema": {"name": schema_name, "schema": schema, "strict": False},
+            }
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {"name": schema_name, "schema": schema, "strict": False},
-                    },
-                )
+                response = self._create(system, user, json_schema, structured=True)
             except openai.BadRequestError:
-                # Schema not supported; retry with json_object + instructions
+                # Schema not supported; remember and retry with json_object + instructions
                 self._use_fallback = True
-                system = system + "\n\n" + schema_instructions(schema)
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    response_format={"type": "json_object"},
-                )
+                response = self._create(prompted_system, user, json_object, structured=False)
 
-        # Check for refusal
+        if not response.choices:
+            raise LLMError(f"{self.name}:{self.model} returned no choices")
         message = response.choices[0].message
-        if message.refusal:
-            raise LLMError(f"Model refused: {message.refusal}")
+        refusal = getattr(message, "refusal", None)
+        if refusal:
+            raise LLMError(f"Model refused: {refusal}")
+        if getattr(response.choices[0], "finish_reason", None) == "length":
+            raise LLMError("output truncated (max tokens reached)")
+        return message.content or ""
 
-        return message.content
+
+@register_provider("openrouter")
+class OpenRouterProvider(OpenAIProvider):
+    """OpenRouter (https://openrouter.ai): one API key, hundreds of models, eg
+    openrouter:deepseek/deepseek-v4-flash. Key from $OPENROUTER_API_KEY."""
+
+    api_key_env = "OPENROUTER_API_KEY"
+    default_base_url = "https://openrouter.ai/api/v1"
+
+    def _client_kwargs(self) -> dict[str, Any]:
+        kwargs = super()._client_kwargs()
+        if not kwargs["api_key"]:
+            raise LLMError("OpenRouter needs an API key: set OPENROUTER_API_KEY (https://openrouter.ai/keys)")
+        # Optional app attribution shown on openrouter.ai
+        kwargs["default_headers"] = {"X-Title": "AGLC4 Citation Tool"}
+        return kwargs
+
+    def _extra_body(self, structured: bool) -> dict[str, Any] | None:
+        # Only route to upstream hosts that honour response_format, so JSON mode is enforced.
+        return {"provider": {"require_parameters": True}}
 
 
 @register_provider("openai-compatible")

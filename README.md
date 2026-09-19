@@ -22,27 +22,43 @@ uv sync --all-extras
 
 ## Configuration
 
-The tool needs an AI model to extract citations. Set it via environment variable (default: Claude Opus):
+The tool needs an AI model to read the citations in your footnotes. The model only
+extracts structured data; all AGLC formatting is done by deterministic code, so a
+small, cheap model is enough.
+
+The easiest setup is a `.env` file in the project folder (git-ignored):
 
 ```bash
-# Anthropic Claude (default)
-export AGLC_LLM=anthropic:claude-opus-5
-export ANTHROPIC_API_KEY=sk-ant-...
+cp .env.example .env    # then edit it
+```
 
-# OpenAI GPT
-export AGLC_LLM=openai:gpt-4o
-export OPENAI_API_KEY=sk-...
+```bash
+# .env: recommended, cheap and fast via OpenRouter (https://openrouter.ai/keys)
+AGLC_LLM=openrouter:deepseek/deepseek-v4-flash
+OPENROUTER_API_KEY=sk-or-...
+```
 
-# Google Gemini
-export AGLC_LLM=gemini:gemini-2.5-pro
-export GEMINI_API_KEY=...
+Any model on OpenRouter works: use `openrouter:<model id from openrouter.ai/models>`.
+Real environment variables override `.env`. Other providers:
 
-# OpenAI-compatible (Ollama, LM Studio, Groq, OpenRouter, etc.)
-export AGLC_LLM=openai-compatible:llama3.1
-export AGLC_OPENAI_BASE_URL=http://localhost:11434/v1
+```bash
+AGLC_LLM=anthropic:claude-opus-5       # ANTHROPIC_API_KEY (the built-in default)
+AGLC_LLM=openai:<model>                # OPENAI_API_KEY
+AGLC_LLM=gemini:<model>                # GEMINI_API_KEY
+AGLC_LLM=openai-compatible:llama3.1    # local Ollama / LM Studio / vLLM;
+                                       # AGLC_OPENAI_BASE_URL=http://localhost:11434/v1
+```
 
-# List available providers
-aglc providers
+You can also pick a model per run: `aglc fix essay.docx --model openrouter:deepseek/deepseek-v4-flash`,
+or type it into the Model field in the web app. `aglc providers` lists what's available.
+
+### Try it
+
+`examples/test_essay.docx` is a short essay with 24 deliberately messy footnotes
+(regenerate it with `uv run python examples/make_test_essay.py`):
+
+```bash
+uv run aglc fix examples/test_essay.docx
 ```
 
 ## Usage
@@ -86,6 +102,7 @@ aglc providers
 #   • gemini
 #   • openai
 #   • openai-compatible
+#   • openrouter
 # Default: anthropic:claude-opus-5
 ```
 
@@ -108,7 +125,7 @@ Serves the web UI.
 
 #### `GET /api/providers`
 ```json
-{"providers": ["anthropic", "openai", "gemini", "openai-compatible"], "default": "anthropic:claude-opus-5"}
+{"providers": ["anthropic", "fake", "gemini", "openai", "openai-compatible", "openrouter"], "default": "openrouter:deepseek/deepseek-v4-flash"}
 ```
 
 #### `POST /api/process`

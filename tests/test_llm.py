@@ -61,9 +61,9 @@ def test_get_provider_default():
 
 
 def test_available_providers():
-    """Test that all five providers are registered."""
+    """Test that all built-in providers are registered."""
     providers = available_providers()
-    expected = {"anthropic", "fake", "gemini", "openai", "openai-compatible"}
+    expected = {"anthropic", "fake", "gemini", "openai", "openai-compatible", "openrouter"}
     assert set(providers) == expected
 
 
@@ -504,3 +504,62 @@ def test_fake_provider_records_calls():
     assert provider.calls[0]["schema_name"] == "M1"
     assert provider.calls[1]["system"] == "s2"
     assert provider.calls[1]["user"] == "u2"
+
+
+# ============================================================================
+# OpenRouter
+# ============================================================================
+
+
+class _RecordingOpenAI:
+    """Stands in for openai.OpenAI; records constructor and request kwargs."""
+
+    instances: list = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.requests: list = []
+        _RecordingOpenAI.instances.append(self)
+        outer = self
+
+        class _Completions:
+            def create(self, **req):
+                outer.requests.append(req)
+                msg = type("M", (), {"content": '{"value": "ok"}', "refusal": None})()
+                choice = type("C", (), {"message": msg, "finish_reason": "stop"})()
+                return type("R", (), {"choices": [choice]})()
+
+        self.chat = type("Chat", (), {"completions": _Completions()})()
+
+
+def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
+    import openai
+    from pydantic import BaseModel
+
+    class Out(BaseModel):
+        value: str
+
+    monkeypatch.setattr(openai, "OpenAI", _RecordingOpenAI)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
+    assert provider.generate_json(system="s", user="u", output_model=Out).value == "ok"
+
+    client = _RecordingOpenAI.instances[-1]
+    assert client.kwargs["base_url"] == "https://openrouter.ai/api/v1"
+    assert client.kwargs["api_key"] == "sk-or-test"
+    req = client.requests[0]
+    assert req["model"] == "deepseek/deepseek-v4-flash"
+    assert req["response_format"]["type"] == "json_schema"
+    assert req["extra_body"] == {"provider": {"require_parameters": True}}
+
+
+def test_openrouter_without_key_gives_helpful_error(monkeypatch):
+    from pydantic import BaseModel
+
+    class Out(BaseModel):
+        value: str
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
+    with pytest.raises(LLMError, match="OPENROUTER_API_KEY"):
+        provider.generate_json(system="s", user="u", output_model=Out)

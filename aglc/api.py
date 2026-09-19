@@ -15,8 +15,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import pipeline
-from .llm.base import DEFAULT_SPEC, available_providers, get_provider
+from .llm.base import available_providers, default_spec, get_provider
 from .models import ProcessResult
+
+from .config import load_env
+
+load_env()
 
 app = FastAPI(title="AGLC4 Citation Tool API")
 
@@ -60,7 +64,7 @@ async def get_providers() -> dict:
     """Get available LLM providers and the default."""
     try:
         providers = available_providers()
-        return {"providers": providers, "default": DEFAULT_SPEC}
+        return {"providers": providers, "default": default_spec()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing providers: {str(e)}")
 

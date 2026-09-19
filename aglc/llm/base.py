@@ -9,7 +9,8 @@ Providers are selected with a spec string "<provider>:<model>", eg
     anthropic:claude-opus-5
     openai:gpt-5
     gemini:gemini-2.5-pro
-    openai-compatible:llama3.1        (Ollama, LM Studio, vLLM, OpenRouter, Groq...)
+    openrouter:deepseek/deepseek-v4-flash   (any model on openrouter.ai)
+    openai-compatible:llama3.1        (Ollama, LM Studio, vLLM, Groq...)
 
 via `get_provider(spec)` or the AGLC_LLM environment variable.
 """
@@ -113,10 +114,15 @@ def available_providers() -> list[str]:
     return sorted(_REGISTRY)
 
 
+def default_spec() -> str:
+    """The model used when none is given: $AGLC_LLM, else DEFAULT_SPEC."""
+    return os.environ.get("AGLC_LLM") or DEFAULT_SPEC
+
+
 def get_provider(spec: str | None = None, **options: Any) -> LLMProvider:
     """Build a provider from "<provider>:<model>" (default: $AGLC_LLM or DEFAULT_SPEC)."""
     _load_builtin_providers()
-    spec = spec or os.environ.get("AGLC_LLM") or DEFAULT_SPEC
+    spec = spec or default_spec()
     if ":" not in spec:
         raise ValueError(f"LLM spec must look like 'provider:model', got {spec!r}")
     name, model = spec.split(":", 1)
