@@ -546,7 +546,7 @@ def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
 
     client = _RecordingOpenAI.instances[-1]
     assert client.kwargs["base_url"] == "https://openrouter.ai/api/v1"
-    assert client.kwargs["api_key"] == "sk-or-test"
+    assert client.kwargs["api_key"] == "sk-or-v1-test"
     req = client.requests[0]
     assert req["model"] == "deepseek/deepseek-v4-flash"
     assert req["response_format"]["type"] == "json_schema"
