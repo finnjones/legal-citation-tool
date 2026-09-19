@@ -124,24 +124,58 @@ def _match_citation(citations: list[Citation], short_title: str | None) -> tuple
     return None
 
 
+_QUOTES = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
+
+
+def _norm_char(ch: str) -> str:
+    return " " if ch.isspace() else ch.translate(_QUOTES)
+
+
 class _TextMapper:
     """Slices substrings out of a `RichText`, preserving italics, walking forward so repeated
-    substrings resolve to successive occurrences rather than always the first."""
+    substrings resolve to successive occurrences rather than always the first.
+
+    Matching ignores differences in whitespace (Word footnotes contain tabs and line breaks
+    the LLM normalises away) and between curly and straight quotes."""
 
     def __init__(self, original: RichText) -> None:
         self._chars: list[tuple[str, bool]] = [(ch, run.italic) for run in original.runs for ch in run.text]
         self.plain: str = "".join(ch for ch, _ in self._chars)
+        # Normalised view: runs of whitespace collapse to one space; _index maps each
+        # normalised position back to its position in `plain`.
+        norm: list[str] = []
+        self._index: list[int] = []
+        for i, ch in enumerate(self.plain):
+            c = _norm_char(ch)
+            if c == " " and norm and norm[-1] == " ":
+                continue
+            norm.append(c)
+            self._index.append(i)
+        self._norm = "".join(norm)
         self.cursor: int = 0
+
+    def _find(self, text: str, start: int) -> tuple[int, int] | None:
+        norm = "".join(_norm_char(c) for c in text)
+        needle = " ".join(norm.split())
+        if not needle:
+            return None
+        # keep one boundary space so separators like "; " keep their trailing space
+        needle = (" " if norm[:1] == " " else "") + needle + (" " if norm[-1:] == " " else "")
+        nstart = next((k for k, i in enumerate(self._index) if i >= start), len(self._index))
+        k = self._norm.find(needle, nstart)
+        if k == -1:
+            return None
+        begin = self._index[k]
+        end = self._index[k + len(needle) - 1] + 1
+        return begin, end
 
     def slice(self, text: str) -> RichText:
         if not text:
             return RichText()
-        idx = self.plain.find(text, self.cursor)
-        if idx == -1:
-            idx = self.plain.find(text)  # fall back to searching from the start
-        if idx == -1:
+        span = self._find(text, self.cursor) or self._find(text, 0)
+        if span is None:
             return RichText.plain(text)  # not found at all: fall back to plain, don't move cursor
-        end = idx + len(text)
+        idx, end = span
         out = RichText()
         for ch, italic in self._chars[idx:end]:
             out.append(ch, italic)
@@ -250,7 +284,9 @@ class Extractor:
 
         if mapper.cursor < len(mapper.plain):
             leftover = mapper.remainder()
-            if leftover.text.strip():
+            # Closing punctuation is re-applied by the document pass, so a leftover that is
+            # only punctuation/whitespace (the footnote's final full stop) is not content.
+            if leftover.text.strip(" \t\n.;,"):
                 self.warnings.append(
                     f"footnote {footnote.number}: trailing text not covered by extraction; appended verbatim"
                 )

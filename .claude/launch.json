@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "aglc-web",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "aglc", "serve", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}

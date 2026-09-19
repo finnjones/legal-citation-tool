@@ -1,0 +1,53 @@
+{
+  "footnotes": [
+    {"number": 1, "segments": [
+      {"kind": "citation", "original": "Mabo v Queensland (No 2) (1992) 175 C.L.R. 1 at 42 per Brennan J",
+       "citation": {"source": {"type": "case", "name": "Mabo v Queensland (No 2)", "year": "1992", "volume": "175", "report": "C.L.R.", "starting_page": "1"},
+                    "pinpoints": [{"kind": "page", "value": "42"}], "pinpoint_judges": "Brennan J"}}
+    ]},
+    {"number": 2, "segments": [
+      {"kind": "citation", "original": "See Competition and Consumer Act 2010 (Cth), section 18",
+       "citation": {"source": {"type": "legislation", "kind": "act", "title": "Competition and Consumer Act", "year": "2010", "jurisdiction": "Cth"},
+                    "pinpoints": [{"kind": "section", "value": "18"}], "signal": "See"}}
+    ]},
+    {"number": 3, "segments": [
+      {"kind": "citation", "original": "Ibid, at 45", "refers_to_footnote": 2,
+       "citation": {"source": {"type": "other", "text": "Ibid, at 45"}, "pinpoints": [{"kind": "page", "value": "45"}]}}
+    ]},
+    {"number": 4, "segments": [
+      {"kind": "citation", "original": "Mabo, above n 1, 60", "refers_to_footnote": 1,
+       "citation": {"source": {"type": "other", "text": "Mabo, above n 1, 60"}, "short_title": "Mabo", "pinpoints": [{"kind": "page", "value": "60"}]}}
+    ]},
+    {"number": 5, "segments": [
+      {"kind": "citation", "original": "Smith v Jones (2005) 220 A.L.R. 1",
+       "citation": {"source": {"type": "case", "name": "Smith v Jones", "year": "2005", "volume": "220", "report": "A.L.R.", "starting_page": "1"}}},
+      {"kind": "text", "text": "; "},
+      {"kind": "citation", "original": "Attorney-General (NSW) v X (2001) 53 N.S.W.L.R. 1",
+       "citation": {"source": {"type": "case", "name": "Attorney-General (NSW) v X", "year": "2001", "volume": "53", "report": "N.S.W.L.R.", "starting_page": "1"}}}
+    ]},
+    {"number": 6, "segments": [
+      {"kind": "citation", "original": "J Smith, 'Native Title and the Common Law' (1995) 19 Melbourne University Law Review 195",
+       "citation": {"source": {"type": "journal_article", "authors": ["J Smith"], "title": "Native Title and the Common Law", "year": "1995", "volume": "19", "journal": "Melbourne University Law Review", "starting_page": "195"}}}
+    ]},
+    {"number": 7, "segments": [
+      {"kind": "citation", "original": "P Butt, Land Law (Lawbook Co, 6th ed, 2010) 45",
+       "citation": {"source": {"type": "book", "authors": ["P Butt"], "title": "Land Law", "publisher": "Lawbook Co", "edition": "6", "year": "2010"},
+                    "pinpoints": [{"kind": "page", "value": "45"}]}}
+    ]},
+    {"number": 8, "segments": [
+      {"kind": "text", "text": "This principle was later confirmed by the Court: "},
+      {"kind": "citation", "original": "Wik Peoples v Queensland (1996) 187 C.L.R. 1, 129 per Toohey J",
+       "citation": {"source": {"type": "case", "name": "Wik Peoples v Queensland", "year": "1996", "volume": "187", "report": "C.L.R.", "starting_page": "1"},
+                    "pinpoints": [{"kind": "page", "value": "129"}], "pinpoint_judges": "Toohey J"}}
+    ]},
+    {"number": 9, "segments": [
+      {"kind": "citation", "original": "Australian Human Rights Commission, 'Native Title Report 2017' (Web Page, 2017) <https://humanrights.gov.au/native-title-report-2017>",
+       "citation": {"source": {"type": "website", "authors": ["Australian Human Rights Commission"], "title": "Native Title Report 2017", "website_name": "Australian Human Rights Commission", "document_type": "Web Page", "date": "2017", "url": "https://humanrights.gov.au/native-title-report-2017"}}}
+    ]},
+    {"number": 10, "segments": [
+      {"kind": "citation", "original": "Australian Law Reform Commission, Connection to Country: Review of the Native Title Act 1993 (Cth) (Report No 126, 2015) 34",
+       "citation": {"source": {"type": "report", "author": "Australian Law Reform Commission", "title": "Connection to Country: Review of the Native Title Act 1993 (Cth)", "document_type": "Report", "document_number": "126", "date": "2015"},
+                    "pinpoints": [{"kind": "page", "value": "34"}]}}
+    ]}
+  ]
+}
