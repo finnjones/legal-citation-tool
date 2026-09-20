@@ -267,11 +267,16 @@ def test_short_title_from_a_later_reference_is_used_from_the_first_citation():
     learns them from the footnotes that use them: "Maynard (n 1)"."""
     from aglc import pipeline
 
-    fns = [_fn(1, "Adoption of Maynard (a pseudonym) [2026] NSWSC 921."), _fn(6, "Maynard (n 1).")]
+    # footnote 2 cites something else, so footnote 6 can't be an 'Ibid' (as in the real document)
+    fns = [_fn(1, "Adoption of Maynard (a pseudonym) [2026] NSWSC 921."), _fn(2, "Adoption Act 2000 (NSW)."),
+           _fn(6, "Maynard (n 1).")]
     batch = json.dumps({"footnotes": [
         {"number": 1, "segments": [{"kind": "citation", "original": "Adoption of Maynard (a pseudonym) [2026] NSWSC 921",
                                     "citation": {"source": {"type": "case", "name": "Adoption of Maynard (a pseudonym)",
                                                             "year": "2026", "court_id": "NSWSC", "judgment_number": "921"}}}]},
+        {"number": 2, "segments": [{"kind": "citation", "original": "Adoption Act 2000 (NSW)",
+                                    "citation": {"source": {"type": "legislation", "title": "Adoption Act", "year": "2000",
+                                                            "jurisdiction": "NSW"}}}]},
         {"number": 6, "segments": [{"kind": "citation", "original": "Maynard (n 1)", "refers_to_footnote": 1,
                                     "citation": {"source": {"type": "other", "text": "Maynard (n 1)"}}}]},
     ]})
