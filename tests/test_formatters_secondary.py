@@ -276,7 +276,11 @@ def test_journal_article_explicit_short_title_is_quoted():
     )
     citation = Citation(source=src, short_title="Meanings of Membership", pinpoints=[pp(PinpointKind.page, "305–11")])
     out = journal.subsequent(citation, journal.short_title(citation), first_footnote=88)
-    assert out.to_markup() == "‘Meanings of Membership’ (n 88) 305–11"
+    # r 1.4.1: a personal author is referred to by surname; the short title is added only
+    # to tell apart several works by that author, which the document pass does (it knows
+    # the whole document). See test_aglc4_subsequent.py::1.4.4-b for the full form
+    # "Rubenstein, ‘Meanings of Membership’ (n 88) 305–11".
+    assert out.to_markup() == "Rubenstein (n 88) 305–11"
 
 
 def test_journal_article_bibliography_inverts_first_author():

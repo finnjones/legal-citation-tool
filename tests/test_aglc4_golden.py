@@ -27,6 +27,8 @@ def _load_examples() -> list[dict]:
         with path.open(encoding="utf-8") as f:
             data = json.load(f)
         for entry in data:
+            if "expected_full" not in entry:
+                continue  # eg subsequent.json holds footnote sequences (test_aglc4_subsequent.py)
             entry = dict(entry)
             entry["_file"] = path.name
             examples.append(entry)

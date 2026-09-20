@@ -113,6 +113,24 @@ def surname_list(names: list[str]) -> str:
     joined the same way as r 4.1.2 (eg 'Edelman and Bant', 'Rishworth et al')."""
     return format_names([surname(n) for n in names])
 
+def _names(source) -> list[str]:
+    if getattr(source, "authors", None):
+        return list(source.authors)
+    if getattr(source, "author", None):
+        return [source.author]
+    return list(getattr(source, "editors", None) or [])
+
+
+def _title_based(citation: Citation) -> bool:
+    """r 1.4.1: subsequent references to secondary sources use the author's surname.
+    The (short) title is used instead only when there is no author, or when the author
+    is a body and a short title was introduced ('*Traditional Rights and Freedoms* (n 52)').
+    A personal author's work keeps the surname even with a short title; the title is then
+    only added to tell apart several works by that author (the document pass does that)."""
+    names = _names(citation.source)
+    return not names or (bool(citation.short_title) and all(is_corporate_author(n) for n in names))
+
+
 
 def format_editors(editors: list[str], *, invert_first: bool = False) -> str:
     """r 4.1.3: editor names, followed by '(ed)'/'(eds)'."""
@@ -221,7 +239,7 @@ class JournalArticleFormatter(Formatter):
         return out
 
     def short_title(self, citation: Citation) -> str:
-        if citation.short_title:
+        if citation.short_title and _title_based(citation):
             return citation.short_title
         src = citation.source
         assert isinstance(src, JournalArticleSource)
@@ -231,7 +249,7 @@ class JournalArticleFormatter(Formatter):
         src = citation.source
         assert isinstance(src, JournalArticleSource)
         out = RichText()
-        title_based = bool(citation.short_title) or not src.authors
+        title_based = _title_based(citation)
         out.append(f"{_LQ}{short_title}{_RQ}" if title_based else short_title)
         out.append(f" (n {first_footnote})")
         pin = self.pinpoints(citation.pinpoints)
@@ -251,7 +269,7 @@ class JournalArticleFormatter(Formatter):
 class BookFormatter(Formatter):
     source_type = "book"
     uses_n_reference = True
-    italic_short_title = False
+    italic_short_title = True  # styled like the italic title (r 1.4.1)
     defines_short_title = False
     bibliography_category = BIB_SECONDARY
 
@@ -300,7 +318,7 @@ class BookFormatter(Formatter):
         return out
 
     def short_title(self, citation: Citation) -> str:
-        if citation.short_title:
+        if citation.short_title and _title_based(citation):
             return citation.short_title
         src = citation.source
         assert isinstance(src, BookSource)
@@ -314,7 +332,7 @@ class BookFormatter(Formatter):
         src = citation.source
         assert isinstance(src, BookSource)
         out = RichText()
-        title_based = bool(citation.short_title) or not (src.authors or src.editors)
+        title_based = _title_based(citation)
         out.append(short_title, italic=title_based)
         out.append(f" (n {first_footnote})")
         pin = self.pinpoints(citation.pinpoints)
@@ -375,7 +393,7 @@ class BookChapterFormatter(Formatter):
         return out
 
     def short_title(self, citation: Citation) -> str:
-        if citation.short_title:
+        if citation.short_title and _title_based(citation):
             return citation.short_title
         src = citation.source
         assert isinstance(src, BookChapterSource)
@@ -387,7 +405,7 @@ class BookChapterFormatter(Formatter):
         src = citation.source
         assert isinstance(src, BookChapterSource)
         out = RichText()
-        title_based = bool(citation.short_title) or not src.authors
+        title_based = _title_based(citation)
         out.append(f"{_LQ}{short_title}{_RQ}" if title_based else short_title)
         out.append(f" (n {first_footnote})")
         pin = self.pinpoints(citation.pinpoints)
@@ -407,7 +425,7 @@ class BookChapterFormatter(Formatter):
 class ReportFormatter(Formatter):
     source_type = "report"
     uses_n_reference = True
-    italic_short_title = False
+    italic_short_title = True  # styled like the italic title (r 1.4.1)
     defines_short_title = False
     bibliography_category = BIB_SECONDARY
 
@@ -438,7 +456,7 @@ class ReportFormatter(Formatter):
         return out
 
     def short_title(self, citation: Citation) -> str:
-        if citation.short_title:
+        if citation.short_title and _title_based(citation):
             return citation.short_title
         src = citation.source
         assert isinstance(src, ReportSource)
@@ -448,7 +466,7 @@ class ReportFormatter(Formatter):
         src = citation.source
         assert isinstance(src, ReportSource)
         out = RichText()
-        title_based = bool(citation.short_title) or not src.author
+        title_based = _title_based(citation)
         out.append(short_title, italic=title_based)
         out.append(f" (n {first_footnote})")
         pin = self.pinpoints(citation.pinpoints)
@@ -517,7 +535,7 @@ class NewspaperFormatter(Formatter):
         return out
 
     def short_title(self, citation: Citation) -> str:
-        if citation.short_title:
+        if citation.short_title and _title_based(citation):
             return citation.short_title
         src = citation.source
         assert isinstance(src, NewspaperSource)
@@ -527,7 +545,7 @@ class NewspaperFormatter(Formatter):
         src = citation.source
         assert isinstance(src, NewspaperSource)
         out = RichText()
-        title_based = bool(citation.short_title) or not src.authors
+        title_based = _title_based(citation)
         out.append(f"{_LQ}{short_title}{_RQ}" if title_based else short_title)
         out.append(f" (n {first_footnote})")
         pin = self.pinpoints(citation.pinpoints)
@@ -583,7 +601,7 @@ class WebsiteFormatter(Formatter):
         return out
 
     def short_title(self, citation: Citation) -> str:
-        if citation.short_title:
+        if citation.short_title and _title_based(citation):
             return citation.short_title
         src = citation.source
         assert isinstance(src, WebsiteSource)
@@ -595,7 +613,7 @@ class WebsiteFormatter(Formatter):
         src = citation.source
         assert isinstance(src, WebsiteSource)
         out = RichText()
-        if citation.short_title:
+        if citation.short_title and _title_based(citation):
             # An author-defined short title abbreviates the (quoted) document
             # title, styled the same way (r 1.4.4).
             out.append(f"{_LQ}{short_title}{_RQ}")

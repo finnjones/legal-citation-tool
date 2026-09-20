@@ -1,0 +1,1038 @@
+[
+ {
+  "id": "1.1.3-a",
+  "rule": "1.1.3",
+  "page": 28,
+  "footnotes": [
+   {
+    "number": 21,
+    "citations": [
+     {
+      "source": {
+       "type": "case",
+       "name": "Muschinski v Dodds",
+       "year": "1985",
+       "year_style": "round",
+       "volume": "160",
+       "report": "CLR",
+       "starting_page": "583"
+      },
+      "source_key": "muschinski"
+     },
+     {
+      "source": {
+       "type": "case",
+       "name": "Baumgartner v Baumgartner",
+       "year": "1987",
+       "year_style": "round",
+       "volume": "164",
+       "report": "CLR",
+       "starting_page": "137"
+      },
+      "source_key": "baumgartner"
+     },
+     {
+      "source": {
+       "type": "case",
+       "name": "Bryson v Bryant",
+       "year": "1992",
+       "year_style": "round",
+       "volume": "29",
+       "report": "NSWLR",
+       "starting_page": "188"
+      },
+      "source_key": "bryson",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "194-5"
+       }
+      ]
+     }
+    ],
+    "expected": "*Muschinski v Dodds* (1985) 160 CLR 583; *Baumgartner v Baumgartner* (1987) 164 CLR 137; *Bryson v Bryant* (1992) 29 NSWLR 188, 194–5."
+   },
+   {
+    "number": 22,
+    "citations": [
+     {
+      "source": {
+       "type": "case",
+       "name": "Spratt v Hermes",
+       "year": "1965",
+       "year_style": "round",
+       "volume": "114",
+       "report": "CLR",
+       "starting_page": "226"
+      },
+      "source_key": "spratt"
+     },
+     {
+      "source": {
+       "type": "case",
+       "name": "Capital TV & Appliances Pty Ltd v Falconer",
+       "year": "1971",
+       "year_style": "round",
+       "volume": "125",
+       "report": "CLR",
+       "starting_page": "591"
+      },
+      "source_key": "capital"
+     },
+     {
+      "source": {
+       "type": "case",
+       "name": "Kruger v Commonwealth",
+       "year": "1997",
+       "year_style": "round",
+       "volume": "190",
+       "report": "CLR",
+       "starting_page": "1"
+      },
+      "source_key": "kruger"
+     },
+     {
+      "source": {
+       "type": "case",
+       "name": "R v Bernasconi",
+       "year": "1915",
+       "year_style": "round",
+       "volume": "19",
+       "report": "CLR",
+       "starting_page": "629"
+      },
+      "source_key": "bernasconi",
+      "signal": "Cf"
+     }
+    ],
+    "expected": "*Spratt v Hermes* (1965) 114 CLR 226; *Capital TV & Appliances Pty Ltd v Falconer* (1971) 125 CLR 591; *Kruger v Commonwealth* (1997) 190 CLR 1. Cf *R v Bernasconi* (1915) 19 CLR 629."
+   }
+  ]
+ },
+ {
+  "id": "1.1.4-a",
+  "rule": "1.4.3",
+  "page": 28,
+  "footnotes": [
+   {
+    "number": 23,
+    "citations": [
+     {
+      "source": {
+       "type": "case",
+       "name": "R v Gomez",
+       "year": "1993",
+       "year_style": "square",
+       "volume": null,
+       "report": "AC",
+       "starting_page": "442"
+      },
+      "source_key": "gomez"
+     }
+    ],
+    "expected": "*R v Gomez* [1993] AC 442."
+   },
+   {
+    "number": 24,
+    "citations": [
+     {
+      "source": {
+       "type": "case",
+       "name": "R v Gomez",
+       "year": "1993",
+       "year_style": "square",
+       "volume": null,
+       "report": "AC",
+       "starting_page": "442"
+      },
+      "source_key": "gomez"
+     },
+     {
+      "source": {
+       "type": "case",
+       "name": "R v Macleod",
+       "year": "2001",
+       "year_style": "round",
+       "volume": "52",
+       "report": "NSWLR",
+       "starting_page": "389"
+      },
+      "source_key": "macleod"
+     }
+    ],
+    "expected": "Ibid; *R v Macleod* (2001) 52 NSWLR 389."
+   }
+  ]
+ },
+ {
+  "id": "1.1.1-a",
+  "rule": "1.2",
+  "page": 26,
+  "footnotes": [
+   {
+    "number": 1,
+    "citations": [
+     {
+      "source": {
+       "type": "case",
+       "name": "Wirth v Wirth",
+       "year": "1956",
+       "year_style": "round",
+       "volume": "98",
+       "report": "CLR",
+       "starting_page": "228"
+      },
+      "source_key": "wirth",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "237"
+       }
+      ],
+      "pinpoint_judges": "Dixon CJ"
+     },
+     {
+      "source": {
+       "type": "case",
+       "name": "Calverley v Green",
+       "year": "1984",
+       "year_style": "round",
+       "volume": "155",
+       "report": "CLR",
+       "starting_page": "242"
+      },
+      "source_key": "calverley",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "250"
+       }
+      ],
+      "signal": "See also",
+      "pinpoint_judges": "Gibbs CJ"
+     }
+    ],
+    "expected": "*Wirth v Wirth* (1956) 98 CLR 228, 237 (Dixon CJ). See also *Calverley v Green* (1984) 155 CLR 242, 250 (Gibbs CJ)."
+   }
+  ]
+ },
+ {
+  "id": "1.2-a",
+  "rule": "1.2",
+  "page": 33,
+  "footnotes": [
+   {
+    "number": 40,
+    "citations": [
+     {
+      "source": {
+       "type": "case",
+       "name": "James v Australia and New Zealand Banking Group Ltd",
+       "year": "1986",
+       "year_style": "round",
+       "volume": "64",
+       "report": "ALR",
+       "starting_page": "347"
+      },
+      "source_key": "james"
+     },
+     {
+      "source": {
+       "type": "case",
+       "name": "Andrews v Australian and New Zealand Banking Group Ltd",
+       "year": "2012",
+       "year_style": "round",
+       "volume": "247",
+       "report": "CLR",
+       "starting_page": "205"
+      },
+      "source_key": "andrews",
+      "signal": "See also"
+     }
+    ],
+    "expected": "*James v Australia and New Zealand Banking Group Ltd* (1986) 64 ALR 347. See also *Andrews v Australian and New Zealand Banking Group Ltd* (2012) 247 CLR 205."
+   },
+   {
+    "number": 41,
+    "citations": [
+     {
+      "source": {
+       "type": "legislation",
+       "kind": "act",
+       "title": "Legislative Instruments Act",
+       "year": "2003",
+       "jurisdiction": "Cth"
+      },
+      "source_key": "lia",
+      "pinpoints": [
+       {
+        "kind": "section",
+        "value": "5"
+       }
+      ],
+      "signal": "Cf"
+     }
+    ],
+    "expected": "Cf *Legislative Instruments Act 2003* (Cth) s 5."
+   },
+   {
+    "number": 42,
+    "citations": [
+     {
+      "source": {
+       "type": "journal_article",
+       "authors": [
+        "Leslie Zines"
+       ],
+       "title": "The Inherent Executive Power of the Commonwealth",
+       "year": "2005",
+       "volume": "16",
+       "issue": "4",
+       "journal": "Public Law Review",
+       "starting_page": "279"
+      },
+      "source_key": "zines",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "280-1"
+       }
+      ]
+     },
+     {
+      "source": {
+       "type": "journal_article",
+       "authors": [
+        "George Winterton"
+       ],
+       "title": "The Limits and Use of Executive Power by Government",
+       "year": "2003",
+       "volume": "31",
+       "issue": "3",
+       "journal": "Federal Law Review",
+       "starting_page": "421"
+      },
+      "source_key": "winterton",
+      "signal": "Cf"
+     }
+    ],
+    "expected": "Leslie Zines, ‘The Inherent Executive Power of the Commonwealth’ (2005) 16(4) *Public Law Review* 279, 280–1. Cf George Winterton, ‘The Limits and Use of Executive Power by Government’ (2003) 31(3) *Federal Law Review* 421."
+   }
+  ]
+ },
+ {
+  "id": "1.4.1-a",
+  "rule": "1.4.1",
+  "page": 35,
+  "footnotes": [
+   {
+    "number": 48,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Catharine MacMillan"
+       ],
+       "title": "Mistakes in Contract Law",
+       "publisher": "Hart Publishing",
+       "year": "2010"
+      },
+      "source_key": "macmillan",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "9"
+       }
+      ]
+     }
+    ],
+    "expected": "Catharine MacMillan, *Mistakes in Contract Law* (Hart Publishing, 2010) 9."
+   },
+   {
+    "number": 50,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Catharine MacMillan"
+       ],
+       "title": "Mistakes in Contract Law",
+       "publisher": "Hart Publishing",
+       "year": "2010"
+      },
+      "source_key": "macmillan",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "41"
+       }
+      ]
+     }
+    ],
+    "expected": "MacMillan (n 48) 41."
+   }
+  ]
+ },
+ {
+  "id": "1.4.1-b",
+  "rule": "1.4.1",
+  "page": 35,
+  "footnotes": [
+   {
+    "number": 52,
+    "citations": [
+     {
+      "source": {
+       "type": "report",
+       "author": "Australian Law Reform Commission",
+       "title": "Traditional Rights and Freedoms: Encroachments by Commonwealth Laws",
+       "document_type": "Report",
+       "document_number": "129",
+       "date": "December 2015"
+      },
+      "source_key": "trf",
+      "short_title": "Traditional Rights and Freedoms"
+     }
+    ],
+    "expected": "Australian Law Reform Commission, *Traditional Rights and Freedoms: Encroachments by Commonwealth Laws* (Report No 129, December 2015) (‘*Traditional Rights and Freedoms*’)."
+   },
+   {
+    "number": 53,
+    "citations": [
+     {
+      "source": {
+       "type": "case",
+       "name": "Penfolds Wines Pty Ltd v Elliott",
+       "year": "1946",
+       "year_style": "round",
+       "volume": "74",
+       "report": "CLR",
+       "starting_page": "204"
+      },
+      "source_key": "penfolds",
+      "short_title": "Penfolds Wines"
+     }
+    ],
+    "expected": "*Penfolds Wines Pty Ltd v Elliott* (1946) 74 CLR 204 (‘*Penfolds Wines*’)."
+   },
+   {
+    "number": 55,
+    "citations": [
+     {
+      "source": {
+       "type": "report",
+       "author": "Australian Law Reform Commission",
+       "title": "Traditional Rights and Freedoms: Encroachments by Commonwealth Laws",
+       "document_type": "Report",
+       "document_number": "129",
+       "date": "December 2015"
+      },
+      "source_key": "trf",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "209"
+       },
+       {
+        "kind": "paragraph",
+        "value": "7.111"
+       }
+      ],
+      "short_title": "Traditional Rights and Freedoms"
+     }
+    ],
+    "expected": "*Traditional Rights and Freedoms* (n 52) 209 [7.111]."
+   },
+   {
+    "number": 56,
+    "citations": [
+     {
+      "source": {
+       "type": "case",
+       "name": "Penfolds Wines Pty Ltd v Elliott",
+       "year": "1946",
+       "year_style": "round",
+       "volume": "74",
+       "report": "CLR",
+       "starting_page": "204"
+      },
+      "source_key": "penfolds",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "224"
+       }
+      ],
+      "pinpoint_judges": "Dixon J",
+      "short_title": "Penfolds Wines"
+     }
+    ],
+    "expected": "*Penfolds Wines* (n 53) 224 (Dixon J)."
+   }
+  ]
+ },
+ {
+  "id": "1.4.1-c",
+  "rule": "1.4.1",
+  "page": 35,
+  "footnotes": [
+   {
+    "number": 58,
+    "citations": [
+     {
+      "source": {
+       "type": "journal_article",
+       "authors": [
+        "Kim Rubenstein"
+       ],
+       "title": "Meanings of Membership: Mary Gaudron’s Contributions to Australian Citizenship",
+       "year": "2004",
+       "volume": "15",
+       "issue": "4",
+       "journal": "Public Law Review",
+       "starting_page": "305"
+      },
+      "source_key": "meanings",
+      "short_title": "Meanings of Membership"
+     }
+    ],
+    "expected": "Kim Rubenstein, ‘Meanings of Membership: Mary Gaudron’s Contributions to Australian Citizenship’ (2004) 15(4) *Public Law Review* 305 (‘Meanings of Membership’)."
+   },
+   {
+    "number": 59,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Kim Rubenstein"
+       ],
+       "title": "Australian Citizenship Law in Context",
+       "publisher": "Lawbook",
+       "year": "2002"
+      },
+      "source_key": "citizenship"
+     }
+    ],
+    "expected": "Kim Rubenstein, *Australian Citizenship Law in Context* (Lawbook, 2002)."
+   },
+   {
+    "number": 61,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Kim Rubenstein"
+       ],
+       "title": "Australian Citizenship Law in Context",
+       "publisher": "Lawbook",
+       "year": "2002"
+      },
+      "source_key": "citizenship",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "48"
+       },
+       {
+        "kind": "page",
+        "value": "65-74"
+       }
+      ]
+     }
+    ],
+    "expected": "Rubenstein, *Australian Citizenship Law in Context* (n 59) 48, 65–74."
+   },
+   {
+    "number": 62,
+    "citations": [
+     {
+      "source": {
+       "type": "journal_article",
+       "authors": [
+        "Kim Rubenstein"
+       ],
+       "title": "Meanings of Membership: Mary Gaudron’s Contributions to Australian Citizenship",
+       "year": "2004",
+       "volume": "15",
+       "issue": "4",
+       "journal": "Public Law Review",
+       "starting_page": "305"
+      },
+      "source_key": "meanings",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "307-11"
+       }
+      ],
+      "short_title": "Meanings of Membership"
+     }
+    ],
+    "expected": "Rubenstein, ‘Meanings of Membership’ (n 58) 307–11."
+   }
+  ]
+ },
+ {
+  "id": "1.4.1-d",
+  "rule": "1.4.1",
+  "page": 35,
+  "footnotes": [
+   {
+    "number": 63,
+    "citations": [
+     {
+      "source": {
+       "type": "legislation",
+       "kind": "act",
+       "title": "Administrative Decisions (Judicial Review) Act",
+       "year": "1977",
+       "jurisdiction": "Cth"
+      },
+      "source_key": "adjr",
+      "short_title": "ADJR Act"
+     }
+    ],
+    "expected": "*Administrative Decisions (Judicial Review) Act 1977* (Cth) (‘*ADJR Act*’)."
+   },
+   {
+    "number": 65,
+    "citations": [
+     {
+      "source": {
+       "type": "legislation",
+       "kind": "act",
+       "title": "Administrative Decisions (Judicial Review) Act",
+       "year": "1977",
+       "jurisdiction": "Cth"
+      },
+      "source_key": "adjr",
+      "pinpoints": [
+       {
+        "kind": "section",
+        "value": "5(2)"
+       }
+      ],
+      "short_title": "ADJR Act"
+     }
+    ],
+    "expected": "*ADJR Act* (n 63) s 5(2)."
+   }
+  ]
+ },
+ {
+  "id": "1.4.3-a",
+  "rule": "1.4.3",
+  "page": 36,
+  "footnotes": [
+   {
+    "number": 68,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Eric Barendt"
+       ],
+       "title": "Freedom of Speech",
+       "publisher": "Oxford University Press",
+       "edition": "2",
+       "year": "2005"
+      },
+      "source_key": "barendt",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "163"
+       }
+      ]
+     }
+    ],
+    "expected": "Eric Barendt, *Freedom of Speech* (Oxford University Press, 2nd ed, 2005) 163."
+   },
+   {
+    "number": 69,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Eric Barendt"
+       ],
+       "title": "Freedom of Speech",
+       "publisher": "Oxford University Press",
+       "edition": "2",
+       "year": "2005"
+      },
+      "source_key": "barendt",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "163"
+       }
+      ],
+      "signal": "See"
+     }
+    ],
+    "expected": "See ibid."
+   },
+   {
+    "number": 70,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Eric Barendt"
+       ],
+       "title": "Freedom of Speech",
+       "publisher": "Oxford University Press",
+       "edition": "2",
+       "year": "2005"
+      },
+      "source_key": "barendt",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "162"
+       }
+      ]
+     }
+    ],
+    "expected": "Ibid 162."
+   },
+   {
+    "number": 75,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Rosalyn Higgins"
+       ],
+       "title": "Problems and Process: International Law and How We Use It",
+       "publisher": "Clarendon Press",
+       "year": "1994"
+      },
+      "source_key": "higgins"
+     },
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Eric Barendt"
+       ],
+       "title": "Freedom of Speech",
+       "publisher": "Oxford University Press",
+       "edition": "2",
+       "year": "2005"
+      },
+      "source_key": "barendt",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "67"
+       }
+      ],
+      "signal": "Cf"
+     }
+    ],
+    "expected": "Rosalyn Higgins, *Problems and Process: International Law and How We Use It* (Clarendon Press, 1994). Cf Barendt (n 68) 67."
+   },
+   {
+    "number": 76,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Eric Barendt"
+       ],
+       "title": "Freedom of Speech",
+       "publisher": "Oxford University Press",
+       "edition": "2",
+       "year": "2005"
+      },
+      "source_key": "barendt",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "69"
+       }
+      ]
+     }
+    ],
+    "expected": "Barendt (n 68) 69."
+   },
+   {
+    "number": 78,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Rosalyn Higgins"
+       ],
+       "title": "Problems and Process: International Law and How We Use It",
+       "publisher": "Clarendon Press",
+       "year": "1994"
+      },
+      "source_key": "higgins",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "220"
+       }
+      ]
+     }
+    ],
+    "expected": "Higgins (n 75) 220."
+   },
+   {
+    "number": 79,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Rosalyn Higgins"
+       ],
+       "title": "Problems and Process: International Law and How We Use It",
+       "publisher": "Clarendon Press",
+       "year": "1994"
+      },
+      "source_key": "higgins",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "222"
+       },
+       {
+        "kind": "page",
+        "value": "239"
+       }
+      ]
+     }
+    ],
+    "expected": "Ibid 222, 239."
+   },
+   {
+    "number": 80,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Rosalyn Higgins"
+       ],
+       "title": "Problems and Process: International Law and How We Use It",
+       "publisher": "Clarendon Press",
+       "year": "1994"
+      },
+      "source_key": "higgins",
+      "signal": "See generally"
+     }
+    ],
+    "expected": "See generally Higgins (n 75)."
+   }
+  ]
+ },
+ {
+  "id": "1.4.3-b",
+  "rule": "1.4.3",
+  "page": 36,
+  "footnotes": [
+   {
+    "number": 72,
+    "citations": [
+     {
+      "source": {
+       "type": "legislation",
+       "kind": "act",
+       "title": "Defamation Act",
+       "year": "2005",
+       "jurisdiction": "Vic"
+      },
+      "source_key": "defamation",
+      "pinpoints": [
+       {
+        "kind": "section",
+        "value": "37"
+       }
+      ]
+     }
+    ],
+    "expected": "*Defamation Act 2005* (Vic) s 37."
+   },
+   {
+    "number": 73,
+    "citations": [
+     {
+      "source": {
+       "type": "legislation",
+       "kind": "act",
+       "title": "Defamation Act",
+       "year": "2005",
+       "jurisdiction": "Vic"
+      },
+      "source_key": "defamation",
+      "pinpoints": [
+       {
+        "kind": "section",
+        "value": "38"
+       }
+      ]
+     }
+    ],
+    "expected": "Ibid s 38."
+   }
+  ]
+ },
+ {
+  "id": "1.4.4-a",
+  "rule": "1.4.4",
+  "page": 37,
+  "footnotes": [
+   {
+    "number": 85,
+    "citations": [
+     {
+      "source": {
+       "type": "report",
+       "author": "Australian Law Reform Commission",
+       "title": "Traditional Rights and Freedoms: Encroachments by Commonwealth Laws",
+       "document_type": "Report",
+       "document_number": "129",
+       "date": "December 2015"
+      },
+      "source_key": "trf",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "209"
+       },
+       {
+        "kind": "paragraph",
+        "value": "7.111"
+       }
+      ],
+      "short_title": "Traditional Rights and Freedoms"
+     }
+    ],
+    "expected": "Australian Law Reform Commission, *Traditional Rights and Freedoms: Encroachments by Commonwealth Laws* (Report No 129, December 2015) 209 [7.111] (‘*Traditional Rights and Freedoms*’)."
+   },
+   {
+    "number": 87,
+    "citations": [
+     {
+      "source": {
+       "type": "report",
+       "author": "Australian Law Reform Commission",
+       "title": "Traditional Rights and Freedoms: Encroachments by Commonwealth Laws",
+       "document_type": "Report",
+       "document_number": "129",
+       "date": "December 2015"
+      },
+      "source_key": "trf",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "209"
+       },
+       {
+        "kind": "paragraph",
+        "value": "7.111"
+       }
+      ],
+      "short_title": "Traditional Rights and Freedoms"
+     }
+    ],
+    "expected": "*Traditional Rights and Freedoms* (n 85) 209 [7.111]."
+   }
+  ]
+ },
+ {
+  "id": "1.4.4-b",
+  "rule": "1.4.4",
+  "page": 37,
+  "footnotes": [
+   {
+    "number": 88,
+    "citations": [
+     {
+      "source": {
+       "type": "journal_article",
+       "authors": [
+        "Kim Rubenstein"
+       ],
+       "title": "Meanings of Membership: Mary Gaudron’s Contributions to Australian Citizenship",
+       "year": "2004",
+       "volume": "15",
+       "issue": "4",
+       "journal": "Public Law Review",
+       "starting_page": "305"
+      },
+      "source_key": "meanings",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "310"
+       }
+      ],
+      "short_title": "Meanings of Membership"
+     }
+    ],
+    "expected": "Kim Rubenstein, ‘Meanings of Membership: Mary Gaudron’s Contributions to Australian Citizenship’ (2004) 15(4) *Public Law Review* 305, 310 (‘Meanings of Membership’)."
+   },
+   {
+    "number": 89,
+    "citations": [
+     {
+      "source": {
+       "type": "book",
+       "authors": [
+        "Kim Rubenstein"
+       ],
+       "title": "Australian Citizenship Law in Context",
+       "publisher": "Lawbook",
+       "year": "2002"
+      },
+      "source_key": "citizenship"
+     }
+    ],
+    "expected": "Kim Rubenstein, *Australian Citizenship Law in Context* (Lawbook, 2002)."
+   },
+   {
+    "number": 90,
+    "citations": [
+     {
+      "source": {
+       "type": "journal_article",
+       "authors": [
+        "Kim Rubenstein"
+       ],
+       "title": "Meanings of Membership: Mary Gaudron’s Contributions to Australian Citizenship",
+       "year": "2004",
+       "volume": "15",
+       "issue": "4",
+       "journal": "Public Law Review",
+       "starting_page": "305"
+      },
+      "source_key": "meanings",
+      "pinpoints": [
+       {
+        "kind": "page",
+        "value": "305-11"
+       }
+      ],
+      "short_title": "Meanings of Membership"
+     }
+    ],
+    "expected": "Rubenstein, ‘Meanings of Membership’ (n 88) 305–11."
+   }
+  ]
+ }
+]

@@ -196,8 +196,11 @@ def _short_titles(
         formatter = formatter_for(citation)
         st = formatter.short_title(citation)
         short_title_text[key] = st
-        wants_definition = formatter.defines_short_title and (
-            needs_lookahead.get(key, False) or bool(citation.short_title)
+        # An author-supplied short title is always defined, for any source type (r 1.4.4:
+        # '(‘*Traditional Rights and Freedoms*’)' for a report, '(‘Meanings of Membership’)'
+        # for an article); otherwise only types that use short titles get one, when reused.
+        wants_definition = bool(citation.short_title) or (
+            formatter.defines_short_title and needs_lookahead.get(key, False)
         )
         append_definition[key] = bool(wants_definition and st)
 
@@ -296,8 +299,10 @@ def _render_citation(
     if plan.kind == "full":
         out.extend(formatter.full(citation))
         if append_definition.get(key):
+            # The definition introduces the author's own short title where they gave one
+            # (r 1.4.4); short_title_text may be an author surname for secondary sources.
             out.append(" (" + OPEN_QUOTE)
-            out.append(short_title_text[key], italic=formatter.italic_short_title)
+            out.append(citation.short_title or short_title_text[key], italic=formatter.italic_short_title)
             out.append(CLOSE_QUOTE + ")")
     elif plan.kind == "ibid":
         # r 1.4.3: 'Ibid' is capitalised at the start of a footnote; a
