@@ -144,6 +144,12 @@ if a journal article, book chapter or newspaper article gives only one page numb
 `..., 2008, p. 38` or `The Age, 31 January 2017, p. 6`), it is the `starting_page` (or the
 newspaper's `page`) and there is no pinpoint. Only a second number (`393, at 400`) is a pinpoint.
 
+**Text AGLC deliberately drops.** A few things in a source have no place in an AGLC citation:
+the publisher and place of publication of a *report* (AGLC gives only "(Report No 31, 1986)"),
+and similar publication furniture. Copy that text verbatim into the citation segment's
+`omitted` field so it is accounted for, rather than silently leaving it out. Everything else
+must go in a field, a pinpoint or a text segment.
+
 **Copy titles in full**, exactly as written, including possessives and subtitles (eg
 `Fleming's The Law of Torts`, not `The Law of Torts`).
 

@@ -95,10 +95,18 @@ def extracted_text(segments: list, extra: Iterable[str] = ()) -> str:
     return " ".join(parts)
 
 
+def _with_joined_pairs(captured: set[str], text: str) -> set[str]:
+    """Also count adjacent words joined together, so the extraction's 'Web Page' covers the
+    original's 'Webpage' (and vice versa)."""
+    toks = tokens(text)
+    return captured | {a + b for a, b in zip(toks, toks[1:])}
+
+
 def missing_from_extraction(original: str, segments: list, extra: Iterable[str] = ()) -> list[str]:
     """Meaningful tokens of `original` that appear nowhere in the extraction, in the
     order they occur in the footnote. Empty means nothing was dropped."""
-    captured = meaningful(extracted_text(segments, extra)) | numbers(extracted_text(segments, extra))
+    text = extracted_text(segments, extra)
+    captured = _with_joined_pairs(meaningful(text) | numbers(text), text)
     seen: set[str] = set()
     missing: list[str] = []
     for tok in tokens(original):
@@ -108,6 +116,11 @@ def missing_from_extraction(original: str, segments: list, extra: Iterable[str] 
         key = (tok.lstrip("0") or "0") if tok.isdigit() else tok
         if key not in captured and tok not in captured:
             missing.append(tok)
+    # a word split in the original ('Web Page') may be joined in the extraction ('Webpage')
+    joined = {a + b for a, b in zip(missing, missing[1:])}
+    if joined & captured:
+        missing = [t for i, t in enumerate(missing)
+                   if not (i and missing[i - 1] + t in captured) and not (i + 1 < len(missing) and t + missing[i + 1] in captured)]
     return missing
 
 

@@ -62,6 +62,15 @@ class LLMCitationSegment(BaseModel):
         default=None,
         description="Footnote number this is a subsequent reference to (Ibid / (n x) / above n x), else null.",
     )
+    omitted: str = Field(
+        default="",
+        description=(
+            "Text from the original that AGLC deliberately leaves out, copied verbatim, eg the "
+            "publisher and place of publication of a report ('Australian Government Publishing "
+            "Service, Canberra'). Use this only for text a correct AGLC citation must not "
+            "contain -- never for detail that belongs in a field."
+        ),
+    )
 
 
 LLMSegment = Annotated[Union[LLMTextSegment, LLMCitationSegment], Field(discriminator="kind")]
@@ -122,6 +131,16 @@ def _split_leading_commentary(original: str, citation: Citation, out: list[Segme
         if out and isinstance(out[-1], TextSegment) and out[-1].text.text.strip():
             return  # the model already gave the commentary as its own text segment
         out.append(TextSegment(text=RichText.plain(prefix)))
+
+
+def _keep_only_real_short_title(citation: Citation) -> Citation:
+    """Drop a 'short title' read from a reference when it isn't an abbreviation at all, ie
+    a case's full name repeated ('Donoghue v Stevenson, supra n 1, 599'). Legislation short
+    titles legitimately equal the title without its year ('Adoption Act')."""
+    short = (citation.short_title or "").strip()
+    if short and citation.source.type == "case" and _norm(short) == _norm(_display_name(citation.source)):
+        return citation.model_copy(update={"short_title": None})
+    return citation
 
 
 def _drop_repeated_start_page(citation: Citation, original: str) -> Citation:
@@ -315,6 +334,21 @@ class Extractor:
             log.info("  got %d footnotes back in %.1fs", len(response.footnotes), time.monotonic() - t0)
 
             by_number = {lf.number: lf for lf in response.footnotes}
+            answered = sum(1 for fn in batch if by_number.get(fn.number) and by_number[fn.number].segments)
+            if answered * 2 < len(batch) and len(batch) > 1:
+                # The model answered for only a few of the batch; re-asking the whole batch is
+                # far cheaper than one call per missing footnote.
+                log.info("  only %d/%d footnotes answered; re-asking the batch", answered, len(batch))
+                try:
+                    retry = self.provider.generate_json(
+                        system=system_prompt, user=user_prompt, output_model=ExtractionBatch
+                    )
+                except LLMError:
+                    retry = None
+                if retry is not None:
+                    better = {lf.number: lf for lf in retry.footnotes}
+                    if sum(1 for fn in batch if better.get(fn.number) and better[fn.number].segments) > answered:
+                        by_number = better
             for fn in batch:
                 llm_fn = by_number.get(fn.number)
                 if (llm_fn is None or not llm_fn.segments) and fn.original.text.strip():
@@ -362,9 +396,14 @@ class Extractor:
     ) -> tuple[list[Segment], list[str]]:
         segments = self._convert_footnote(fn, llm_fn, resolved)
         # footnote numbers in '(n 4)' / 'above n 4' are captured as refers_to_footnote
-        refs = [str(s.refers_to_footnote) for s in llm_fn.segments
-                if isinstance(s, LLMCitationSegment) and s.refers_to_footnote is not None]
-        return segments, validate.missing_from_extraction(fn.original.text, segments, extra=refs)
+        accounted = [str(s.refers_to_footnote) for s in llm_fn.segments
+                     if isinstance(s, LLMCitationSegment) and s.refers_to_footnote is not None]
+        accounted += [s.omitted for s in llm_fn.segments if isinstance(s, LLMCitationSegment) and s.omitted]
+        for text in (s.omitted for s in llm_fn.segments if isinstance(s, LLMCitationSegment) and s.omitted):
+            note = f"footnote {fn.number}: left out of the AGLC citation: {text.strip()!r}"
+            if note not in self.warnings:
+                self.warnings.append(note)
+        return segments, validate.missing_from_extraction(fn.original.text, segments, extra=accounted)
 
     def _repair(
         self, fn: Footnote, missing: list[str], resolved: dict[int, Footnote], system_prompt: str
@@ -476,6 +515,13 @@ class Extractor:
         citation = seg.citation
         if seg.refers_to_footnote is None:
             return citation
+        if not citation.short_title:
+            # The author's own short title is right there in the text of the subsequent
+            # reference ("Adoption Act (n 2) s 24", "Maynard, above n 1"); read it rather
+            # than relying on the model to have reported it.
+            m = re.match(r"\s*\*?\s*(?P<title>[^*(]{1,80}?)\s*\*?\s*[,(]?\s*(?:\(\s*n\s*\d|above\s+n|supra)", seg.original)
+            if m and m.group("title").strip().lower() not in {"ibid", "id"}:
+                citation = citation.model_copy(update={"short_title": m.group("title").strip(" ,*")})
 
         ref_fn = resolved.get(seg.refers_to_footnote)
         ref_citations = [s.citation for s in ref_fn.segments if isinstance(s, CitationSegment)] if ref_fn else []
@@ -492,4 +538,8 @@ class Extractor:
             )
 
         source, short_title = match
-        return citation.model_copy(update={"source": source, "short_title": short_title})
+        # the short title read from this reference's own text wins over the referenced one
+        resolved_citation = citation.model_copy(
+            update={"source": source, "short_title": citation.short_title or short_title}
+        )
+        return _keep_only_real_short_title(resolved_citation)

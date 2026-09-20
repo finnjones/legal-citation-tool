@@ -257,3 +257,47 @@ def test_pinpoint_equal_to_start_page_is_kept_when_written_twice():
                       "pinpoints": [{"kind": "page", "value": "189"}]}},
     ]}])
     assert len(out[0].segments[0].citation.pinpoints) == 1
+
+
+# ---- run on a real student case note ------------------------------------------ #
+
+
+def test_short_title_from_a_later_reference_is_used_from_the_first_citation():
+    """The author defines short titles in the body text ("... ('Maynard')"), so the tool
+    learns them from the footnotes that use them: "Maynard (n 1)"."""
+    from aglc import pipeline
+
+    fns = [_fn(1, "Adoption of Maynard (a pseudonym) [2026] NSWSC 921."), _fn(6, "Maynard (n 1).")]
+    batch = json.dumps({"footnotes": [
+        {"number": 1, "segments": [{"kind": "citation", "original": "Adoption of Maynard (a pseudonym) [2026] NSWSC 921",
+                                    "citation": {"source": {"type": "case", "name": "Adoption of Maynard (a pseudonym)",
+                                                            "year": "2026", "court_id": "NSWSC", "judgment_number": "921"}}}]},
+        {"number": 6, "segments": [{"kind": "citation", "original": "Maynard (n 1)", "refers_to_footnote": 1,
+                                    "citation": {"source": {"type": "other", "text": "Maynard (n 1)"}}}]},
+    ]})
+    result = pipeline.process_footnotes(fns, get_provider("fake:x", responses=[batch]), bibliography=False)
+    out = {f.number: f.formatted.to_markup() for f in result.footnotes}
+    assert out[1] == "*Adoption of Maynard (a pseudonym)* [2026] NSWSC 921 (‘*Maynard*’)."
+    assert out[6] == "*Maynard* (n 1)."
+
+
+def test_a_cases_full_name_is_not_treated_as_a_short_title():
+    fns = [_fn(1, "Donoghue v Stevenson [1932] AC 562."), _fn(5, "Donoghue v Stevenson, supra n 1, 599.")]
+    batch = json.dumps({"footnotes": [
+        {"number": 1, "segments": [{"kind": "citation", "original": "Donoghue v Stevenson [1932] AC 562",
+                                    "citation": {"source": {"type": "case", "name": "Donoghue v Stevenson", "year": "1932",
+                                                            "report": "AC", "starting_page": "562"}}}]},
+        {"number": 5, "segments": [{"kind": "citation", "original": "Donoghue v Stevenson, supra n 1, 599", "refers_to_footnote": 1,
+                                    "citation": {"source": {"type": "other", "text": "x"},
+                                                 "pinpoints": [{"kind": "page", "value": "599"}]}}]},
+    ]})
+    out = Extractor(get_provider("fake:x", responses=[batch]), verify=False).extract(fns)
+    assert out[1].segments[0].citation.short_title is None
+
+
+def test_webpage_and_web_page_count_as_the_same_word():
+    from aglc import validate as V
+
+    seg = CitationSegment(citation=Citation(source=WebsiteSource(
+        title="Legal Formalism", website_name="Cornell", document_type="Web Page", date="2023", url="https://x")))
+    assert V.missing_from_extraction("‘Legal Formalism’, Cornell (Webpage, 2023) <https://x>.", [seg]) == []

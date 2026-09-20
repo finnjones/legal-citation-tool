@@ -29,7 +29,9 @@ class OpenAIProvider(LLMProvider):
             "api_key": api_key,
             "base_url": self.options.get("base_url") or self.default_base_url,
             # a stalled upstream host should fail (and be retried) rather than hang the run
-            "timeout": float(self.options.get("timeout") or os.environ.get("AGLC_TIMEOUT") or 120),
+            "timeout": float(self.options.get("timeout") or os.environ.get("AGLC_TIMEOUT") or 90),
+            # one retry, not two: a stalled host should be abandoned quickly
+            "max_retries": int(self.options.get("max_retries", 1)),
         }
 
     def _extra_body(self, structured: bool) -> dict[str, Any] | None:

@@ -36,6 +36,8 @@ def process_footnotes(
                 seg.citation, msgs = normalise_citation(seg.citation)
                 warnings += [Warning_(footnote=fn.number, message=m) for m in msgs]
 
+    _share_short_titles(extracted)
+
     # Deterministic check that the formatter printed every field (aglc/validate.py)
     for fn in extracted:
         warnings += [Warning_(footnote=fn.number, message=m) for m in check_footnote_rendering(fn, formatter_for)]
@@ -43,6 +45,26 @@ def process_footnotes(
     result = render_document(extracted, bibliography=bibliography)
     result.warnings = warnings + result.warnings
     return result
+
+
+def _share_short_titles(footnotes: list[Footnote]) -> None:
+    """A short title is often introduced in the body text ("the Adoption Act 2000 (NSW)
+    ('Adoption Act')") and then used in later footnotes ("Adoption Act (n 2) s 24"). Give
+    every citation of a source the short title any of them uses, so the document pass
+    defines it at the first citation and abbreviates the rest."""
+    chosen: dict[str, str] = {}
+    for fn in footnotes:
+        for seg in fn.segments:
+            if isinstance(seg, CitationSegment):
+                key, short = seg.citation.source_key, seg.citation.short_title
+                if key and short and key not in chosen:
+                    chosen[key] = short
+    for fn in footnotes:
+        for seg in fn.segments:
+            if isinstance(seg, CitationSegment) and not seg.citation.short_title:
+                short = chosen.get(seg.citation.source_key or "")
+                if short:
+                    seg.citation.short_title = short
 
 
 def process_docx(
