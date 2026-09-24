@@ -3,7 +3,7 @@
 THESIS: The essay is lodged like a brief and every footnote is entered in a register and stamped. This refuses the SaaS dropzone-plus-table.
 OWN-WORLD: Cool registry-counter grey ground, near-white sheets, one buff backsheet tied with pink tape, violet stamp ink, refer red. Serif citations, system-sans UI, a typed Courier line on the backsheet only.
 STORY: A student lodges an essay, sees every footnote stamped AMENDED / UNCHANGED / REFER, checks the redline where they doubt it, and downloads.
-FIRST VIEWPORT: Masthead; backsheet (drop zone, model, options, Process) left, "how it works" right. Results add a pinned strip (filters, markup, Download) over the register.
+FIRST VIEWPORT: Masthead; backsheet (drop zone, options, Process) left, "how it works" right. Results add a pinned strip (filters, markup, Download) over the register.
 FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit (the register previews the document; Download commits). Seed 53960d8c.
 -->
 <html lang="en">
@@ -141,20 +141,10 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
         .matter-hint u { text-underline-offset: 3px; }
 
         .particulars { margin-top: 22px; display: grid; gap: 14px; }
-        .field label, .field-label {
+        .field-label {
             display: block; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em;
             text-transform: uppercase; color: var(--buff-ink-2); margin-bottom: 6px;
         }
-        .field input[type="text"] {
-            width: 100%;
-            font-family: var(--font-typed); font-size: 0.9375rem; color: var(--buff-ink);
-            background: color-mix(in oklch, var(--sheet) 55%, var(--buff));
-            border: 1px solid color-mix(in oklch, var(--buff-ink) 25%, transparent);
-            border-radius: 4px; padding: 8px 10px;
-        }
-        .field input[type="text"]::placeholder { color: var(--buff-ink-2); }
-        .field input[type="text"]:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
-        .field-hint { margin-top: 5px; font-size: 0.8125rem; color: var(--buff-ink-2); }
 
         .options { display: flex; flex-wrap: wrap; gap: 8px 24px; }
         .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9375rem; }
@@ -360,12 +350,6 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                     </label>
 
                     <div class="particulars">
-                        <div class="field">
-                            <label for="modelSelect">AI Model</label>
-                            <input type="text" id="modelSelect" placeholder="Loading providers…" list="modelList" autocomplete="off" spellcheck="false" />
-                            <datalist id="modelList"></datalist>
-                            <p class="field-hint">Only reads the footnotes. The formatting itself is done by fixed AGLC4 rules.</p>
-                        </div>
                         <div>
                             <span class="field-label">Output</span>
                             <div class="options">
@@ -426,7 +410,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             </section>
         </main>
 
-        <footer>Runs on your machine. Only your footnotes are sent, and only to the AI model you choose.</footer>
+        <footer>Runs on your machine. Only your footnotes are sent, and only to the AI model set in your .env.</footer>
     </div>
 
     <script>
@@ -440,30 +424,10 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
         window.addEventListener("error", (e) => showError(`Unexpected error: ${e.message}`));
         window.addEventListener("unhandledrejection", (e) => showError(`Unexpected error: ${e.reason?.message || e.reason}`));
 
-        document.addEventListener("DOMContentLoaded", async () => {
+        document.addEventListener("DOMContentLoaded", () => {
             setupUpload();
             setupControls();
-            await loadProviders();
         });
-
-        async function loadProviders() {
-            const select = document.getElementById("modelSelect");
-            try {
-                const response = await fetch("/api/providers");
-                if (!response.ok) throw new Error("Failed to load providers");
-
-                const data = await response.json();
-                select.placeholder = data.default;
-                select.value = data.default;
-                document.getElementById("modelList").innerHTML = data.providers
-                    .map(p => `<option value="${escapeHtml(p)}"></option>`)
-                    .join("");
-            } catch (error) {
-                console.error("Error loading providers:", error);
-                select.placeholder = "provider:model";
-                showError("Failed to load LLM providers", "Note.");
-            }
-        }
 
         function setupUpload() {
             const section = document.getElementById("uploadSection");
@@ -530,7 +494,6 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             try {
                 const formData = new FormData();
                 formData.append("file", file);
-                formData.append("model", document.getElementById("modelSelect").value || "");
                 formData.append("track_changes", document.getElementById("trackChanges").checked);
                 formData.append("bibliography", document.getElementById("bibliography").checked);
 
