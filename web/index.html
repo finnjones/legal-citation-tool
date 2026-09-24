@@ -1,491 +1,442 @@
 <!DOCTYPE html>
+<!--
+THESIS: The essay is lodged like a brief and every footnote is entered in a register and stamped. This refuses the SaaS dropzone-plus-table.
+OWN-WORLD: Cool registry-counter grey ground, near-white sheets, one buff backsheet tied with pink tape, violet stamp ink, refer red. Serif citations, system-sans UI, a typed Courier line on the backsheet only.
+STORY: A student lodges an essay, sees every footnote stamped AMENDED / UNCHANGED / REFER, checks the redline where they doubt it, and downloads.
+FIRST VIEWPORT: Masthead; backsheet (drop zone, model, options, Process) left, "how it works" right. Results add a pinned strip (filters, markup, Download) over the register.
+FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit (the register previews the document; Download commits). Seed 53960d8c.
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AGLC4 Citation Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400;1,8..60,600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --color-primary: #1e40af;
-            --color-primary-light: #3b82f6;
-            --color-success: #16a34a;
-            --color-warning: #ea580c;
-            --color-error: #dc2626;
-            --color-border: #d1d5db;
-            --color-bg: #ffffff;
-            --color-bg-secondary: #f9fafb;
-            --color-text: #111827;
-            --color-text-secondary: #6b7280;
-            --font-serif: "Georgia", "Times New Roman", serif;
-            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            --spacing-xs: 0.25rem;
-            --spacing-sm: 0.5rem;
-            --spacing-md: 1rem;
-            --spacing-lg: 1.5rem;
-            --spacing-xl: 2rem;
+            --ground: oklch(0.93 0.008 150);
+            --sheet: oklch(0.995 0.002 100);
+            --sheet-2: oklch(0.97 0.004 150);
+            --ink: oklch(0.22 0.02 260);
+            --ink-2: oklch(0.46 0.02 260);
+            --rule: oklch(0.86 0.01 250);
+            --buff: oklch(0.87 0.055 82);
+            --buff-deep: oklch(0.8 0.065 78);
+            --buff-ink: oklch(0.3 0.04 60);
+            --buff-ink-2: oklch(0.42 0.045 65);
+            --tape: oklch(0.74 0.12 2);
+            --tape-deep: oklch(0.64 0.13 2);
+            --stamp: oklch(0.45 0.16 295);
+            --stamp-wash: oklch(0.45 0.16 295 / 0.08);
+            --refer: oklch(0.52 0.19 25);
+            --refer-wash: oklch(0.52 0.19 25 / 0.07);
+            --focus: oklch(0.55 0.16 295);
+            --shadow: 0 1px 1px oklch(0.3 0.02 250 / 0.06), 0 3px 10px -2px oklch(0.3 0.02 250 / 0.12);
+            --shadow-board: 0 2px 2px oklch(0.3 0.04 60 / 0.1), 0 10px 24px -8px oklch(0.3 0.04 60 / 0.3);
+
+            --font-cite: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+            --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            --font-typed: "Courier Prime", "Courier New", monospace;
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            color-scheme: light;
         }
 
         @media (prefers-color-scheme: dark) {
             :root:not([data-theme="light"]) {
-                --color-bg: #1f2937;
-                --color-bg-secondary: #111827;
-                --color-text: #f3f4f6;
-                --color-text-secondary: #9ca3af;
-                --color-border: #374151;
+                --ground: oklch(0.18 0.012 260);
+                --sheet: oklch(0.23 0.012 260);
+                --sheet-2: oklch(0.205 0.012 260);
+                --ink: oklch(0.93 0.008 250);
+                --ink-2: oklch(0.72 0.015 250);
+                --rule: oklch(0.33 0.014 260);
+                --buff: oklch(0.44 0.05 75);
+                --buff-deep: oklch(0.38 0.05 72);
+                --buff-ink: oklch(0.95 0.02 85);
+                --buff-ink-2: oklch(0.85 0.03 80);
+                --tape: oklch(0.62 0.11 2);
+                --tape-deep: oklch(0.54 0.11 2);
+                --stamp: oklch(0.76 0.12 295);
+                --stamp-wash: oklch(0.76 0.12 295 / 0.1);
+                --refer: oklch(0.74 0.15 25);
+                --refer-wash: oklch(0.74 0.15 25 / 0.1);
+                --focus: oklch(0.76 0.12 295);
+                --shadow: 0 1px 1px oklch(0 0 0 / 0.3), 0 3px 10px -2px oklch(0 0 0 / 0.4);
+                --shadow-board: 0 2px 2px oklch(0 0 0 / 0.3), 0 10px 24px -8px oklch(0 0 0 / 0.55);
+                color-scheme: dark;
             }
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: var(--font-sans);
-            background-color: var(--color-bg);
-            color: var(--color-text);
-            line-height: 1.6;
+            font-family: var(--font-ui);
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            background-color: var(--ground);
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
         }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: var(--spacing-lg);
-        }
+        :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-        header {
-            margin-bottom: var(--spacing-xl);
-            text-align: center;
-        }
+        .container { max-width: 1080px; margin: 0 auto; padding: 0 24px 64px; }
 
-        h1 {
-            font-size: 2rem;
-            margin-bottom: var(--spacing-sm);
+        /* Masthead */
+        .masthead {
+            display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+            padding: 28px 0 22px; margin-bottom: 28px; border-bottom: 1px solid var(--rule);
         }
+        h1 { font-size: 1.0625rem; font-weight: 700; letter-spacing: -0.01em; }
+        h1 span { font-weight: 400; color: var(--ink-2); }
+        .masthead p { color: var(--ink-2); font-size: 0.8125rem; }
+        .masthead p cite { font-family: var(--font-cite); font-size: 0.9375rem; }
 
-        .subtitle {
-            color: var(--color-text-secondary);
-            font-size: 1rem;
+        /* Lodge row */
+        .lodge { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; align-items: start; }
+
+        /* The backsheet: the one board in the world */
+        .backsheet {
+            position: relative;
+            background-color: var(--buff);
+            color: var(--buff-ink);
+            border-radius: 3px;
+            box-shadow: var(--shadow-board);
+            padding: 28px 28px 28px 76px;
+            transition: background-color 0.25s var(--ease-out);
         }
+        .backsheet::before { /* pink tape */
+            content: ""; position: absolute; top: 0; bottom: 0; left: 30px; width: 16px;
+            background: linear-gradient(90deg, var(--tape-deep), var(--tape) 30%, var(--tape) 70%, var(--tape-deep));
+            box-shadow: 1px 0 2px oklch(0.3 0.05 20 / 0.25);
+        }
+        .backsheet.dragover { background-color: var(--buff-deep); }
 
-        .upload-section {
-            background-color: var(--color-bg-secondary);
-            border: 2px dashed var(--color-border);
-            border-radius: 8px;
-            padding: var(--spacing-xl);
-            margin-bottom: var(--spacing-xl);
-            text-align: center;
+        .dropzone {
+            display: block;
+            border: 1.5px dashed color-mix(in oklch, var(--buff-ink) 35%, transparent);
+            border-radius: 3px;
+            padding: 20px 20px 22px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: border-color 0.2s, background-color 0.2s;
         }
-
-        .upload-section:hover {
-            border-color: var(--color-primary);
-            background-color: var(--color-bg);
+        .dropzone:hover, .backsheet.dragover .dropzone {
+            border-color: var(--buff-ink);
+            background-color: color-mix(in oklch, var(--sheet) 12%, transparent);
         }
+        .dropzone:has(:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+        .file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
-        .upload-section.dragover {
-            border-color: var(--color-primary-light);
-            background-color: var(--color-bg);
+        .matter-label {
+            font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+            color: var(--buff-ink-2); margin-bottom: 6px;
         }
-
-        .file-input {
-            display: none;
+        .matter-title {
+            font-family: var(--font-typed); font-size: 1.25rem; font-weight: 700; line-height: 1.3;
+            overflow-wrap: anywhere; min-height: 1.3em;
         }
+        .matter-title.empty { font-weight: 400; color: var(--buff-ink-2); }
+        .matter-hint { margin-top: 8px; font-size: 0.875rem; color: var(--buff-ink-2); }
+        .matter-hint u { text-underline-offset: 3px; }
 
-        .upload-text {
-            font-size: 1.1rem;
-            margin-bottom: var(--spacing-sm);
+        .particulars { margin-top: 22px; display: grid; gap: 14px; }
+        .field label, .field-label {
+            display: block; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em;
+            text-transform: uppercase; color: var(--buff-ink-2); margin-bottom: 6px;
         }
-
-        .upload-subtext {
-            color: var(--color-text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: var(--spacing-lg);
-            margin-bottom: var(--spacing-lg);
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            font-weight: 500;
-            margin-bottom: var(--spacing-sm);
-            font-size: 0.95rem;
-        }
-
-        input[type="text"],
-        input[type="file"],
-        select {
-            padding: var(--spacing-sm) var(--spacing-md);
-            border: 1px solid var(--color-border);
-            border-radius: 4px;
-            background-color: var(--color-bg);
-            color: var(--color-text);
-            font-family: var(--font-sans);
-            font-size: 0.95rem;
-        }
-
-        input[type="text"]:focus,
-        select:focus {
-            outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-        }
-
-        input[type="checkbox"] {
-            width: 1.1rem;
-            height: 1.1rem;
-            cursor: pointer;
-        }
-
-        .button-group {
-            display: flex;
-            gap: var(--spacing-md);
-            margin-bottom: var(--spacing-xl);
-        }
-
-        button {
-            padding: var(--spacing-sm) var(--spacing-lg);
-            border: none;
-            border-radius: 4px;
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-family: var(--font-sans);
-        }
-
-        .btn-primary {
-            background-color: var(--color-primary);
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            background-color: var(--color-primary-light);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background-color: var(--color-bg-secondary);
-            color: var(--color-text);
-            border: 1px solid var(--color-border);
-        }
-
-        .btn-secondary:hover {
-            background-color: var(--color-border);
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            margin: var(--spacing-xl) 0;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            border: 3px solid var(--color-border);
-            border-top-color: var(--color-primary);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .results-section {
-            display: none;
-            margin-top: var(--spacing-xl);
-        }
-
-        .summary {
-            background-color: var(--color-bg-secondary);
-            padding: var(--spacing-lg);
-            border-radius: 4px;
-            margin-bottom: var(--spacing-lg);
-        }
-
-        .summary-stat {
-            display: inline-block;
-            margin-right: var(--spacing-xl);
-        }
-
-        .summary-stat-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--color-primary);
-        }
-
-        .summary-stat-label {
-            color: var(--color-text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .warning-list {
-            background-color: #fef3c7;
-            color: #92400e;
-            border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
-            border-radius: 6px;
-            padding: var(--spacing-md) var(--spacing-lg);
-            border-radius: 4px;
-            margin-bottom: var(--spacing-lg);
-        }
-
-        .warning-list.dark-mode {
-            background-color: #78350f;
-            color: #fcd34d;
-        }
-
-        .warning-item {
-            margin-bottom: var(--spacing-sm);
-        }
-
-        .warning-item:last-child {
-            margin-bottom: 0;
-        }
-
-        table {
+        .field input[type="text"] {
             width: 100%;
-            border-collapse: collapse;
-            margin-bottom: var(--spacing-lg);
-            font-size: 0.95rem;
+            font-family: var(--font-typed); font-size: 0.9375rem; color: var(--buff-ink);
+            background: color-mix(in oklch, var(--sheet) 55%, var(--buff));
+            border: 1px solid color-mix(in oklch, var(--buff-ink) 25%, transparent);
+            border-radius: 4px; padding: 8px 10px;
+        }
+        .field input[type="text"]::placeholder { color: var(--buff-ink-2); }
+        .field input[type="text"]:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+        .field-hint { margin-top: 5px; font-size: 0.8125rem; color: var(--buff-ink-2); }
+
+        .options { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+        .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9375rem; }
+        .check input { width: 17px; height: 17px; accent-color: var(--stamp); cursor: pointer; }
+
+        .actions { margin-top: 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .status {
+            font-family: var(--font-typed); font-size: 0.875rem; color: var(--buff-ink-2);
+            min-height: 1.3em;
         }
 
-        th, td {
-            text-align: left;
-            padding: var(--spacing-md);
-            border-bottom: 1px solid var(--color-border);
+        button { font-family: var(--font-ui); font-size: 0.9375rem; cursor: pointer; }
+        .btn-primary {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--ink); color: var(--sheet);
+            border: 1px solid var(--ink); border-radius: 4px;
+            padding: 10px 18px; font-weight: 600;
+            box-shadow: 0 1px 2px oklch(0.2 0.02 260 / 0.25);
+            transition: transform 0.12s var(--ease-out), background-color 0.2s, box-shadow 0.2s;
         }
+        .btn-primary:hover:not(:disabled) { background: color-mix(in oklch, var(--ink) 85%, var(--stamp)); }
+        .btn-primary:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+        .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+        .btn-primary svg { width: 16px; height: 16px; flex: none; }
 
-        th {
-            background-color: var(--color-bg-secondary);
-            font-weight: 600;
-            font-size: 0.9rem;
+        .busy-rule { /* indeterminate progress: a typist's dotted rule */
+            display: none; height: 2px; margin-top: 18px; border-radius: 1px;
+            background: repeating-linear-gradient(90deg, var(--buff-ink) 0 6px, transparent 6px 12px);
+            background-size: 24px 2px; opacity: 0.55;
+            animation: typing 0.9s linear infinite;
         }
+        .backsheet.busy .busy-rule { display: block; }
+        @keyframes typing { to { background-position: 24px 0; } }
 
-        tr.changed {
-            background-color: #fef3c7;
-        }
+        .backsheet > .stamp { position: absolute; bottom: 26px; right: 24px; }
 
-        tr.changed em {
-            font-style: italic;
-        }
+        /* How it works */
+        .how { padding-top: 6px; }
+        .how h2 { font-size: 0.9375rem; font-weight: 700; margin-bottom: 12px; }
+        .how ol { list-style: none; counter-reset: how; display: grid; gap: 14px; }
+        .how li { counter-increment: how; display: grid; grid-template-columns: 22px 1fr; gap: 4px 8px; color: var(--ink-2); max-width: 44ch; }
+        .how li::before { content: counter(how); font-family: var(--font-cite); font-weight: 600; color: var(--ink); }
+        .how li strong { color: var(--ink); font-weight: 600; }
 
-        @media (prefers-color-scheme: dark) {
-            tr.changed {
-                background-color: #78350f;
-            }
-        }
-
-        tr:hover {
-            background-color: var(--color-bg-secondary);
-        }
-
-        .collapsible-row {
-            cursor: pointer;
-        }
-
-        .collapsible-row:hover {
-            background-color: var(--color-bg-secondary);
-        }
-
-        .toggle-icon {
-            display: inline-block;
-            margin-right: var(--spacing-sm);
-            transition: transform 0.2s;
-        }
-
-        .toggle-icon.collapsed {
-            transform: rotate(-90deg);
-        }
-
-        .hidden-row {
-            display: none;
-        }
-
-        .bibliography {
-            margin-bottom: var(--spacing-xl);
-        }
-
-        .bibliography h3 {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-top: var(--spacing-lg);
-            margin-bottom: var(--spacing-md);
-        }
-
-        .bibliography-entry {
-            margin-left: var(--spacing-lg);
-            margin-bottom: var(--spacing-md);
-            font-family: var(--font-serif);
-        }
-
+        /* Messages */
         .error {
-            background-color: #fee2e2;
-            color: #991b1b;
-            border: 1px solid color-mix(in srgb, var(--color-error) 35%, transparent);
-            border-radius: 6px;
-            padding: var(--spacing-md) var(--spacing-lg);
-            border-radius: 4px;
-            margin-bottom: var(--spacing-lg);
-            display: none;
+            display: none; margin-top: 24px; padding: 14px 18px;
+            background: var(--refer-wash); color: var(--ink);
+            border: 1px solid color-mix(in oklch, var(--refer) 40%, transparent); border-radius: 4px;
+        }
+        .error strong { color: var(--refer); margin-right: 6px; }
+
+        /* Stamps */
+        .stamp {
+            --tilt: -3deg;
+            display: inline-block; justify-self: end; align-self: start;
+            font-family: var(--font-ui); font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.14em;
+            text-transform: uppercase; white-space: nowrap; line-height: 1;
+            color: var(--stamp);
+            padding: 6px 8px 5px;
+            border: 2px solid currentColor; border-radius: 3px;
+            box-shadow: inset 0 0 0 1.5px var(--sheet), inset 0 0 0 2.5px currentColor;
+            transform: rotate(var(--tilt));
+            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 1.9'/%3E%3C/filter%3E%3Crect width='120' height='40' filter='url(%23n)'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 1.9'/%3E%3C/filter%3E%3Crect width='120' height='40' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+        .stamp.refer { color: var(--refer); }
+        .stamp.unchanged { color: var(--ink-2); opacity: 0.8; }
+        .stamp.received { box-shadow: inset 0 0 0 1.5px var(--buff), inset 0 0 0 2.5px currentColor; text-align: center; }
+        .stamp.received small { display: block; margin-top: 4px; font-size: 0.625rem; letter-spacing: 0.1em; }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .stamp.land { animation: land 0.32s var(--ease-out) both; animation-delay: var(--delay, 0ms); }
+        }
+        @keyframes land {
+            0% { opacity: 0; transform: rotate(var(--tilt)) scale(1.5); }
+            60% { opacity: 1; }
+            100% { opacity: 1; transform: rotate(var(--tilt)) scale(1); }
         }
 
-        .error.dark-mode {
-            background-color: #7f1d1d;
-            color: #fecaca;
+        /* Register */
+        .results-section { display: none; margin-top: 48px; }
+        .register-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+        h2.section-title { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.015em; }
+        .register-head p { color: var(--ink-2); font-size: 0.875rem; }
+
+        .strip {
+            position: sticky; top: 0; z-index: 5;
+            display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
+            padding: 10px 0; margin-bottom: 14px;
+            background: color-mix(in oklch, var(--ground) 92%, transparent);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--rule);
         }
-
-        .success {
-            background-color: #dcfce7;
-            color: #166534;
-            border: 1px solid color-mix(in srgb, var(--color-success) 35%, transparent);
-            border-radius: 6px;
-            padding: var(--spacing-md) var(--spacing-lg);
-            border-radius: 4px;
-            margin-bottom: var(--spacing-lg);
-            display: none;
+        .filters { display: flex; gap: 4px; flex-wrap: wrap; }
+        .filter {
+            display: inline-flex; align-items: baseline; gap: 6px;
+            padding: 6px 11px; border-radius: 4px;
+            background: transparent; color: var(--ink-2); border: 1px solid transparent;
+            font-weight: 500; transition: background-color 0.15s, color 0.15s;
         }
+        .filter:hover { color: var(--ink); background: var(--sheet-2); }
+        .filter[aria-pressed="true"] { color: var(--ink); background: var(--sheet); border-color: var(--rule); box-shadow: var(--shadow); }
+        .filter .count { font-variant-numeric: tabular-nums; font-weight: 700; }
+        .filter[data-filter="amended"] .count { color: var(--stamp); }
+        .filter[data-filter="refer"] .count { color: var(--refer); }
+        .filter:disabled { opacity: 0.45; cursor: default; }
+        .filter:disabled:hover { background: transparent; color: var(--ink-2); }
 
-        .success.dark-mode {
-            background-color: #064e3b;
-            color: #bbf7d0;
+        .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--ink-2); font-weight: 500; }
+        .switch input { appearance: none; -webkit-appearance: none; width: 30px; height: 18px; border-radius: 9px; background: var(--rule); position: relative; cursor: pointer; transition: background-color 0.2s; }
+        .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--sheet); box-shadow: 0 1px 2px oklch(0 0 0 / 0.25); transition: transform 0.2s var(--ease-out); }
+        .switch input:checked { background: var(--stamp); }
+        .switch input:checked::after { transform: translateX(12px); }
+        .switch:has(input:checked) { color: var(--ink); }
+        .strip .btn-primary { margin-left: auto; max-width: 100%; }
+        #downloadLabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32ch; }
+
+        .general-notes {
+            background: var(--sheet); border-radius: 3px; box-shadow: var(--shadow);
+            padding: 14px 20px; margin-bottom: 14px; display: grid; gap: 6px;
         }
+        .general-notes p { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: baseline; }
 
-        @media (max-width: 768px) {
-            .container {
-                padding: var(--spacing-md);
-            }
-
-            h1 {
-                font-size: 1.5rem;
-            }
-
-            .controls {
-                grid-template-columns: 1fr;
-            }
-
-            .button-group {
-                flex-direction: column;
-            }
-
-            button {
-                width: 100%;
-            }
-
-            table {
-                font-size: 0.85rem;
-            }
-
-            th, td {
-                padding: var(--spacing-sm);
-            }
-
-            .summary-stat {
-                display: block;
-                margin-bottom: var(--spacing-md);
-            }
+        .register { list-style: none; background: var(--sheet); border-radius: 3px; box-shadow: var(--shadow); }
+        .entry {
+            display: grid; grid-template-columns: 56px minmax(0, 1fr) 118px; gap: 0 16px;
+            padding: 18px 20px 18px 0; border-top: 1px solid var(--rule);
         }
+        .entry:first-child { border-top: 0; }
+        .entry[hidden] { display: none; }
+        .entry.refer { background: var(--refer-wash); }
+        .margin-no {
+            text-align: right; padding-right: 14px; border-right: 1px solid var(--rule);
+            font-family: var(--font-cite); font-size: 0.9375rem; font-weight: 600; color: var(--ink-2);
+            font-variant-numeric: tabular-nums; line-height: 1.65;
+        }
+        .cite { font-family: var(--font-cite); font-size: 1.0625rem; line-height: 1.55; max-width: 72ch; overflow-wrap: anywhere; }
+        .cite em { font-style: italic; }
+        .was {
+            font-size: 0.9375rem; color: var(--ink-2); margin-bottom: 6px;
+            text-decoration: line-through; text-decoration-thickness: 1px;
+            text-decoration-color: color-mix(in oklch, var(--ink-2) 55%, transparent);
+        }
+        .sr-only, .was-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+        .entry.unchanged .cite.now { color: var(--ink-2); }
+        .register.markup .was { display: none; }
+        .now ins { text-decoration: underline; text-decoration-color: var(--stamp); text-decoration-thickness: 2px; text-underline-offset: 3px; background: var(--stamp-wash); color: inherit; }
+        .now del { color: var(--ink-2); text-decoration-thickness: 1px; }
+        .now del + ins, .now ins + del { margin-left: 0.25em; }
+        .missing { font-family: var(--font-ui); font-size: 0.8125rem; font-weight: 600; color: var(--refer); background: var(--refer-wash); padding: 1px 4px; border-radius: 2px; }
+        .notes { margin-top: 10px; display: grid; gap: 4px; font-size: 0.875rem; color: var(--ink); max-width: 72ch; }
+        .notes p::before { content: "Warning: "; font-weight: 700; color: var(--refer); }
+        .entry .stamp { margin-top: 2px; }
 
-        em {
-            font-style: italic;
+        .empty-filter { padding: 28px 20px; color: var(--ink-2); text-align: center; }
+
+        /* Bibliography */
+        .bibliography-wrap { margin-top: 48px; }
+        .bibliography { background: var(--sheet); border-radius: 3px; box-shadow: var(--shadow); padding: 28px 32px 32px; margin-top: 12px; }
+        .bibliography h3 {
+            font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+            color: var(--ink-2); margin: 28px 0 12px;
+        }
+        .bibliography h3:first-child { margin-top: 0; }
+        .bibliography-entry { font-family: var(--font-cite); font-size: 1.0625rem; line-height: 1.55; padding-left: 2em; text-indent: -2em; margin-bottom: 8px; max-width: 75ch; }
+
+        footer { margin-top: 56px; color: var(--ink-2); font-size: 0.8125rem; }
+
+        @media (max-width: 820px) {
+            .lodge { grid-template-columns: 1fr; gap: 28px; }
+            .masthead { flex-direction: column; gap: 4px; }
+        }
+        @media (max-width: 560px) {
+            .container { padding: 0 16px 48px; }
+            .backsheet { padding: 22px 18px 22px 52px; }
+            .backsheet::before { left: 18px; width: 14px; }
+            .backsheet > .stamp { position: static; display: inline-block; margin-top: 18px; }
+            .entry { grid-template-columns: 40px minmax(0, 1fr); padding-right: 16px; }
+            .margin-no { padding-right: 10px; grid-row: span 2; }
+            .entry .stamp { grid-column: 2; justify-self: start; margin-top: 12px; }
+            .strip { position: static; backdrop-filter: none; -webkit-backdrop-filter: none; }
+            .strip .btn-primary { margin-left: 0; width: 100%; justify-content: center; }
+            .bibliography { padding: 22px 18px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>AGLC4 Citation Tool</h1>
-            <p class="subtitle">Format legal citations in Word documents to the Australian Guide to Legal Citation</p>
+        <header class="masthead">
+            <h1>AGLC4 <span>Citation Tool</span></h1>
+            <p>Format legal citations in Word documents to the <cite>Australian Guide to Legal Citation</cite></p>
         </header>
 
-        <div class="upload-section" id="uploadSection">
-            <div class="upload-text">Drop your .docx file here or click to select</div>
-            <div class="upload-subtext">Maximum 10 MB</div>
-            <input type="file" id="fileInput" class="file-input" accept=".docx" />
-        </div>
+        <main>
+            <section class="lodge" aria-label="Lodge a document">
+                <div class="backsheet" id="uploadSection">
+                    <label class="dropzone" for="fileInput">
+                        <div class="matter-label">In the matter of</div>
+                        <div class="matter-title empty upload-text" id="matterTitle">No document lodged</div>
+                        <div class="matter-hint upload-subtext" id="matterHint">Drop your .docx file here or <u>click to select</u>. Maximum 10 MB</div>
+                        <input type="file" id="fileInput" class="file-input" accept=".docx" />
+                    </label>
 
-        <div class="controls">
-            <div class="control-group">
-                <label for="modelSelect">AI Model</label>
-                <input type="text" id="modelSelect" placeholder="Loading providers..." list="modelList" />
-                <datalist id="modelList"></datalist>
-            </div>
+                    <div class="particulars">
+                        <div class="field">
+                            <label for="modelSelect">AI Model</label>
+                            <input type="text" id="modelSelect" placeholder="Loading providers…" list="modelList" autocomplete="off" spellcheck="false" />
+                            <datalist id="modelList"></datalist>
+                            <p class="field-hint">Only reads the footnotes. The formatting itself is done by fixed AGLC4 rules.</p>
+                        </div>
+                        <div>
+                            <span class="field-label">Output</span>
+                            <div class="options">
+                                <label class="check"><input type="checkbox" id="trackChanges" checked /> Track changes</label>
+                                <label class="check"><input type="checkbox" id="bibliography" checked /> Generate bibliography</label>
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="control-group">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="trackChanges" checked />
-                    <label for="trackChanges">Track changes</label>
+                    <div class="actions">
+                        <button class="btn-primary" id="processButton">Process</button>
+                        <span class="status" id="loading" aria-hidden="true"></span>
+                        <span class="sr-only" id="announce" role="status" aria-live="polite"></span>
+                    </div>
+                    <div class="busy-rule" aria-hidden="true"></div>
                 </div>
-            </div>
 
-            <div class="control-group">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="bibliography" checked />
-                    <label for="bibliography">Generate bibliography</label>
+                <aside class="how">
+                    <h2>How it works</h2>
+                    <ol>
+                        <li><span><strong>An AI model reads each footnote</strong> and pulls out its parts: names, years, reports, pinpoints.</span></li>
+                        <li><span><strong>Tested AGLC4 rules</strong> rebuild every citation, adding <em>Ibid</em>, (n x) references and short titles.</span></li>
+                        <li><span><strong>Nothing is dropped or invented.</strong> A footnote that can't be fully accounted for is left exactly as you wrote it and marked Refer.</span></li>
+                        <li><span><strong>Review, then download</strong> your .docx with every edit as a Word tracked change.</span></li>
+                    </ol>
+                </aside>
+            </section>
+
+            <div class="error" id="errorMessage" role="alert"></div>
+
+            <section class="results-section" id="resultsSection" aria-labelledby="registerTitle">
+                <div class="register-head">
+                    <h2 class="section-title" id="registerTitle">Footnotes</h2>
+                    <p id="summary"></p>
                 </div>
-            </div>
-        </div>
 
-        <div class="button-group">
-            <button class="btn-primary" id="processButton">Process</button>
-            <button class="btn-secondary" id="downloadButton" style="display: none;">Download</button>
-        </div>
+                <div class="strip">
+                    <div class="filters" role="group" aria-label="Show footnotes">
+                        <button class="filter" data-filter="all" aria-pressed="true">All <span class="count" id="countAll">0</span></button>
+                        <button class="filter" data-filter="amended" aria-pressed="false">Amended <span class="count" id="countAmended">0</span></button>
+                        <button class="filter" data-filter="refer" aria-pressed="false">Refer <span class="count" id="countRefer">0</span></button>
+                        <button class="filter" data-filter="unchanged" aria-pressed="false">Unchanged <span class="count" id="countUnchanged">0</span></button>
+                    </div>
+                    <label class="switch"><input type="checkbox" id="markupToggle" role="switch" /> Show markup</label>
+                    <button class="btn-primary" id="downloadButton">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg>
+                        <span id="downloadLabel">Download .docx</span>
+                    </button>
+                </div>
 
-        <div class="error" id="errorMessage"></div>
-        <div class="success" id="successMessage"></div>
+                <div id="warnings"></div>
+                <ol class="register" id="footnotes"></ol>
 
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Processing document...</p>
-        </div>
+                <div class="bibliography-wrap" id="bibliographyWrap" hidden>
+                    <h2 class="section-title">Bibliography</h2>
+                    <div id="bibliographyOut"></div>
+                </div>
+            </section>
+        </main>
 
-        <div class="results-section" id="resultsSection">
-            <div class="summary" id="summary"></div>
-            <div id="warnings"></div>
-            <h2>Footnotes</h2>
-            <table id="footnotes">
-                <thead>
-                    <tr>
-                        <th style="width: 50px;">No.</th>
-                        <th>Original</th>
-                        <th>AGLC4</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-            <div id="bibliography"></div>
-        </div>
+        <footer>Runs on your machine. Only your footnotes are sent, and only to the AI model you choose.</footer>
     </div>
 
     <script>
         // State
         let currentSessionId = null;
         let currentFilename = null;
-        let isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        let processedFilename = null;
+        let selectedFile = null;
+        let currentFilter = "all";
 
-        // Initialize
         window.addEventListener("error", (e) => showError(`Unexpected error: ${e.message}`));
         window.addEventListener("unhandledrejection", (e) => showError(`Unexpected error: ${e.reason?.message || e.reason}`));
 
@@ -495,41 +446,36 @@
             await loadProviders();
         });
 
-        // Load providers
         async function loadProviders() {
+            const select = document.getElementById("modelSelect");
             try {
                 const response = await fetch("/api/providers");
                 if (!response.ok) throw new Error("Failed to load providers");
 
                 const data = await response.json();
-                const select = document.getElementById("modelSelect");
-                const datalist = document.getElementById("modelList");
-
-                // Set default
                 select.placeholder = data.default;
                 select.value = data.default;
-
-                // Populate datalist
-                datalist.innerHTML = data.providers
-                    .map(p => `<option value="${p}"></option>`)
+                document.getElementById("modelList").innerHTML = data.providers
+                    .map(p => `<option value="${escapeHtml(p)}"></option>`)
                     .join("");
             } catch (error) {
                 console.error("Error loading providers:", error);
-                showError("Failed to load LLM providers");
+                select.placeholder = "provider:model";
+                showError("Failed to load LLM providers", "Note.");
             }
         }
 
-        // Setup upload
         function setupUpload() {
             const section = document.getElementById("uploadSection");
             const input = document.getElementById("fileInput");
 
-            section.addEventListener("click", () => input.click());
             section.addEventListener("dragover", (e) => {
                 e.preventDefault();
                 section.classList.add("dragover");
             });
-            section.addEventListener("dragleave", () => section.classList.remove("dragover"));
+            section.addEventListener("dragleave", (e) => {
+                if (!section.contains(e.relatedTarget)) section.classList.remove("dragover");
+            });
             section.addEventListener("drop", (e) => {
                 e.preventDefault();
                 section.classList.remove("dragover");
@@ -538,32 +484,38 @@
                     handleFileSelected();
                 }
             });
-
             input.addEventListener("change", handleFileSelected);
-            // The input lives inside the drop zone, so clicking it must not re-open the picker
-            input.addEventListener("click", (e) => e.stopPropagation());
         }
-
-        let selectedFile = null;
 
         function handleFileSelected() {
             const file = document.getElementById("fileInput").files[0];
-            if (file) {
-                selectedFile = file;
-                currentFilename = file.name;
-                // Only change the label: replacing the section's contents would delete the file input
-                document.querySelector("#uploadSection .upload-text").textContent = `Selected: ${file.name}`;
-                document.querySelector("#uploadSection .upload-subtext").textContent = "Click or drop to choose a different file";
+            if (!file) return;
+            if (!file.name.toLowerCase().endsWith(".docx")) {
+                showError("Please select a .docx file");
+                return;
             }
+            clearMessages();
+            selectedFile = file;
+            currentFilename = file.name;
+            const title = document.getElementById("matterTitle");
+            title.textContent = file.name;
+            title.classList.remove("empty");
+            document.getElementById("matterHint").innerHTML = `${formatSize(file.size)} · Click or drop to choose a different file`;
+            document.getElementById("uploadSection").querySelector(".stamp.received")?.remove();
         }
 
-        // Setup controls
         function setupControls() {
             document.getElementById("processButton").addEventListener("click", processDocument);
             document.getElementById("downloadButton").addEventListener("click", downloadDocument);
+            document.getElementById("markupToggle").addEventListener("change", (e) => {
+                document.getElementById("footnotes").classList.toggle("markup", e.target.checked);
+                renderCitationBodies();
+            });
+            document.querySelectorAll(".filter").forEach(btn => {
+                btn.addEventListener("click", () => setFilter(btn.dataset.filter));
+            });
         }
 
-        // Process document
         async function processDocument() {
             const file = selectedFile;
             if (!file) {
@@ -573,6 +525,7 @@
 
             clearMessages();
             showLoading(true);
+            let succeeded = false;
 
             try {
                 const formData = new FormData();
@@ -581,110 +534,209 @@
                 formData.append("track_changes", document.getElementById("trackChanges").checked);
                 formData.append("bibliography", document.getElementById("bibliography").checked);
 
-                const response = await fetch("/api/process", {
-                    method: "POST",
-                    body: formData,
-                });
+                const response = await fetch("/api/process", { method: "POST", body: formData });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || "Processing failed");
+                    let detail = "Processing failed";
+                    try { detail = (await response.json()).detail || detail; } catch {}
+                    throw new Error(detail);
                 }
 
                 const result = await response.json();
                 currentSessionId = result.id;
-
+                processedFilename = file.name;
                 displayResults(result);
-                showSuccess("Document processed successfully");
-                document.getElementById("downloadButton").style.display = "inline-block";
+                stampReceived();
+                succeeded = true;
             } catch (error) {
                 console.error("Error:", error);
                 showError(error.message || "Error processing document");
             } finally {
                 showLoading(false);
+                if (succeeded) {
+                    document.getElementById("loading").textContent = "Document processed successfully";
+                    document.getElementById("announce").textContent = "Document processed successfully";
+                }
             }
         }
 
-        // Display results
+        // Results
+        let entries = [];
+
         function displayResults(result) {
-            const section = document.getElementById("resultsSection");
-            section.style.display = "block";
-
-            // Summary
-            const changed = result.footnotes.filter(fn => fn.changed).length;
-            const total = result.footnotes.length;
-            document.getElementById("summary").innerHTML = `
-                <div class="summary-stat">
-                    <div class="summary-stat-value">${changed}/${total}</div>
-                    <div class="summary-stat-label">Footnotes Changed</div>
-                </div>
-            `;
-
-            // Warnings
-            const warningsDiv = document.getElementById("warnings");
-            if (result.warnings && result.warnings.length > 0) {
-                const darkClass = isDarkMode ? "dark-mode" : "";
-                warningsDiv.innerHTML = `
-                    <div class="warning-list ${darkClass}">
-                        <strong>Warnings:</strong>
-                        ${result.warnings.map(w => `
-                            <div class="warning-item">
-                                ${w.footnote ? `Footnote ${w.footnote}: ` : ""}${escapeHtml(w.message)}
-                            </div>
-                        `).join("")}
-                    </div>
-                `;
-            } else {
-                warningsDiv.innerHTML = "";
+            const refers = new Map();
+            const general = [];
+            for (const w of result.warnings || []) {
+                const numbers = w.footnote ? [w.footnote] : footnotesNamedIn(w.message);
+                if (!numbers.length) { general.push(w.message); continue; }
+                for (const n of numbers) {
+                    if (!refers.has(n)) refers.set(n, []);
+                    refers.get(n).push(w.message);
+                }
             }
 
-            // Footnotes table
-            const tbody = document.querySelector("#footnotes tbody");
-            tbody.innerHTML = result.footnotes.map((fn, idx) => {
-                const changed = fn.changed ? "changed" : "";
-                const nextRow = result.footnotes[idx + 1];
-                const isLast = idx === result.footnotes.length - 1;
-                const isChanged = fn.changed;
-                const shouldCollapse = !isChanged && idx > 0;
+            entries = result.footnotes.map(fn => ({
+                ...fn,
+                notes: refers.get(fn.number) || [],
+                state: refers.has(fn.number) ? "refer" : fn.changed ? "amended" : "unchanged",
+            }));
 
-                return `
-                    <tr class="${changed} ${shouldCollapse ? "collapsible-row" : ""}" data-footnote="${fn.number}">
-                        <td>${fn.number}</td>
-                        <td>${fn.original_html}</td>
-                        <td>${fn.formatted_html}</td>
-                    </tr>
-                `;
-            }).join("");
-
-            // Setup collapsible rows
-            document.querySelectorAll(".collapsible-row").forEach(row => {
-                row.addEventListener("click", () => {
-                    const nextRow = row.nextElementSibling;
-                    if (nextRow && !nextRow.classList.contains("collapsible-row")) {
-                        nextRow.classList.toggle("hidden-row");
-                    }
-                });
+            const counts = { all: entries.length, amended: 0, refer: 0, unchanged: 0 };
+            entries.forEach(e => counts[e.state]++);
+            document.getElementById("countAll").textContent = counts.all;
+            document.getElementById("countAmended").textContent = counts.amended;
+            document.getElementById("countRefer").textContent = counts.refer;
+            document.getElementById("countUnchanged").textContent = counts.unchanged;
+            document.querySelectorAll(".filter").forEach(btn => {
+                btn.disabled = btn.dataset.filter !== "all" && counts[btn.dataset.filter] === 0;
             });
 
-            // Bibliography
-            const bibDiv = document.getElementById("bibliography");
-            if (result.bibliography && result.bibliography.length > 0) {
-                bibDiv.innerHTML = `
-                    <div class="bibliography">
-                        ${result.bibliography.map(section => `
-                            <h3>${escapeHtml(section.heading)}</h3>
-                            ${section.entries.map(entry => `
-                                <div class="bibliography-entry">${entry}</div>
-                            `).join("")}
-                        `).join("")}
+            const changedTotal = entries.filter(e => e.changed).length;
+            document.getElementById("summary").textContent =
+                `${changedTotal} of ${entries.length} footnote${entries.length === 1 ? "" : "s"} changed`;
+            document.getElementById("downloadLabel").textContent = `Download ${downloadName()}`;
+
+            document.getElementById("warnings").innerHTML = general.length ? `
+                <div class="general-notes">
+                    ${general.map(m => `<p><span class="stamp refer" style="--tilt:-2deg">Warning</span><span>${escapeHtml(m)}</span></p>`).join("")}
+                </div>` : "";
+
+            const tilts = [-3, -1.5, -4, -2.5, -1, -3.5];
+            const labels = { amended: "Amended", refer: "Refer", unchanged: "Unchanged" };
+            document.getElementById("footnotes").innerHTML = entries.map((e, i) => `
+                <li class="entry ${e.state}" data-state="${e.state}" id="fn-${e.number}">
+                    <span class="margin-no" aria-label="Footnote ${e.number}">${e.number}</span>
+                    <div>
+                        ${e.changed ? `<p class="cite was"><span class="was-label">Original: </span>${e.original_html}</p>` : ""}
+                        <p class="cite now" data-index="${i}"></p>
+                        ${e.notes.length ? `<div class="notes">${e.notes.map(m => `<p>${escapeHtml(m)}</p>`).join("")}</div>` : ""}
                     </div>
-                `;
-            } else {
-                bibDiv.innerHTML = "";
-            }
+                    <span class="stamp land ${e.state}" style="--tilt:${tilts[i % tilts.length]}deg; --delay:${Math.min(i, 12) * 35}ms">${labels[e.state]}</span>
+                </li>`).join("");
+            renderCitationBodies();
+
+            // Bibliography
+            const bib = result.bibliography || [];
+            document.getElementById("bibliographyWrap").hidden = bib.length === 0;
+            document.getElementById("bibliographyOut").innerHTML = bib.length ? `
+                <div class="bibliography">
+                    ${bib.map(section => `
+                        <h3>${escapeHtml(section.heading)}</h3>
+                        ${section.entries.map(entry => `<p class="bibliography-entry">${markMissing(entry)}</p>`).join("")}
+                    `).join("")}
+                </div>` : "";
+
+            const section = document.getElementById("resultsSection");
+            section.style.display = "block";
+            setFilter("all");
+            section.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
         }
 
-        // Download document
+        // Extractor warnings carry no footnote field but name them: "footnote 3: ..." or "footnotes [1, 2]"
+        function footnotesNamedIn(message) {
+            const single = message.match(/^footnote (\d+):/i);
+            if (single) return [Number(single[1])];
+            const many = message.match(/footnotes \[([\d,\s]+)\]/i);
+            return many ? many[1].split(",").map(n => Number(n.trim())).filter(Boolean) : [];
+        }
+
+        function renderCitationBodies() {
+            const markup = document.getElementById("markupToggle").checked;
+            document.querySelectorAll(".cite.now").forEach(el => {
+                const e = entries[Number(el.dataset.index)];
+                el.innerHTML = markup && e.changed ? diffHtml(e.original_html, e.formatted_html) : markMissing(e.formatted_html);
+            });
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll(".filter").forEach(btn => {
+                btn.setAttribute("aria-pressed", String(btn.dataset.filter === filter));
+            });
+            let shown = 0;
+            document.querySelectorAll(".entry").forEach(li => {
+                const show = filter === "all" || li.dataset.state === filter;
+                li.hidden = !show;
+                if (show) shown++;
+            });
+            const list = document.getElementById("footnotes");
+            list.querySelector(".empty-filter")?.remove();
+            if (!shown) list.insertAdjacentHTML("beforeend", `<li class="empty-filter">No footnotes in this group.</li>`);
+        }
+
+        // Word-level redline between the original and formatted footnote, italics included
+        function tokenize(html) {
+            const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+            const tokens = [];
+            const walk = (node, italic) => {
+                for (const child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        for (const t of child.textContent.match(/\s+|[\p{L}\p{N}]+|[^\s\p{L}\p{N}]/gu) || []) {
+                            tokens.push({ text: t, italic });
+                        }
+                    } else if (child.nodeType === Node.ELEMENT_NODE) {
+                        walk(child, italic || child.tagName === "EM" || child.tagName === "I");
+                    }
+                }
+            };
+            walk(doc.body.firstChild, false);
+            return tokens;
+        }
+
+        function diffHtml(beforeHtml, afterHtml) {
+            const a = tokenize(beforeHtml), b = tokenize(afterHtml);
+            const key = t => (/^\s+$/.test(t.text) ? " " : t.text) + (t.italic ? "\u0001" : "");
+            const n = a.length, m = b.length;
+            const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+            for (let i = n - 1; i >= 0; i--) {
+                for (let j = m - 1; j >= 0; j--) {
+                    dp[i][j] = key(a[i]) === key(b[j]) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+                }
+            }
+            const ops = [];
+            let i = 0, j = 0;
+            while (i < n || j < m) {
+                if (i < n && j < m && key(a[i]) === key(b[j])) { ops.push(["eq", b[j]]); i++; j++; }
+                // Deletions before insertions, as Word shows them
+                else if (i < n && (j === m || dp[i + 1][j] >= dp[i][j + 1])) { ops.push(["del", a[i]]); i++; }
+                else { ops.push(["ins", b[j]]); j++; }
+            }
+            // Group runs and render; whitespace between two changes of the same kind joins the run
+            let out = "", run = null;
+            const flush = () => {
+                if (!run) return;
+                const inner = run.tokens.map(t => t.italic ? `<em>${escapeHtml(t.text)}</em>` : escapeHtml(t.text)).join("").replace(/<\/em><em>/g, "");
+                out += run.op === "eq" ? inner : `<${run.op}>${inner}</${run.op}>`;
+                run = null;
+            };
+            ops.forEach(([op, t], idx) => {
+                const isSpace = /^\s+$/.test(t.text);
+                if (run && (run.op === op || (isSpace && op === "eq" && run.op !== "eq" && ops[idx + 1]?.[0] === run.op))) {
+                    run.tokens.push(t);
+                } else {
+                    flush();
+                    run = { op, tokens: [t] };
+                }
+            });
+            flush();
+            return markMissing(out);
+        }
+
+        function markMissing(html) {
+            return html.replace(/\[MISSING:[^\]]*\]/g, m => `<span class="missing">${m}</span>`);
+        }
+
+        function stampReceived() {
+            const sheet = document.getElementById("uploadSection");
+            sheet.querySelector(".stamp.received")?.remove();
+            const date = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+            sheet.insertAdjacentHTML("beforeend", `<span class="stamp received land" style="--tilt:6deg">Formatted<small>${escapeHtml(date)}</small></span>`);
+        }
+
+        function downloadName() {
+            return processedFilename ? processedFilename.replace(/\.docx$/i, ".aglc.docx") : "document.aglc.docx";
+        }
+
         async function downloadDocument() {
             if (!currentSessionId) return;
 
@@ -696,7 +748,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = currentFilename ? currentFilename.replace(".docx", ".aglc.docx") : "document.aglc.docx";
+                a.download = downloadName();
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -711,39 +763,38 @@
         let loadingTimer = null;
 
         function showLoading(show) {
-            const loading = document.getElementById("loading");
-            loading.style.display = show ? "block" : "none";
-            document.getElementById("processButton").disabled = show;
+            const status = document.getElementById("loading");
+            const button = document.getElementById("processButton");
+            document.getElementById("uploadSection").classList.toggle("busy", show);
+            button.disabled = show;
+            button.textContent = show ? "Processing…" : "Process";
             clearInterval(loadingTimer);
+            status.textContent = "";
+            document.getElementById("announce").textContent = show ? "Processing document…" : "";
             if (show) {
                 const started = Date.now();
-                const label = loading.querySelector("p");
                 const tick = () => {
                     const secs = Math.round((Date.now() - started) / 1000);
-                    label.textContent = `Processing document... ${secs}s (the AI model is reading your footnotes; this can take a minute)`;
+                    status.textContent = `Processing document… ${secs}s (the AI model is reading your footnotes; this can take a minute)`;
                 };
                 tick();
                 loadingTimer = setInterval(tick, 1000);
             }
         }
 
-        function showError(message) {
+        function showError(message, title = "Error.") {
             const el = document.getElementById("errorMessage");
-            el.textContent = message;
+            el.innerHTML = `<strong>${escapeHtml(title)}</strong>${escapeHtml(message)}`;
             el.style.display = "block";
-            if (isDarkMode) el.classList.add("dark-mode");
-        }
-
-        function showSuccess(message) {
-            const el = document.getElementById("successMessage");
-            el.textContent = message;
-            el.style.display = "block";
-            if (isDarkMode) el.classList.add("dark-mode");
+            el.scrollIntoView({ block: "nearest" });
         }
 
         function clearMessages() {
             document.getElementById("errorMessage").style.display = "none";
-            document.getElementById("successMessage").style.display = "none";
+        }
+
+        function formatSize(bytes) {
+            return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
         }
 
         function escapeHtml(text) {
