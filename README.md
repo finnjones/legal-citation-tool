@@ -8,6 +8,8 @@ Format legal citations in Word documents to the *Australian Guide to Legal Citat
 - **Reformat to AGLC4** with deterministic, tested formatters
 - **Preserve source documents** with Word tracked changes
 - **Generate bibliography** sorted by category (cases, legislation, secondary sources, etc.)
+- **Fix footnote numbers in the body text**: moves them after punctuation (r 1.1.2, "Act¹." → "Act.¹"),
+  sets italic footnote numbers upright, and keeps headings with the text that follows them
 - **Multiple interfaces**: CLI, HTTP API, and web UI
 - **Model-agnostic**: Works with Anthropic Claude, OpenAI, Google Gemini, Ollama, LM Studio, etc.
 
@@ -87,12 +89,13 @@ aglc fix essay.docx -o output.docx           # Custom output path
 aglc fix essay.docx --model openai:gpt-4o    # Specify model
 aglc fix essay.docx --no-track-changes       # Disable tracked changes
 aglc fix essay.docx --no-bibliography        # Skip bibliography
+aglc fix essay.docx --no-body-fixes          # Leave the body text alone
 aglc fix essay.docx --report changes.json    # Save JSON report
 ```
 
 **Output:**
 - Processed `.docx` with tracked changes and bibliography
-- Console summary: number of footnotes changed, before/after list, warnings
+- Console summary: number of footnotes changed, before/after list, body text fixes, warnings
 - Optional JSON report with all changes and metadata
 
 ### CLI: `aglc format-json`
@@ -150,6 +153,7 @@ Multipart form submission (e.g., from the web UI or `curl`).
 - `model` (optional): `"provider:model"` (defaults to `$AGLC_LLM`)
 - `track_changes` (optional, bool, default true)
 - `bibliography` (optional, bool, default true)
+- `fix_body` (optional, bool, default true): fix footnote numbers and headings in the body text
 
 **Response:**
 ```json
@@ -173,6 +177,9 @@ Multipart form submission (e.g., from the web UI or `curl`).
   ],
   "warnings": [
     {"footnote": 3, "message": "[MISSING: report] — manual review needed"}
+  ],
+  "body_fixes": [
+    {"footnote": 1, "message": "footnote number moved after the ‘.’ (AGLC4 r 1.1.2: footnote numbers go after punctuation)"}
   ]
 }
 ```

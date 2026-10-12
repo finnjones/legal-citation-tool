@@ -21,7 +21,7 @@ from pathlib import Path
 
 from lxml import etree
 
-from .models import BibliographySection, Footnote, FootnoteResult, RichText
+from .models import BibliographySection, BodyFix, Footnote, FootnoteResult, RichText
 
 # --------------------------------------------------------------------------- #
 # OOXML plumbing
@@ -579,11 +579,14 @@ def write_document(
     *,
     bibliography: list[BibliographySection] | None = None,
     track_changes: bool = True,
+    fix_body: bool = True,
     author: str = "AGLC Citation Tool",
-) -> None:
+) -> list[BodyFix]:
     """Copy `src` to `dst`, replacing the text of each changed footnote with
     `result.formatted` (as tracked insertions/deletions when `track_changes`),
-    and append a Bibliography at the end of the body if given."""
+    applying the body-text fixes in `aglc/body.py` when `fix_body`, and
+    appending a Bibliography at the end of the body if given. Returns the body
+    fixes made."""
     src = Path(src)
     dst = Path(dst)
     date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -612,11 +615,20 @@ def write_document(
                 _rewrite_footnote(fn_elem, result, track_changes, author, date, id_gen)
         data[FOOTNOTES_PATH] = _serialize(fn_root)
 
+    body_fixes: list[BodyFix] = []
+    if fix_body:
+        from .body import fix_body as _fix_body  # body.py builds on this module's helpers
+
+        body_fixes = _fix_body(doc_root, styles_root, track_changes=track_changes,
+                               author=author, date=date, id_gen=id_gen)
+
     if bibliography:
         _append_bibliography(doc_root, bibliography, styles_root, track_changes, author, date, id_gen)
+    if bibliography or body_fixes:
         data[DOCUMENT_PATH] = _serialize(doc_root)
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
         for name in names:
             zout.writestr(infos[name], data[name])
+    return body_fixes

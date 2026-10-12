@@ -559,10 +559,14 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                 `${changedTotal} of ${entries.length} footnote${entries.length === 1 ? "" : "s"} changed`;
             document.getElementById("downloadLabel").textContent = `Download ${downloadName()}`;
 
-            document.getElementById("warnings").innerHTML = general.length ? `
+            const bodyFixes = (result.body_fixes || []).map(b => b.footnote ? `Footnote ${b.footnote}: ${b.message}` : b.message);
+            document.getElementById("warnings").innerHTML = (general.length ? `
                 <div class="general-notes">
                     ${general.map(m => `<p><span class="stamp refer" style="--tilt:-2deg">Warning</span><span>${escapeHtml(m)}</span></p>`).join("")}
-                </div>` : "";
+                </div>` : "") + (bodyFixes.length ? `
+                <div class="general-notes" aria-label="Body text fixes">
+                    ${bodyFixes.map(m => `<p><span class="stamp" style="--tilt:-2deg">Body text</span><span>${escapeHtml(m)}</span></p>`).join("")}
+                </div>` : "");
 
             const tilts = [-3, -1.5, -4, -2.5, -1, -3.5];
             const labels = { amended: "Amended", refer: "Refer", unchanged: "Unchanged" };

@@ -340,6 +340,13 @@ class FootnoteResult(BaseModel):
         return self.original.to_markup() != self.formatted.to_markup()
 
 
+class BodyFix(BaseModel):
+    """A change made to the body text rather than a footnote (see aglc/body.py)."""
+
+    footnote: int | None = None
+    message: str
+
+
 class BibliographySection(BaseModel):
     heading: str  # eg "A Articles/Books/Reports"
     entries: list[RichText]
@@ -349,3 +356,4 @@ class ProcessResult(BaseModel):
     footnotes: list[FootnoteResult]
     bibliography: list[BibliographySection] = Field(default_factory=list)
     warnings: list[Warning_] = Field(default_factory=list)
+    body_fixes: list[BodyFix] = Field(default_factory=list)

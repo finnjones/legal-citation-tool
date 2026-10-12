@@ -95,6 +95,7 @@ async def process_document(
     model: Annotated[str | None, Form()] = None,
     track_changes: Annotated[bool, Form()] = True,
     bibliography: Annotated[bool, Form()] = True,
+    fix_body: Annotated[bool, Form()] = True,
 ) -> dict:
     """Process a Word document and return formatted citations.
 
@@ -103,9 +104,10 @@ async def process_document(
         model: LLM provider:model (optional)
         track_changes: Whether to use tracked changes in output
         bibliography: Whether to generate a bibliography
+        fix_body: Whether to fix footnote numbers and headings in the body text
 
     Returns:
-        JSON with id, footnotes, bibliography, warnings
+        JSON with id, footnotes, bibliography, warnings, body_fixes
     """
     # Validate file type
     if not file.filename or not file.filename.lower().endswith(".docx"):
@@ -138,6 +140,7 @@ async def process_document(
             model,
             bibliography=bibliography,
             track_changes=track_changes,
+            fix_body=fix_body,
         )
 
         # Format response
@@ -166,6 +169,7 @@ async def process_document(
             "footnotes": footnotes,
             "bibliography": bibliography,
             "warnings": warnings,
+            "body_fixes": [{"footnote": b.footnote, "message": b.message} for b in result.body_fixes],
         }
 
     except Exception as e:

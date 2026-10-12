@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from aglc import api
 from aglc.models import (
     BibliographySection,
+    BodyFix,
     FootnoteResult,
     ProcessResult,
     RichText,
@@ -59,6 +60,9 @@ def fake_process_result():
         ],
         warnings=[
             Warning_(footnote=1, message="Test warning"),
+        ],
+        body_fixes=[
+            BodyFix(footnote=1, message="footnote number moved after the ‘.’"),
         ],
     )
 
@@ -141,6 +145,7 @@ def test_process_with_options(minimal_docx, fake_process_result):
                 "model": "openai:gpt-4",
                 "track_changes": "false",
                 "bibliography": "true",
+                "fix_body": "false",
             },
             files={"file": ("test.docx", minimal_docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
         )
@@ -150,6 +155,7 @@ def test_process_with_options(minimal_docx, fake_process_result):
         assert call_args[0][2] == "openai:gpt-4"
         assert call_args[1]["track_changes"] is False
         assert call_args[1]["bibliography"] is True
+        assert call_args[1]["fix_body"] is False
 
 
 def test_process_response_format(minimal_docx, fake_process_result):
@@ -186,6 +192,9 @@ def test_process_response_format(minimal_docx, fake_process_result):
         assert len(data["warnings"]) == 1
         assert data["warnings"][0]["footnote"] == 1
         assert "message" in data["warnings"][0]
+
+        # Check body text fixes format
+        assert data["body_fixes"] == [{"footnote": 1, "message": "footnote number moved after the ‘.’"}]
 
 
 def test_process_non_docx_rejected():

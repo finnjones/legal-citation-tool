@@ -39,6 +39,7 @@ def fix(
     model: Annotated[Optional[str], typer.Option("--model", help="LLM provider:model (default: AGLC_LLM or anthropic:claude-opus-5)")] = None,
     no_track_changes: Annotated[bool, typer.Option("--no-track-changes", help="Don't use tracked changes")] = False,
     no_bibliography: Annotated[bool, typer.Option("--no-bibliography", help="Don't generate bibliography")] = False,
+    no_body_fixes: Annotated[bool, typer.Option("--no-body-fixes", help="Don't fix footnote numbers and headings in the body text")] = False,
     report: Annotated[Optional[Path], typer.Option("--report", help="Save JSON report to file")] = None,
 ) -> None:
     """Fix citations in a Word document to AGLC4 format.
@@ -70,6 +71,7 @@ def fix(
             provider=model,
             bibliography=not no_bibliography,
             track_changes=not no_track_changes,
+            fix_body=not no_body_fixes,
         )
 
         # Write output
@@ -88,6 +90,12 @@ def fix(
                     before = fn.original.to_markup()
                     after = fn.formatted.to_markup()
                     rprint(f"  {fn.number}: {before} → {after}")
+
+        # Print body text fixes
+        if result.body_fixes:
+            rprint("\n[bold]Body text fixes:[/bold]")
+            for b in result.body_fixes:
+                rprint(f"  Footnote {b.footnote}: {b.message}" if b.footnote else f"  {b.message}")
 
         # Print warnings
         if result.warnings:

@@ -131,12 +131,15 @@ def _content_runs(tokens: list[tuple]) -> list:
     return elems
 
 
-def _body_footnote_reference_run(fn_id: int):
+def _body_footnote_reference_run(fn_id: int, italic: bool = False):
     """The clickable reference mark in the body: <w:r><w:footnoteReference/></w:r>."""
     r = etree.Element(qn("w:r"))
     rpr = etree.SubElement(r, qn("w:rPr"))
     se = etree.SubElement(rpr, qn("w:rStyle"))
     se.set(qn("w:val"), "FootnoteReference")
+    if italic:  # eg typed straight after an italic title
+        etree.SubElement(rpr, qn("w:i"))
+        etree.SubElement(rpr, qn("w:iCs"))
     ref = etree.SubElement(r, qn("w:footnoteReference"))
     ref.set(qn("w:id"), str(fn_id))
     return r
@@ -201,8 +204,8 @@ def _add_body_paragraph(document, tokens: list[tuple], style: str | None = None)
             run = p.add_run(text)
             if italic:
                 run.italic = True
-        elif tok[0] == "fnref":
-            p._p.append(_body_footnote_reference_run(tok[1]))
+        elif tok[0] == "fnref":  # ("fnref", id) or ("fnref", id, italic)
+            p._p.append(_body_footnote_reference_run(tok[1], *tok[2:]))
         else:  # pragma: no cover
             raise ValueError(f"unknown body token: {tok!r}")
     return p
@@ -234,7 +237,9 @@ def build_docx(dst: str | Path, body_paragraphs: list[tuple[str, Any]],
     """Build a .docx with real Word footnotes at `dst`.
 
     `body_paragraphs`: list of ("heading", text) | ("para", tokens) where tokens
-    are the same ("text", str, italic) / ("fnref", id) tuples used elsewhere.
+    are the same ("text", str, italic) / ("fnref", id[, italic]) tuples used
+    elsewhere | ("bold_heading", text), a heading made with direct bold italic
+    formatting rather than a style | ("blank", None), an empty paragraph.
     `footnote_specs`: list of (footnote_id, paragraphs) as consumed by
     `_footnote_element` (paragraphs is a list of token-lists, one per w:p).
     """
@@ -245,6 +250,11 @@ def build_docx(dst: str | Path, body_paragraphs: list[tuple[str, Any]],
             document.add_heading(payload, level=1)
         elif kind == "para":
             _add_body_paragraph(document, payload)
+        elif kind == "bold_heading":
+            run = document.add_paragraph().add_run(payload)
+            run.bold = run.italic = True
+        elif kind == "blank":
+            document.add_paragraph()
         else:  # pragma: no cover
             raise ValueError(f"unknown paragraph kind: {kind!r}")
 

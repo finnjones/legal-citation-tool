@@ -74,6 +74,7 @@ def process_docx(
     *,
     bibliography: bool = True,
     track_changes: bool = True,
+    fix_body: bool = True,
 ) -> ProcessResult:
     t0 = time.monotonic()
     footnotes = read_footnotes(src)
@@ -81,12 +82,15 @@ def process_docx(
     result = process_footnotes(footnotes, provider, bibliography=bibliography)
     changed = sum(f.changed for f in result.footnotes)
     log.info("formatted: %d footnotes changed, %d warnings", changed, len(result.warnings))
-    write_document(
+    result.body_fixes = write_document(
         src,
         dst,
         result.footnotes,
         bibliography=result.bibliography if bibliography else None,
         track_changes=track_changes,
+        fix_body=fix_body,
     )
+    if result.body_fixes:
+        log.info("body text: %d fixes", len(result.body_fixes))
     log.info("wrote %s (%.1fs total)", Path(dst).name, time.monotonic() - t0)
     return result
