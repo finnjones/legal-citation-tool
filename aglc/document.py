@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from .formatters import BIB_ORDER, Formatter, formatter_for
+from .formatters import BIB_CASES, BIB_ORDER, BIB_SECONDARY, Formatter, formatter_for
 from .models import (
     BibliographySection,
     Citation,
@@ -401,6 +401,34 @@ def _build_bibliography(first_citation: dict[str, Citation]) -> list[Bibliograph
 
 
 # --------------------------------------------------------------------------- #
+# pinpoints (r 1.1.6)
+# --------------------------------------------------------------------------- #
+
+# Repeat references to these point at a passage, so they want a pinpoint; a repeat
+# reference to an Act or treaty as a whole is normal.
+_PINPOINTED_CATEGORIES = {BIB_CASES, BIB_SECONDARY}
+
+
+def _pinpoint_warnings(fn: Footnote, plans: dict[int, _Plan]) -> list[Warning_]:
+    """r 1.1.6: a reference supporting a particular proposition should pinpoint the
+    page or paragraph it relies on. A first, full citation may refer to a source as a
+    whole, but 'Ibid' or '(n x)' with no pinpoint almost always means one is missing.
+    The pinpoint can't be invented, so this is a warning, not a fix."""
+    warnings = []
+    for seg in _citation_segments(fn):
+        citation = seg.citation
+        plan = plans[id(seg)]
+        if plan.kind == "full" or citation.pinpoints:
+            continue
+        if formatter_for(citation).bibliography_category not in _PINPOINTED_CATEGORIES:
+            continue
+        how = "Ibid" if plan.kind == "ibid" else "this repeat reference"
+        warnings.append(Warning_(footnote=fn.number, message=(
+            f"{how} has no pinpoint: add the paragraph or page you are relying on (AGLC4 r 1.1.6)")))
+    return warnings
+
+
+# --------------------------------------------------------------------------- #
 # entry point
 # --------------------------------------------------------------------------- #
 
@@ -421,6 +449,7 @@ def render_document(footnotes: list[Footnote], *, bibliography: bool = True) -> 
         results.append(FootnoteResult(number=fn.number, original=fn.original, formatted=formatted))
         if "[MISSING:" in formatted.text:
             warnings.append(Warning_(footnote=fn.number, message=f"Footnote {fn.number} has missing data"))
+        warnings += _pinpoint_warnings(fn, plans)
 
     bib_sections = _build_bibliography(first_citation) if bibliography else []
 

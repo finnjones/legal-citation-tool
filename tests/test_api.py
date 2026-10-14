@@ -194,7 +194,7 @@ def test_process_response_format(minimal_docx, fake_process_result):
         assert "message" in data["warnings"][0]
 
         # Check body text fixes format
-        assert data["body_fixes"] == [{"footnote": 1, "message": "footnote number moved after the ‘.’"}]
+        assert data["body_fixes"] == [{"footnote": 1, "message": "footnote number moved after the ‘.’", "applied": True}]
 
 
 def test_process_non_docx_rejected():

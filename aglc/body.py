@@ -7,18 +7,33 @@ presentation rules that live in the body text instead:
   so "the Act¹." becomes "the Act.¹".
 - Footnote reference marks are never italic, even when they follow italic text
   ("Human Tissue Act 1983 (NSW).*¹¹*" picks up italics when typed after a title).
+- No space before a footnote reference mark ("Adoption Act ⁹" -> "Adoption Act⁹").
+- Citations in the body text are italicised like citations in footnotes: the
+  case name (including its 'v') and the Act title and year only, never the
+  jurisdiction, year, report series or medium neutral citation (AGLC4 chs 2-3).
+- More than one section is 'ss', with an en dash for a range ("s 57-64" ->
+  "ss 57–64", r 3.1.4).
 - Headings are kept with the paragraph that follows them, so a heading is never
   stranded at the foot of a page with its text on the next.
 
 Every fix is written as a Word tracked change when `track_changes` is set
-(w:ins/w:del for moved punctuation, w:rPrChange/w:pPrChange for formatting) and
-reported back as a `BodyFix`.
+(w:ins/w:del for text, w:rPrChange/w:pPrChange for formatting) and reported back
+as a `BodyFix`.
+
+Some problems can only be spotted, not safely fixed, so they are reported as
+checks (`BodyFix(applied=False)`) and the text is left alone: a footnote number
+followed by a new sentence with no full stop before it, and an italicised
+possessive ("*Maynard’s* affidavit"), which usually means the person rather
+than the case.
 """
 
 from __future__ import annotations
 
 import copy
+import json
 import re
+from dataclasses import dataclass
+from pathlib import Path
 
 from lxml import etree
 
@@ -46,8 +61,7 @@ _TRANSPARENT = {"bookmarkStart", "bookmarkEnd", "proofErr", "commentRangeStart",
 _NON_TEXT_RUN_CHILDREN = {"rPr", "lastRenderedPageBreak"}
 
 # Relevant subset of CT_PPrBase's child order (ECMA-376 Part 1, §17.3.1.26):
-# keepNext must come straight after pStyle, and pPrChange must be last.
-_PPR_HEAD = ("pStyle",)
+# pPrChange must be last, after rPr and sectPr.
 _PPR_TAIL = ("rPr", "sectPr", "pPrChange")
 
 _HEADING_MAX_WORDS = 15
@@ -188,7 +202,7 @@ def _ensure_ppr(p):
 # --------------------------------------------------------------------------- #
 
 
-def _reference_is_italic(run, styles: _Styles) -> bool:
+def _is_italic(run, styles: _Styles) -> bool:
     rpr = run.find(qn("w:rPr"))
     for tag in ("w:i", "w:iCs"):
         value = _on_off(rpr.find(qn(tag))) if rpr is not None else None
@@ -202,8 +216,10 @@ def _reference_is_italic(run, styles: _Styles) -> bool:
     return bool(styles.flag(p_style or styles.default_paragraph, "w:rPr", "w:i"))
 
 
-def _unitalicise(run, styles: _Styles, track_changes: bool, author: str, date: str, id_gen) -> bool:
-    if not _reference_is_italic(run, styles):
+def _set_italic(run, styles: _Styles, italic: bool, track_changes: bool, author: str, date: str,
+                id_gen) -> bool:
+    """Make `run` italic or upright; False if it already was."""
+    if _is_italic(run, styles) == italic:
         return False
     rpr = run.find(qn("w:rPr"))
     if rpr is None:
@@ -215,12 +231,13 @@ def _unitalicise(run, styles: _Styles, track_changes: bool, author: str, date: s
         el = rpr.find(qn(tag))
         if el is not None:
             rpr.remove(el)
-    if _reference_is_italic(run, styles):
-        # Italic comes from a style, so it has to be switched off explicitly.
+    if _is_italic(run, styles) != italic:
+        # The inherited formatting is wrong too, so set it explicitly.
         for tag in ("w:i", "w:iCs"):
-            off = etree.Element(qn(tag))
-            off.set(qn("w:val"), "0")
-            _insert_ordered(rpr, off)
+            el = etree.Element(qn(tag))
+            if not italic:
+                el.set(qn("w:val"), "0")
+            _insert_ordered(rpr, el)
     return True
 
 
@@ -233,17 +250,22 @@ def _is_empty_run(el) -> bool:
 
 
 def _adjacent_text_run(run, forward: bool):
-    """The nearest sibling run carrying text, skipping bookmarks and empty runs;
-    None if anything else (another reference mark, a hyperlink, a tracked change)
+    """The nearest sibling run carrying text, skipping bookmarks, empty runs and
+    deleted text; None if anything else (another reference mark, a hyperlink)
     comes first."""
     sib = run.getnext() if forward else run.getprevious()
     while sib is not None:
         tag = _local(sib)
-        if tag in _TRANSPARENT or _is_empty_run(sib):
+        if tag in _TRANSPARENT or tag == "del" or _is_empty_run(sib):
             sib = sib.getnext() if forward else sib.getprevious()
             continue
         if tag == "r" and not _is_reference_run(sib):
             return sib
+        if tag == "ins" and not forward:
+            # Text inserted by a fix made just before (eg a removed space): it is
+            # only read, never edited, so looking inside is safe.
+            inserted = sib.findall(qn("w:r"))
+            return inserted[-1] if inserted else None
         return None
     return None
 
@@ -299,6 +321,236 @@ def _move_punctuation_before(run, track_changes: bool, author: str, date: str, i
     if not t.text and len([c for c in after if _local(c) not in _NON_TEXT_RUN_CHILDREN]) == 1:
         after.getparent().remove(after)
     return punct
+
+
+# --------------------------------------------------------------------------- #
+# Citations and punctuation in the running text
+# --------------------------------------------------------------------------- #
+
+# A paragraph is read as one string so patterns can span runs. Content that can't be
+# edited as plain text stands in as a single placeholder character, so no pattern
+# matches across it: _FN for a footnote reference mark, _OPAQUE for anything else
+# (tabs, fields, hyperlinks, earlier tracked insertions).
+_FN = ""
+_OPAQUE = "￼"
+
+_JURISDICTIONS = "|".join(
+    re.escape(code) for code in json.loads((Path(__file__).parent / "data" / "jurisdictions.json").read_text())
+)
+# 'Adoption Act 2000 (NSW)': only the title and year are italic (r 3.1.2).
+_ACT_JURISDICTION = re.compile(rf"(?<=\d{{4}} )\((?:{_JURISDICTIONS})\)")
+# '[2020] NSWCA 83', '[1991] 1 WLR 844', '(1992) 175 CLR 1': never italic (rr 2.2, 2.3).
+_CASE_DETAILS = re.compile(r"[\[(]\d{4}[\])] (?:\d+ )?[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*)* \d+\b")
+# 'Hackett v Secretary': the 'v' is part of the italicised case name (r 2.1.1).
+_CASE_V = re.compile(r"(?<=\S) v (?=\S)")
+# 's 57-64' -> 'ss 57–64' (r 3.1.4); 'ss 57-64' -> 'ss 57–64'. A hyphen followed by
+# '(' is part of a single provision number instead (eg ITAA 1997 's 20-110(1)').
+_SECTION_RANGE = re.compile(r"\b(ss?) (\d+[A-Z]*) ?[-–] ?(\d+[A-Z]*)\b(?![-(])")
+_SPACE_BEFORE_FN = re.compile(rf"(?<=[^\s{_FN}{_OPAQUE}]) +(?={_FN})")
+_NEW_SENTENCE = re.compile(rf"{_FN}(?= ([A-Z][a-z]*))")
+_POSSESSIVE = re.compile(r"\b([A-Z][A-Za-z-]+)[’']s\b")
+
+
+@dataclass
+class _Piece:
+    run: object | None  # a run holding exactly one w:t, or None for a placeholder
+    text: str
+    footnote: int | None = None
+
+
+def _pieces(p, numbers: dict[str, int]) -> list[_Piece]:
+    pieces: list[_Piece] = []
+    for child in p:
+        tag = _local(child)
+        if tag in _TRANSPARENT or tag in ("pPr", "del") or _is_empty_run(child):
+            continue
+        if _is_reference_run(child):
+            fid = child.find(qn("w:footnoteReference")).get(qn("w:id"))
+            pieces.append(_Piece(None, _FN, numbers.get(fid)))
+            continue
+        if tag == "r":
+            content = [c for c in child if _local(c) not in _NON_TEXT_RUN_CHILDREN]
+            if len(content) == 1 and _local(content[0]) == "t":
+                pieces.append(_Piece(child, content[0].text or ""))
+                continue
+        pieces.append(_Piece(None, _OPAQUE))
+    return pieces
+
+
+@dataclass
+class _Edit:
+    start: int
+    end: int
+    message: str
+    replacement: str | None = None  # new text, or None for a formatting change
+    italic: bool = False  # the formatting to apply when replacement is None
+    footnote: int | None = None
+
+
+class _Editor:
+    """Applies `_Edit`s to a paragraph's runs, as tracked changes if asked."""
+
+    def __init__(self, styles: _Styles, track_changes: bool, author: str, date: str, id_gen) -> None:
+        self.styles, self.track = styles, track_changes
+        self.author, self.date, self.id_gen = author, date, id_gen
+
+    def apply(self, pieces: list[_Piece], edits: list[_Edit]) -> list[_Edit]:
+        """Apply non-overlapping edits right to left (so splitting a run never moves
+        the text an earlier edit points at). Returns the edits that changed anything."""
+        done: list[_Edit] = []
+        limit = None
+        for e in sorted(edits, key=lambda e: e.start, reverse=True):
+            if limit is not None and e.end > limit:
+                continue
+            runs = self._isolate(pieces, e.start, e.end)
+            if runs is None:
+                continue
+            if e.replacement is not None:
+                self._replace(runs, e.replacement)
+                changed = True
+            else:
+                changed = False
+                for r in runs:
+                    changed |= _set_italic(r, self.styles, e.italic, self.track, self.author,
+                                           self.date, self.id_gen)
+            if changed:
+                done.append(e)
+                limit = e.start
+        return done[::-1]
+
+    def _isolate(self, pieces: list[_Piece], start: int, end: int):
+        """The runs covering exactly [start, end), splitting runs at the edges; None if
+        the span crosses a placeholder."""
+        spans = []
+        pos = 0
+        for piece in pieces:
+            a, b = pos, pos + len(piece.text)
+            pos = b
+            if b <= start or a >= end:
+                continue
+            if piece.run is None:
+                return None
+            spans.append((piece.run, max(start, a) - a, min(end, b) - a))
+        runs = []
+        for run, lo, hi in spans:
+            if hi < len(_run_text(run)):
+                self._split(run, hi)
+            runs.append(self._split(run, lo) if lo > 0 else run)
+        return runs
+
+    def _split(self, run, k: int):
+        """Split a one-w:t run at offset k: `run` keeps the text before k, and the
+        returned new run (inserted just after it) holds the rest."""
+        new = copy.deepcopy(run)
+        for change in new.iter(qn("w:rPrChange")):
+            change.set(qn("w:id"), str(self.id_gen()))
+        t, new_t = run.find(qn("w:t")), new.find(qn("w:t"))
+        t.text, new_t.text = t.text[:k], t.text[k:]
+        t.set(XML_SPACE, "preserve")
+        new_t.set(XML_SPACE, "preserve")
+        run.addnext(new)
+        return new
+
+    def _replace(self, runs: list, text: str) -> None:
+        first = runs[0]
+        if text:
+            new = _text_run_like(first, text)
+            first.addprevious(_wrap_change("w:ins", self.author, self.date, self.id_gen, [new])
+                              if self.track else new)
+        for r in runs:
+            if self.track:
+                r.find(qn("w:t")).tag = qn("w:delText")
+                wrapper = _wrap_change("w:del", self.author, self.date, self.id_gen, [])
+                r.addprevious(wrapper)
+                wrapper.append(r)
+            else:
+                r.getparent().remove(r)
+
+
+def _italic_flags(pieces: list[_Piece], styles: _Styles) -> list[bool]:
+    flags: list[bool] = []
+    for piece in pieces:
+        italic = piece.run is not None and _is_italic(piece.run, styles)
+        flags.extend([italic] * len(piece.text))
+    return flags
+
+
+def _footnote_at(pieces: list[_Piece], index: int) -> int | None:
+    pos = 0
+    for piece in pieces:
+        if pos == index:
+            return piece.footnote
+        pos += len(piece.text)
+    return None
+
+
+def _fix_paragraph_text(p, numbers: dict[str, int], styles: _Styles, edit: _Editor) -> list[BodyFix]:
+    pieces = _pieces(p, numbers)
+    text = "".join(piece.text for piece in pieces)
+    if not text.strip(_FN + _OPAQUE + " "):
+        return []
+    italic = _italic_flags(pieces, styles)
+    edits: list[_Edit] = []
+
+    for m in _SPACE_BEFORE_FN.finditer(text):
+        edits.append(_Edit(m.start(), m.end(), "space before the footnote number removed",
+                           replacement="", footnote=_footnote_at(pieces, m.end())))
+    for m in _ACT_JURISDICTION.finditer(text):
+        if any(italic[m.start():m.end()]):
+            edits.append(_Edit(m.start(), m.end(),
+                               f"‘{m.group(0)}’ after an Act’s title set upright (AGLC4 r 3.1.2: "
+                               "the jurisdiction is not italicised)"))
+    for m in _CASE_DETAILS.finditer(text):
+        if any(italic[m.start():m.end()]):
+            edits.append(_Edit(m.start(), m.end(),
+                               f"‘{m.group(0)}’ set upright (AGLC4 ch 2: only the case name is "
+                               "italicised, not the year, report or medium neutral citation)"))
+    for m in _CASE_V.finditer(text):
+        if italic[m.start() - 1] and italic[m.end()] and not italic[m.start() + 1]:
+            left = text[:m.start()].rsplit(" ", 1)[-1]
+            right = text[m.end():].split(" ", 1)[0]
+            edits.append(_Edit(m.start(), m.end(),
+                               f"‘v’ in ‘{left} v {right}’ italicised (AGLC4 r 2.1.1: it is part of "
+                               "the case name)", italic=True))
+    for m in _SECTION_RANGE.finditer(text):
+        label, a, b = m.groups()
+        if a.isdigit() and b.isdigit() and int(b) <= int(a):
+            continue  # not an ascending range, so probably one provision's number
+        fixed = f"ss {a}–{b}"
+        if fixed != m.group(0):
+            edits.append(_Edit(m.start(), m.end(),
+                               f"‘{m.group(0)}’ changed to ‘{fixed}’ (AGLC4 r 3.1.4: ‘ss’ for more "
+                               "than one section, and an en dash for a range)", replacement=fixed))
+
+    fixes = [BodyFix(footnote=e.footnote, message=e.message) for e in edit.apply(pieces, edits)]
+
+    for m in _NEW_SENTENCE.finditer(text):
+        before = text[:m.start()].rstrip("’”'\")]")
+        if before and before[-1] not in ".!?" + _FN + _OPAQUE:
+            fixes.append(BodyFix(
+                footnote=_footnote_at(pieces, m.start()), applied=False,
+                message=f"a new sentence (‘{m.group(1)} …’) starts after this footnote number, "
+                        "but the sentence before it has no full stop"))
+    return fixes
+
+
+def _possessive_checks(paragraphs: list, styles: _Styles) -> list[BodyFix]:
+    """'*Maynard’s* sworn affidavit': an italic name with a possessive almost always
+    means the person, not the case. Only the reader can tell, so this is a check."""
+    counts: dict[str, int] = {}
+    for p in paragraphs:
+        pieces = _pieces(p, {})
+        text = "".join(piece.text for piece in pieces)
+        italic = _italic_flags(pieces, styles)
+        for m in _POSSESSIVE.finditer(text):
+            if all(italic[m.start(1):m.end(1)]) and not m.group(1).endswith("Act"):
+                counts[m.group(1)] = counts.get(m.group(1), 0) + 1
+    return [
+        BodyFix(applied=False, message=(
+            f"‘{name}’s’ is italicised{f' ({n} times)' if n > 1 else ''}. Italicise a case name only "
+            f"when you mean the case; when you mean the person (‘{name}’s affidavit’), use roman type"))
+        for name, n in counts.items()
+    ]
 
 
 # --------------------------------------------------------------------------- #
@@ -397,17 +649,25 @@ def _keep_headings_with_text(doc_root, styles: _Styles, track_changes: bool, aut
 
 
 def fix_body(doc_root, styles_root, *, track_changes: bool, author: str, date: str, id_gen) -> list[BodyFix]:
-    """Apply the body-text fixes in place and describe each one."""
+    """Apply the body-text fixes in place and describe each one (plus the checks
+    that were only reported)."""
     styles = _Styles(styles_root)
     numbers = {fid: n for n, fid in enumerate(_footnote_reference_order(doc_root), start=1)}
+    edit = _Editor(styles, track_changes, author, date, id_gen)
     fixes: list[BodyFix] = []
+
+    body = doc_root.find(qn("w:body"))
+    paragraphs = list(body.iter(qn("w:p"))) if body is not None else []
+    for p in paragraphs:
+        fixes += _fix_paragraph_text(p, numbers, styles, edit)
+    fixes += _possessive_checks(paragraphs, styles)
 
     for ref in list(doc_root.iter(qn("w:footnoteReference"))):
         run = ref.getparent()
         if _local(run) != "r" or _inside(run, "del"):
             continue
         number = numbers.get(ref.get(qn("w:id")))
-        if _unitalicise(run, styles, track_changes, author, date, id_gen):
+        if _set_italic(run, styles, False, track_changes, author, date, id_gen):
             fixes.append(BodyFix(footnote=number,
                                  message="footnote number in the text was italic; set upright"))
         moved = _move_punctuation_before(run, track_changes, author, date, id_gen)

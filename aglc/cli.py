@@ -91,11 +91,14 @@ def fix(
                     after = fn.formatted.to_markup()
                     rprint(f"  {fn.number}: {before} → {after}")
 
-        # Print body text fixes
-        if result.body_fixes:
-            rprint("\n[bold]Body text fixes:[/bold]")
-            for b in result.body_fixes:
-                rprint(f"  Footnote {b.footnote}: {b.message}" if b.footnote else f"  {b.message}")
+        # Print body text fixes, then the body text problems left for the author to check
+        for applied, title in ((True, "[bold]Body text fixes:[/bold]"),
+                               (False, "[bold yellow]Body text to check:[/bold yellow]")):
+            items = [b for b in result.body_fixes if b.applied == applied]
+            if items:
+                rprint(f"\n{title}")
+                for b in items:
+                    rprint(f"  Footnote {b.footnote}: {b.message}" if b.footnote else f"  {b.message}")
 
         # Print warnings
         if result.warnings:

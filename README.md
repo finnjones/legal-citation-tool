@@ -8,8 +8,14 @@ Format legal citations in Word documents to the *Australian Guide to Legal Citat
 - **Reformat to AGLC4** with deterministic, tested formatters
 - **Preserve source documents** with Word tracked changes
 - **Generate bibliography** sorted by category (cases, legislation, secondary sources, etc.)
-- **Fix footnote numbers in the body text**: moves them after punctuation (r 1.1.2, "Act¹." → "Act.¹"),
-  sets italic footnote numbers upright, and keeps headings with the text that follows them
+- **Fix the body text around citations**: moves footnote numbers after punctuation (r 1.1.2,
+  "Act¹." → "Act.¹") and removes spaces before them, sets italic footnote numbers upright,
+  italicises citations in the text correctly (not the jurisdiction or the medium neutral
+  citation; the 'v' too), writes "ss 57–64" for section ranges, and keeps headings with the
+  text that follows them
+- **Flags what it can't safely fix**: a missing full stop before a new sentence, an italicised
+  possessive like "*Maynard’s* affidavit" (the person, not the case), and *Ibid* or "(n x)" with
+  no pinpoint
 - **Multiple interfaces**: CLI, HTTP API, and web UI
 - **Model-agnostic**: Works with Anthropic Claude, OpenAI, Google Gemini, Ollama, LM Studio, etc.
 

@@ -161,3 +161,139 @@ def test_correct_document_is_left_alone(tmp_path):
     assert write_document(src, out, []) == []
     with zipfile.ZipFile(src) as a, zipfile.ZipFile(out) as b:
         assert a.read(DOCUMENT_PATH) == b.read(DOCUMENT_PATH)
+
+
+# --------------------------------------------------------------------------- #
+# Citations in the running text (feedback on a case note)
+# --------------------------------------------------------------------------- #
+
+CASE_NOTE = [
+    ("para", [
+        ("text", "Adoption of Maynard (a pseudonym)", True),
+        ("text", " [2026] NSWSC 921 ", False),
+        ("text", "(‘Maynard’)", True),
+        ("text", " was heard with Rees J presiding.", False),
+        ("fnref", 1),
+        ("text", " As per the ", False),
+        ("text", "Adoption Act 2000 (NSW)", True),  # "jurisdiction should not be italicised"
+        ("fnref", 2, True),
+        ("text", " ", False),
+        ("text", "(‘Adoption Act’)", True),
+        ("text", " s 180, the judgement anonymises the parties.", False),
+        ("fnref", 3),
+        ("text", " The test is in the ", False),
+        ("text", "Aboriginal Land Rights Act 1983 (NSW) (‘ALRA’)", True),
+        ("fnref", 4, True),
+        ("text", " This case attempts to clarify the law.", False),  # "Full stop needed"
+    ]),
+    ("para", [
+        ("text", "Maynard", True),
+        ("text", " was born in April 2007. ", False),
+        ("text", "Maynard’s", True),  # the person, not the case
+        ("text", " sworn affidavit was valid under the ", False),
+        ("text", "Adoption Act", True),
+        ("text", " ", False),  # "Adoption Act ⁹"
+        ("fnref", 5),
+        ("text", " and more.", False),
+    ]),
+    ("para", [
+        ("text", "The legislation required the processes in s 57-64", False),  # "write 'ss'"
+        ("fnref", 6),
+        ("text", " to be undertaken, drawing from ", False),
+        # "the medium neutral citation should not be italicised"
+        ("text", "Hackett v Secretary, Department of Communities and Justice [2020] NSWCA 83", True),
+        ("text", ". See also ", False),
+        ("text", "Mabo", True),
+        ("text", " v ", False),
+        ("text", "Queensland", True),
+        ("text", " and ", False),
+        ("text", "Maynard’s", True),
+        ("text", " Aboriginality.", False),
+    ]),
+]
+
+
+def _italic_spans(path) -> list[list[str]]:
+    """Per body paragraph, the visible italic stretches of text (changes accepted),
+    ignoring italic spaces at their edges, which look the same either way."""
+    out = []
+    for p in _body_root(path).iter(qn("w:p")):
+        spans, current = [], ""
+        for r in p.iter(qn("w:r")):
+            if any(a.tag == qn("w:del") for a in r.iterancestors()):
+                continue
+            rpr = r.find(qn("w:rPr"))
+            i = rpr.find(qn("w:i")) if rpr is not None else None
+            italic = i is not None and i.get(qn("w:val")) not in ("0", "false")
+            text = "".join(t.text or "" for t in r.findall(qn("w:t")))
+            if r.find(qn("w:footnoteReference")) is not None:
+                italic, text = False, ""
+            if italic:
+                current += text
+            elif current and text:
+                spans.append(current)
+                current = ""
+        if current:
+            spans.append(current)
+        out.append([span.strip() for span in spans if span.strip()])
+    return out
+
+
+@pytest.fixture
+def case_note(tmp_path):
+    return build_docx(tmp_path / "case_note.docx", CASE_NOTE, FOOTNOTES[:6])
+
+
+@pytest.mark.parametrize("track_changes", [True, False])
+def test_case_note_text(case_note, tmp_path, track_changes):
+    out = tmp_path / "out.docx"
+    write_document(case_note, out, [], track_changes=track_changes)
+    assert _visible_body(out) == [
+        "Adoption of Maynard (a pseudonym) [2026] NSWSC 921 (‘Maynard’) was heard with Rees J presiding.[1]"
+        " As per the Adoption Act 2000 (NSW)[2] (‘Adoption Act’) s 180, the judgement anonymises the parties.[3]"
+        " The test is in the Aboriginal Land Rights Act 1983 (NSW) (‘ALRA’)[4] This case attempts to clarify the law.",
+        "Maynard was born in April 2007. Maynard’s sworn affidavit was valid under the Adoption Act[5] and more.",
+        "The legislation required the processes in ss 57–64[6] to be undertaken, drawing from Hackett v "
+        "Secretary, Department of Communities and Justice [2020] NSWCA 83. See also Mabo v Queensland and "
+        "Maynard’s Aboriginality.",
+    ]
+    assert _italic_spans(out) == [
+        ["Adoption of Maynard (a pseudonym)", "(‘Maynard’)", "Adoption Act 2000", "(‘Adoption Act’)",
+         "Aboriginal Land Rights Act 1983", "(‘ALRA’)"],
+        ["Maynard", "Maynard’s", "Adoption Act"],
+        ["Hackett v Secretary, Department of Communities and Justice", "Mabo v Queensland", "Maynard’s"],
+    ]
+    docx.Document(str(out))
+
+
+def test_case_note_report(case_note, tmp_path):
+    fixes = write_document(case_note, tmp_path / "out.docx", [])
+    applied = [(f.footnote, f.message) for f in fixes if f.applied]
+    checks = [(f.footnote, f.message) for f in fixes if not f.applied]
+    assert applied == [
+        (None, "‘(NSW)’ after an Act’s title set upright (AGLC4 r 3.1.2: the jurisdiction is not italicised)"),
+        (None, "‘(NSW)’ after an Act’s title set upright (AGLC4 r 3.1.2: the jurisdiction is not italicised)"),
+        (5, "space before the footnote number removed"),
+        (None, "‘s 57-64’ changed to ‘ss 57–64’ (AGLC4 r 3.1.4: ‘ss’ for more than one section, "
+               "and an en dash for a range)"),
+        (None, "‘[2020] NSWCA 83’ set upright (AGLC4 ch 2: only the case name is italicised, "
+               "not the year, report or medium neutral citation)"),
+        (None, "‘v’ in ‘Mabo v Queensland’ italicised (AGLC4 r 2.1.1: it is part of the case name)"),
+        (2, "footnote number in the text was italic; set upright"),
+        (4, "footnote number in the text was italic; set upright"),
+    ]
+    assert checks == [
+        (4, "a new sentence (‘This …’) starts after this footnote number, but the sentence before it "
+            "has no full stop"),
+        (None, "‘Maynard’s’ is italicised (2 times). Italicise a case name only when you mean the case; "
+               "when you mean the person (‘Maynard’s affidavit’), use roman type"),
+    ]
+
+
+def test_provision_numbers_with_hyphens_are_left_alone(tmp_path):
+    # ITAA-style provision numbers ('s 20-110(1)', 's 995-1') aren't ranges.
+    src = build_docx(tmp_path / "itaa.docx", [
+        ("para", [("text", "See s 20-110(1) and s 995-1 of the Act, and ss 4–9.", False)]),
+    ], [])
+    out = tmp_path / "out.docx"
+    assert write_document(src, out, []) == []

@@ -341,10 +341,12 @@ class FootnoteResult(BaseModel):
 
 
 class BodyFix(BaseModel):
-    """A change made to the body text rather than a footnote (see aglc/body.py)."""
+    """A change made to the body text rather than a footnote (see aglc/body.py), or,
+    when `applied` is False, a problem spotted there that needs the author's judgement."""
 
     footnote: int | None = None
     message: str
+    applied: bool = True
 
 
 class BibliographySection(BaseModel):

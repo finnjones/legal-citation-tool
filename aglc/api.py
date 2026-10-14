@@ -169,7 +169,8 @@ async def process_document(
             "footnotes": footnotes,
             "bibliography": bibliography,
             "warnings": warnings,
-            "body_fixes": [{"footnote": b.footnote, "message": b.message} for b in result.body_fixes],
+            "body_fixes": [{"footnote": b.footnote, "message": b.message, "applied": b.applied}
+                           for b in result.body_fixes],
         }
 
     except Exception as e:

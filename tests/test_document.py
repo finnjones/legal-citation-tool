@@ -640,6 +640,27 @@ def test_no_warning_when_nothing_missing():
     assert result.warnings == []
 
 
+def test_repeat_case_reference_without_pinpoint_is_flagged():
+    # Marker feedback: "*Maynard* (n 1)." / "Ibid." -- "provide a pinpoint" (r 1.1.6)
+    f1 = footnote(1, cseg(case()))
+    f2 = footnote(2, cseg(case()))                      # Ibid, no pinpoint
+    f3 = footnote(3, cseg(legislation(title="Some Act")))
+    f4 = footnote(4, cseg(case()))                      # Mabo (n 1), no pinpoint
+    f5 = footnote(5, cseg(case(pinpoints=[pin("42")])))  # Ibid 42: fine
+    result = render_document([f1, f2, f3, f4, f5], bibliography=False)
+    assert [(w.footnote, w.message) for w in result.warnings] == [
+        (2, "Ibid has no pinpoint: add the paragraph or page you are relying on (AGLC4 r 1.1.6)"),
+        (4, "this repeat reference has no pinpoint: add the paragraph or page you are relying on "
+            "(AGLC4 r 1.1.6)"),
+    ]
+
+
+def test_repeat_legislation_reference_without_pinpoint_is_not_flagged():
+    f1 = footnote(1, cseg(legislation(title="Some Act")))
+    f2 = footnote(2, cseg(legislation(title="Some Act")))
+    assert render_document([f1, f2], bibliography=False).warnings == []
+
+
 # --------------------------------------------------------------------------- #
 # bibliography (r 1.13)
 # --------------------------------------------------------------------------- #
