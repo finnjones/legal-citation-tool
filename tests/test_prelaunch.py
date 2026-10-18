@@ -382,3 +382,18 @@ def test_ipv6_counts_as_its_64():
     b = billing._client_ip(_request(peer="2001:db8:1:2:ffff::9"))
     assert a == b == "2001:db8:1:2::/64"
     assert billing._client_ip(_request(peer="::ffff:203.0.113.9")) == "203.0.113.9"
+
+
+def test_entitlement_says_expired_after_deletion(paid, client, fake):
+    sid = _process(client).json()["id"]
+    poid = _provider_order_id(_checkout(client, sid)["order_id"])
+    fake.pay(poid)
+    _webhook(client, fake, poid)
+    _age(sid, 50, unlocked=25, orders=50)
+    _sweep()
+    assert client.get(f"/api/entitlement/{sid}").json() == {"session_id": sid, "unlocked": False, "status": "expired"}
+
+
+def test_too_large_message_keeps_fractions(monkeypatch):
+    monkeypatch.setenv("AGLC_MAX_UPLOAD_MB", "0.5")
+    assert "0.5 MB" in guards.too_large_message()

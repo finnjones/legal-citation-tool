@@ -8,7 +8,8 @@ the entitlement) unlocks it and the .docx download.
     GET  /api/config                    what the page needs to know (price, payments on/off)
     POST /api/checkout {session_id}     create a hosted checkout, return its URL
     POST /api/webhooks/{provider}       verified, deduplicated, applied in one transaction
-    GET  /api/entitlement/{session_id}  unlocked yet? (asks the provider if the webhook is late)
+    GET  /api/entitlement/{session_id}  unlocked yet? (asks the provider if the webhook is late);
+                                        status unlocked | pending | refunded | expired | none
     GET  /api/results/{session_id}      the full result once unlocked, else the preview
 
 Free processing is limited before any LLM call: per browser and per IP address per day,
@@ -591,11 +592,15 @@ def get_entitlement(session_id: str) -> dict:
         _reconcile(session_id)
         doc = store.document(session_id)
     statuses = {o["status"] for o in store.orders_for(session_id)}
+    refunded = bool(statuses & {"refunding", "refunded", "refund_failed"})
+    if doc["purged_at"]:  # deleted by the retention sweep: nothing left to unlock or download
+        status = "refunded" if refunded else "expired"
+        return {"session_id": session_id, "unlocked": False, "status": status}
     if doc["unlocked_at"]:
         status = "unlocked"
     elif "pending" in statuses:
         status = "pending"
-    elif statuses & {"refunding", "refunded", "refund_failed"}:
+    elif refunded:
         status = "refunded"
     else:
         status = "none"
