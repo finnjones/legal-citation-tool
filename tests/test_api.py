@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 import uuid
 from io import BytesIO
@@ -437,9 +438,33 @@ def test_policy_pages_keep_consumer_law_rights(path):
 
 def test_privacy_page_marks_unknown_facts_as_todo():
     text = client.get("/privacy").text
-    assert "[TODO: retention period" in text
+    assert "[TODO: confirm the OpenRouter account's data settings" in text
     assert "OpenRouter" in text and "DeepSeek" in text
     assert "never used for training" not in text
+
+
+def test_privacy_page_states_the_real_retention_period(monkeypatch):
+    assert "deleted automatically 24 hours after" in client.get("/privacy").text  # the default
+    monkeypatch.setenv("AGLC_RETENTION_HOURS", "48")
+    text = client.get("/privacy").text
+    assert "deleted automatically 48 hours after" in text and "TODO: retention" not in text
+
+
+@pytest.mark.parametrize("path", ["/", "/privacy"])
+def test_pages_load_no_third_party_fonts(path):
+    text = client.get(path).text
+    assert "fonts.googleapis.com" not in text and "fonts.gstatic.com" not in text
+    assert 'href="/assets/fonts/fonts.css"' in text and 'rel="icon"' in text
+
+
+def test_self_hosted_fonts_and_favicon_are_served():
+    css = client.get("/assets/fonts/fonts.css")
+    assert css.status_code == 200 and css.text.count("@font-face") == 6
+    for url in sorted(set(re.findall(r'url\("(/assets/fonts/[^"]+)"\)', css.text))):
+        font = client.get(url)
+        assert font.status_code == 200 and font.content[:4] == b"wOF2", url
+    icon = client.get("/favicon.ico")
+    assert icon.status_code == 200 and icon.headers["content-type"].startswith("image/svg+xml")
 
 
 def test_status():

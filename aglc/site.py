@@ -8,6 +8,7 @@ and analytics are set in one place:
     {{preview_full}}  changed footnotes shown free before paying
     {{base_url}}      $AGLC_PUBLIC_URL or the request's own origin (for Open Graph URLs)
     {{analytics}}     the Plausible script, only when $AGLC_PLAUSIBLE_DOMAIN is set
+    {{retention_hours}} how long documents are kept: $AGLC_RETENTION_HOURS (aglc/retention.py)
     {{> name}}        web/partials/<name>.html
 """
 
@@ -21,7 +22,7 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from . import billing
+from . import billing, retention
 
 #: The product's name. A placeholder until one is chosen; swap it here only.
 BRAND = "Wordmark"
@@ -60,6 +61,7 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "preview_full": str(billing.PREVIEW_FULL),
         "base_url": escape(base_url(request)),
         "analytics": analytics_tag(),
+        "retention_hours": f"{retention.retention_hours():g}",
         **(extra or {}),
     }
     return re.sub(r"\{\{\s*([a-z_]+)\s*\}\}", lambda m: values.get(m[1], m[0]), html)

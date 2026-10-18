@@ -11,7 +11,7 @@
                     <li><strong>The footnotes</strong> are sent to an AI model, which reads them and returns their parts (names, years, report series, pinpoints). The body text of your essay is not sent to the AI model.</li>
                     <li><strong>The body text</strong> is checked by our own code on our server (for example, footnote numbers after punctuation). It isn't sent anywhere else.</li>
                     <li><strong>What we keep:</strong> your uploaded document, the corrected document, the results shown on the page, the file name, and the date. These are kept so you can come back to your results, pay, and download again.</li>
-                    <li><strong>How long:</strong> <span class="todo">[TODO: retention period. The code has no automatic deletion yet: documents stay in the server's data folder ($AGLC_DATA_DIR/sessions) until removed by hand. Set a period, add the cleanup, then state it here.]</span></li>
+                    <li><strong>How long:</strong> {{retention_hours}} hours. Your uploaded document, the corrected document, the results and the file name are deleted automatically {{retention_hours}} hours after you last upload, check out or pay for that document. After that the results link no longer works and the document can't be downloaded again. A record of any order (amount, status and Square's references) is kept for our accounts.</li>
                 </ul>
                 <p>Anyone with your results link (the page address after you check a document) can see the results for that document, so share it only if you mean to.</p>
 
@@ -26,7 +26,7 @@
                 <p>Our web server's own logs record IP addresses for security and troubleshooting. <span class="todo">[TODO: how long server logs are kept]</span></p>
 
                 <h2>Fonts and analytics</h2>
-                <p>The page's fonts are loaded from Google Fonts, so your browser contacts Google when the page loads. <span class="todo">[TODO: or self-host the fonts and remove this paragraph]</span></p>
+                <p>The page's fonts are served from our own server, so loading the page doesn't contact any other site.</p>
                 <p>If we turn on analytics, we use Plausible, which counts page views without cookies and without personal data. <span class="todo">[TODO: say whether analytics is on]</span></p>
 
                 <h2>Your choices</h2>

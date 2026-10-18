@@ -121,6 +121,12 @@ async def root(request: Request) -> HTMLResponse:
     return site.index(request)
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> FileResponse:
+    """Browsers ask for this whatever the page says; the icon is an SVG."""
+    return FileResponse(site.WEB_DIR / "assets" / "favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/privacy")
 @app.get("/terms")
 @app.get("/refunds")
