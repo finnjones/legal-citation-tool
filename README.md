@@ -141,6 +141,8 @@ aglc serve --port 9000      # Custom port
 
 Opens at http://localhost:8000 — upload documents, view results, download processed files.
 
+Hosting it publicly with payments on: see [DEPLOY.md](DEPLOY.md).
+
 ### HTTP API
 
 #### `GET /`
