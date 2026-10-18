@@ -114,6 +114,9 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .banner p { max-width: 75ch; }
         .banner .actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 8px; }
         .banner ul { padding-left: 1.2em; display: grid; gap: 4px; }
+        .banner ul.check-list { list-style: none; padding: 0; gap: 10px; margin-top: 4px; }
+        .check-list li { display: grid; gap: 2px; max-width: 80ch; }
+        .check-list .where { font-size: 0.8125rem; font-weight: 600; color: var(--check); }
         .upload-card .banner { margin-top: 16px; }
         .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
         .copy-row code {
@@ -280,7 +283,48 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
         .empty-filter { padding: 32px 20px; color: var(--muted); text-align: center; }
 
-        .bib-wrap { margin-top: 56px; }
+        .bib-wrap, .body-wrap { margin-top: 56px; }
+        .body-wrap .bib-head { display: grid; gap: 6px; }
+        .bib-head p { color: var(--muted); font-size: 0.9375rem; max-width: 65ch; }
+
+        /* Body-text fixes: one row per kind of fix, opened to see where */
+        .fixes { background: var(--sheet); border: 1px solid var(--hairline); border-radius: 8px; }
+        .fix-group + .fix-group { border-top: 1px solid var(--hairline); }
+        .fix-group summary {
+            list-style: none; cursor: pointer; display: grid; align-items: center;
+            grid-template-columns: 16px minmax(0, 1fr) auto auto; gap: 4px 16px;
+            padding: 14px 20px; border-radius: 8px;
+        }
+        .fix-group summary::-webkit-details-marker { display: none; }
+        .fix-group summary:hover { background: var(--sheet-2); }
+        .fix-group summary:focus-visible { outline-offset: -2px; }
+        .fix-group[open] summary { border-radius: 8px 8px 0 0; }
+        .fix-group summary svg { width: 12px; height: 12px; color: var(--muted); transition: transform 180ms var(--ease-out); }
+        .fix-group[open] summary svg { transform: rotate(90deg); }
+        .fix-title { font-weight: 500; }
+        .fix-why { grid-column: 2; color: var(--muted); font-size: 0.875rem; }
+        .fix-rule { font-size: 0.8125rem; color: var(--muted); white-space: nowrap; }
+        .fix-count {
+            min-width: 28px; padding: 2px 8px; border-radius: 999px; text-align: center;
+            font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums;
+            color: var(--accent); background: var(--accent-wash);
+        }
+        .fix-group summary > svg { grid-column: 1; grid-row: 1; }
+        .fix-title { grid-column: 2; grid-row: 1; }
+        .fix-rule { grid-column: 3; grid-row: 1; }
+        .fix-count { grid-column: 4; grid-row: 1; }
+        .fix-why { grid-row: 2; }
+        .fix-items { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 20px 18px 52px; }
+        .fix-item {
+            display: inline-flex; align-items: baseline; gap: 6px; min-height: 28px; padding: 3px 10px;
+            border: 1px solid var(--hairline); border-radius: 6px; background: var(--sheet-2); font-size: 0.875rem;
+        }
+        .fix-item .cite { font-family: var(--font-serif); font-size: 0.9375rem; }
+        .fix-item .times { color: var(--muted); font-size: 0.8125rem; }
+        a.fix-item { color: var(--ink); text-decoration: none; }
+        a.fix-item:hover { border-color: var(--hairline-strong); background: var(--sheet); }
+        .fix-item .fn-ref { color: var(--muted); }
+        a.fix-item .fn-ref { color: var(--accent); }
         .bib-head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
         .bib-head h2 { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 600; }
         .bibliography { background: var(--sheet); border: 1px solid var(--hairline); border-radius: 8px; padding: 28px 32px 32px; }
@@ -346,6 +390,10 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             .filters { width: 100%; }
             .filter { flex: 1 1 auto; justify-content: center; padding: 4px 6px; }
             .bibliography { padding: 20px 16px; }
+            .fix-group summary { grid-template-columns: 16px minmax(0, 1fr) auto; padding: 14px 16px; }
+            .fix-count { grid-column: 3; }
+            .fix-rule { grid-column: 2; grid-row: 3; }
+            .fix-items { padding: 2px 16px 16px 16px; }
             .paybar .btn { width: 100%; }
         }
     </style>
@@ -603,6 +651,14 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 </div>
 
                 <div class="register" id="register" role="list" aria-label="Footnotes"></div>
+
+                <section class="body-wrap" id="bodyWrap" hidden aria-labelledby="bodyTitle">
+                    <div class="bib-head">
+                        <h2 id="bodyTitle">Body text</h2>
+                        <p id="bodyLede"></p>
+                    </div>
+                    <div class="fixes" id="bodyOut"></div>
+                </section>
 
                 <section class="bib-wrap" id="bibWrap" hidden aria-labelledby="bibTitle">
                     <div class="bib-head"><h2 id="bibTitle">Bibliography</h2></div>
@@ -963,14 +1019,17 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             document.querySelectorAll(".filter").forEach(btn => {
                 btn.disabled = btn.dataset.filter !== "all" && counts[btn.dataset.filter] === 0;
             });
-            document.getElementById("summary").textContent =
-                `${plural(entries.length, "footnote")} · ${counts.amended} amended · ${counts.check} to check · ${counts.unchanged} unchanged`;
+            const bodyFixed = (data.body_fixes || []).filter(b => b.applied !== false).length;
+            document.getElementById("summary").innerHTML =
+                `${plural(entries.length, "footnote")} · ${counts.amended} amended · ${counts.check} to check · ${counts.unchanged} unchanged`
+                + (bodyFixed ? ` · <a href="#bodyWrap">${plural(bodyFixed, "fix", "fixes")} in the body text</a>` : "");
             const next = document.getElementById("nextCheck");
             next.hidden = counts.check === 0;
             next.textContent = `Next Check (${counts.check})`;
 
             renderBanners(data, general, failed);
             renderRegister();
+            renderBodyFixes(data);
             renderBibliography(data);
             renderActions(data);
             setFilter("all");
@@ -995,15 +1054,16 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 + (bib ? `The bibliography (${plural(bib, "entry", "entries")}) unlocks with them. ` : "")
                 + `Unlock to see everything and download the .docx.`) : "");
 
-            setBanner("general", general.length ? banner("check", "Check", "",
-                "", `<ul>${general.map(m => `<li>${escapeHtml(humanNote(m))}</li>`).join("")}</ul>`) : "");
-
-            const body = data.body_fixes || [];
-            const checks = body.filter(b => b.applied === false);
-            const fixed = body.filter(b => b.applied !== false);
-            setBanner("body", body.length ? banner(checks.length ? "check" : "", "Body text",
-                `${fixed.length ? `${plural(fixed.length, "fix", "fixes")} made in the body text` : ""}${fixed.length && checks.length ? "; " : ""}${checks.length ? `${checks.length} to check` : ""}.`,
-                "", `<ul>${body.map(b => `<li>${b.applied === false ? "<strong>Check:</strong> " : ""}${escapeHtml((b.footnote ? `Footnote ${b.footnote}: ` : "") + b.message)}</li>`).join("")}</ul>`) : "");
+            // Things to check that aren't on a footnote's row: general notes and body-text checks
+            const bodyChecks = (data.body_fixes || []).filter(b => b.applied === false);
+            const outside = [
+                ...general.map(m => escapeHtml(humanNote(m))),
+                ...bodyChecks.map(b => (b.footnote ? `<span class="where">In the text, near footnote ${b.footnote}</span>` : `<span class="where">In the text</span>`)
+                    + escapeHtml(sentence(b.message))),
+            ];
+            setBanner("general", outside.length ? banner("check", `Check ${outside.length === 1 ? "this" : `these ${outside.length}`} outside the footnotes`,
+                "These aren't changed for you, because they need your judgement.",
+                "", `<ul class="check-list">${outside.map(item => `<li>${item}</li>`).join("")}</ul>`) : "");
 
             const relink = document.getElementById("relink");
             relink.hidden = !(config.payments && !locked);
@@ -1091,6 +1151,79 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             return many ? many[1].split(",").map(n => Number(n.trim())).filter(Boolean) : [];
         }
 
+        // Body-text fixes, grouped by kind. Each kind: how to recognise its message, a short
+        // title, why (in the student's terms), the AGLC4 rule, and the snippet to show for each.
+        const BODY_KINDS = [
+            { re: /^footnote number in the text was italic/i, title: "Footnote numbers set upright", why: "Footnote numbers in the text aren't italic." },
+            { re: /^footnote number moved after the ‘(.+?)’/i, title: "Footnote numbers moved after punctuation", rule: "r 1.1.2", why: "A footnote number goes after the punctuation, not before it.", show: m => `after ‘${m[1]}’` },
+            { re: /^space before the footnote number removed/i, title: "Spaces before footnote numbers removed", why: "No space goes between a word and its footnote number." },
+            { re: /^‘(.+?)’ after an Act’s title set upright/, title: "Jurisdictions after Act titles set upright", rule: "r 3.1.2", why: "Only the Act's title and year are italicised, not the jurisdiction.", show: m => m[1], cite: true },
+            { re: /^‘(.+?)’ set upright \(AGLC4 ch 2/, title: "Case citation details set upright", rule: "ch 2", why: "Only the case name is italicised, not the year, report or medium neutral citation.", show: m => m[1], cite: true },
+            { re: /^‘v’ in ‘(.+?)’ italicised/, title: "‘v’ italicised in case names", rule: "r 2.1.1", why: "The ‘v’ is part of the case name.", show: m => m[1], cite: true },
+            { re: /^‘(.+?)’ changed to ‘(.+?)’ \(AGLC4 r 3\.1\.4/, title: "Section references corrected", rule: "r 3.1.4", why: "‘ss’ for more than one section, and an en dash for a range.", show: m => `${m[1]} → ${m[2]}`, cite: true },
+            { re: /^Heading ‘(.+?)’ set to keep with/, title: "Headings kept with the text after them", why: "So a heading can't be left alone at the foot of a page.", show: m => `‘${m[1]}’` },
+        ];
+
+        function renderBodyFixes(data) {
+            const fixes = (data.body_fixes || []).filter(b => b.applied !== false);
+            const wrap = document.getElementById("bodyWrap");
+            wrap.hidden = !fixes.length;
+            if (!fixes.length) return;
+            const groups = new Map();
+            for (const fix of fixes) {
+                let kind = BODY_KINDS.find(k => k.re.test(fix.message));
+                const match = kind ? fix.message.match(kind.re) : null;
+                kind ||= { title: "Other changes", why: "" };
+                if (!groups.has(kind.title)) groups.set(kind.title, { kind, items: new Map(), total: 0 });
+                const group = groups.get(kind.title);
+                group.total++;
+                // One chip per place: the footnote it's next to and/or the text it changed
+                const text = kind.show ? kind.show(match) : kind.re ? "" : sentence(fix.message);
+                const key = `${fix.footnote ?? ""}|${text}`;
+                const item = group.items.get(key) || { footnote: fix.footnote, text, times: 0 };
+                item.times++;
+                group.items.set(key, item);
+            }
+            document.getElementById("bodyLede").textContent =
+                `${plural(fixes.length, "change", "changes")} to the text of your essay, outside the footnotes. Each one is a tracked change in Word.`;
+            document.getElementById("bodyOut").innerHTML = [...groups.values()].map(({ kind, items, total }) => `
+                <details class="fix-group">
+                    <summary>
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
+                        <span class="fix-title">${escapeHtml(kind.title)}</span>
+                        ${kind.rule ? `<span class="fix-rule">AGLC4 ${escapeHtml(kind.rule)}</span>` : ""}
+                        <span class="fix-count" aria-label="${plural(total, "change", "changes")}">${total}</span>
+                        ${kind.why ? `<span class="fix-why">${escapeHtml(kind.why)}</span>` : ""}
+                    </summary>
+                    <div class="fix-items">${[...items.values()].map(fixItem(kind)).join("")}</div>
+                </details>`).join("");
+        }
+
+        function fixItem(kind) {
+            return ({ footnote, text, times }) => {
+                const ref = footnote ? `<span class="fn-ref">Footnote ${footnote}</span>` : "";
+                const body = text ? `<span class="${kind.cite ? "cite" : ""}">${escapeHtml(text)}</span>` : "";
+                const count = times > 1 ? `<span class="times">×${times}</span>` : "";
+                return footnote
+                    ? `<a class="fix-item" href="#fn-${footnote}" data-jump="${footnote}">${ref}${body}${count}</a>`
+                    : `<span class="fix-item">${body}${count}</span>`;
+            };
+        }
+
+        // "a new sentence ... full stop" -> "A new sentence ... full stop."
+        function sentence(text) {
+            const t = text.trim();
+            return t.charAt(0).toUpperCase() + t.slice(1) + (/[.!?)’]$/.test(t) ? "" : ".");
+        }
+
+        function jumpToFootnote(number) {
+            const el = document.getElementById(`fn-${number}`);
+            if (!el) return;
+            if (el.hidden) setFilter("all");
+            el.focus({ preventScroll: true });
+            el.scrollIntoView({ behavior: smooth(), block: "start" });
+        }
+
         function renderBibliography(data) {
             const bib = data.bibliography || [];
             const lockedCount = data.locked ? data.bibliography_entries || 0 : 0;
@@ -1106,8 +1239,10 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             const locked = Boolean(data.locked);
             const download = document.getElementById("downloadButton");
             download.hidden = locked;
-            document.getElementById("downloadLabel").textContent = `Download ${downloadName()}`;
+            // A long essay title would push the button onto its own line; the name is in the tooltip
+            document.getElementById("downloadLabel").textContent = "Download .docx";
             download.title = `Download ${downloadName()}`;
+            download.setAttribute("aria-label", `Download ${downloadName()}`);
 
             const bar = document.getElementById("paybar");
             const show = config.payments && locked;
@@ -1171,6 +1306,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 ({ rerun: rerunDocument, home: () => { location.href = "/"; } }[e.currentTarget.dataset.action] || startCheckout)());
             document.addEventListener("click", (e) => {
                 if (e.target.closest("[data-rerun]")) rerunDocument();
+                const jump = e.target.closest("[data-jump]");
+                if (jump) { e.preventDefault(); jumpToFootnote(Number(jump.dataset.jump)); }
                 if (e.target.closest("[data-download]")) downloadDocument();
                 const copy = e.target.closest("[data-copy-link]");
                 if (copy) copyText(reDownloadLink(), copy, "Link copied");
@@ -1310,7 +1447,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             </div>`;
         }
 
-        const BANNER_ORDER = ["payment", "error", "failed", "preview", "general", "body"];
+        const BANNER_ORDER = ["payment", "error", "failed", "preview", "general"];
         const banners = {};
         function setBanner(key, html) {
             banners[key] = html;
