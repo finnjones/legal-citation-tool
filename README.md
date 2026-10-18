@@ -60,6 +60,20 @@ AGLC_LLM=openai-compatible:llama3.1    # local Ollama / LM Studio / vLLM;
 You can also pick a model per run: `aglc fix essay.docx --model openrouter:deepseek/deepseek-v4-flash`,
 or type it into the Model field in the web app. `aglc providers` lists what's available.
 
+If the model sends back an empty reply, times out or its host is overloaded, the request is
+retried after 1s and then 3s (on OpenRouter, the retry is routed away from the upstream host
+that failed). A batch that still fails is asked again in batches of 5, then one footnote at a
+time, so one bad request doesn't leave a whole batch unformatted. You can also name a second
+model to ask when the first gives up:
+
+```bash
+AGLC_LLM_FALLBACK=openrouter:<model id>   # any provider:model; only used on failure
+```
+
+A footnote left unchanged because extraction failed (rather than deliberately left for
+review) has `extraction_failed` set (`"provider_error"` or `"not_returned"`) in the result
+and in the web API's footnote objects.
+
 ### Nothing dropped, nothing invented
 
 The AI model's output is checked deterministically (no second AI involved, see

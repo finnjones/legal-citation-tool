@@ -103,3 +103,11 @@ def test_separator_text_keeps_its_trailing_space():
     )
     assert isinstance(segs[1], TextSegment) and segs[1].text.text == "; "
     assert len(segs) == 3
+
+
+def test_result_records_footnotes_left_unchanged_because_extraction_failed():
+    footnotes = [Footnote(number=n, original=RichText.plain(f"Commentary {n}.")) for n in (1, 2)]
+    result = pipeline.process_footnotes(footnotes, get_provider("fake:down", responses=[""]), bibliography=False)
+    assert [f.extraction_failed for f in result.footnotes] == ["provider_error", "provider_error"]
+    assert result.failed_footnotes == [1, 2]
+    assert [f.formatted.text for f in result.footnotes] == ["Commentary 1.", "Commentary 2."]

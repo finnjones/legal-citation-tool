@@ -37,6 +37,20 @@ class LLMError(RuntimeError):
     """Raised when a provider cannot produce valid output after retries."""
 
 
+class TransientLLMError(LLMError):
+    """The provider answered with nothing usable (an empty reply, a timeout, an overloaded
+    or failing upstream host). Unlike invalid JSON this says nothing about the prompt, so
+    it is retried as-is after a short pause rather than with a correction."""
+
+
+#: pauses before the 2nd and 3rd attempt after a transient failure, in seconds
+RETRY_DELAYS = (1.0, 3.0)
+
+
+def _sleep(seconds: float) -> None:  # replaced in tests
+    time.sleep(seconds)
+
+
 class LLMProvider(ABC):
     """A chat model that can return JSON conforming to a schema."""
 
@@ -46,6 +60,8 @@ class LLMProvider(ABC):
     def __init__(self, model: str, **options: Any) -> None:
         self.model = model
         self.options = options
+        #: asked instead when this provider has failed every attempt (see $AGLC_LLM_FALLBACK)
+        self.fallback: LLMProvider | None = None
 
     # ---- the one method subclasses must implement -------------------------- #
     @abstractmethod
@@ -67,13 +83,40 @@ class LLMProvider(ABC):
         max_attempts: int = 3,
     ) -> T:
         """Ask the model for JSON, validate it against `output_model`, retry with the
-        validation error fed back if it doesn't conform."""
+        validation error fed back if it doesn't conform. An empty or failed reply is retried
+        unchanged after a short pause. If every attempt fails, ask `self.fallback`."""
+        try:
+            return self._generate_json(system=system, user=user, output_model=output_model, max_attempts=max_attempts)
+        except LLMError as e:
+            if self.fallback is None:
+                raise
+            log.warning("%s failed (%s); asking the fallback model %s", self, e, self.fallback)
+            return self.fallback.generate_json(
+                system=system, user=user, output_model=output_model, max_attempts=max_attempts
+            )
+
+    def _generate_json(self, *, system: str, user: str, output_model: type[T], max_attempts: int) -> T:
         schema = output_model.model_json_schema()
         prompt = user
         last_error: Exception | None = None
+        delays = list(self.options.get("retry_delays", RETRY_DELAYS))
         for attempt in range(1, max_attempts + 1):
             t0 = time.monotonic()
-            raw = self._complete_json(system=system, user=prompt, schema=schema, schema_name=output_model.__name__)
+            try:
+                raw = self._complete_json(system=system, user=prompt, schema=schema, schema_name=output_model.__name__)
+                if not (raw or "").strip():
+                    raise TransientLLMError(f"{self.name}:{self.model} returned an empty reply")
+            except TransientLLMError as e:
+                last_error = e
+                if attempt == max_attempts:
+                    break
+                delay = delays[min(attempt - 1, len(delays) - 1)] if delays else 0
+                log.warning(
+                    "%s attempt %d/%d failed after %.1fs (%s); retrying in %gs",
+                    self, attempt, max_attempts, time.monotonic() - t0, e, delay,
+                )
+                _sleep(delay)
+                continue  # same prompt: an empty reply is not something the model can correct
             log.debug("%s attempt %d: %d chars in %.1fs", self, attempt, len(raw), time.monotonic() - t0)
             try:
                 return output_model.model_validate_json(_strip_fences(raw))
@@ -87,6 +130,10 @@ class LLMProvider(ABC):
                     f"{user}\n\nYour previous response was not valid for the required JSON schema.\n"
                     f"Error:\n{e}\n\nPrevious response:\n{raw}\n\nReturn corrected JSON only."
                 )
+        if isinstance(last_error, TransientLLMError):
+            raise TransientLLMError(
+                f"{self.name}:{self.model} failed {max_attempts} times: {last_error}"
+            ) from last_error
         raise LLMError(f"{self.name}:{self.model} did not return valid {output_model.__name__}: {last_error}")
 
     def __repr__(self) -> str:
@@ -129,10 +176,23 @@ def default_spec() -> str:
     return os.environ.get("AGLC_LLM") or DEFAULT_SPEC
 
 
-def get_provider(spec: str | None = None, **options: Any) -> LLMProvider:
-    """Build a provider from "<provider>:<model>" (default: $AGLC_LLM or DEFAULT_SPEC)."""
-    _load_builtin_providers()
+def get_provider(spec: str | None = None, *, fallback: LLMProvider | str | None = None, **options: Any) -> LLMProvider:
+    """Build a provider from "<provider>:<model>" (default: $AGLC_LLM or DEFAULT_SPEC).
+
+    `fallback` (default: $AGLC_LLM_FALLBACK) is a second "<provider>:<model>", asked only
+    when the first fails every attempt. Pass "" to turn it off."""
     spec = spec or default_spec()
+    provider = _build_provider(spec, options)
+    if fallback is None:
+        fallback = os.environ.get("AGLC_LLM_FALLBACK") or None
+    if isinstance(fallback, str):
+        fallback = _build_provider(fallback, {}) if fallback and fallback != spec else None
+    provider.fallback = fallback
+    return provider
+
+
+def _build_provider(spec: str, options: dict[str, Any]) -> LLMProvider:
+    _load_builtin_providers()
     if ":" not in spec:
         raise ValueError(f"LLM spec must look like 'provider:model', got {spec!r}")
     name, model = spec.split(":", 1)

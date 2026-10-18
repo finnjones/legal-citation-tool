@@ -154,6 +154,8 @@ async def process_document(
                     "formatted": fn.formatted.to_markup(),
                     "formatted_html": _richtext_to_html(fn.formatted),
                     "changed": fn.changed,
+                    # "provider_error" / "not_returned" when left unchanged because extraction failed
+                    "extraction_failed": fn.extraction_failed,
                 }
             )
 

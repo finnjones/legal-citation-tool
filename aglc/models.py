@@ -314,10 +314,21 @@ class CitationSegment(BaseModel):
 Segment = Annotated[Union[TextSegment, CitationSegment], Field(discriminator="kind")]
 
 
+#: Why a footnote was left exactly as written because extraction *failed*:
+#: "provider_error": the AI model gave no usable answer, even asked on its own;
+#: "not_returned": it answered, but never for this footnote.
+#: A footnote the tool deliberately left alone for review (it couldn't account for every
+#: word, or couldn't resolve a reference) is not a failure and has no reason set.
+ExtractionFailure = Literal["provider_error", "not_returned"]
+
+
 class Footnote(BaseModel):
     number: int
     original: RichText = Field(description="Footnote text as read from the document")
     segments: list[Segment] = Field(default_factory=list, description="Filled by extraction")
+    extraction_failed: ExtractionFailure | None = Field(
+        default=None, description="Set when extraction failed and the footnote was left unchanged"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -334,6 +345,8 @@ class FootnoteResult(BaseModel):
     number: int
     original: RichText
     formatted: RichText
+    #: see ExtractionFailure: set when this footnote is unchanged because extraction failed
+    extraction_failed: ExtractionFailure | None = None
 
     @property
     def changed(self) -> bool:
@@ -359,3 +372,8 @@ class ProcessResult(BaseModel):
     bibliography: list[BibliographySection] = Field(default_factory=list)
     warnings: list[Warning_] = Field(default_factory=list)
     body_fixes: list[BodyFix] = Field(default_factory=list)
+
+    @property
+    def failed_footnotes(self) -> list[int]:
+        """Footnotes left unchanged because extraction failed (not deliberately)."""
+        return [f.number for f in self.footnotes if f.extraction_failed]

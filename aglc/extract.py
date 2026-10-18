@@ -291,6 +291,12 @@ class _TextMapper:
 
 
 class Extractor:
+    #: a failed batch is asked again in pieces this size, then one footnote at a time
+    split_size = 5
+    #: after this many failed requests in a row the provider is taken to be down, and a
+    #: failed batch is no longer split (each top-level batch is still tried once)
+    max_failures_in_a_row = 4
+
     def __init__(self, provider: LLMProvider, batch_size: int = 15, strict: bool = True, verify: bool = True) -> None:
         self.provider = provider
         self.batch_size = batch_size
@@ -301,10 +307,12 @@ class Extractor:
         self.strict = strict
         #: human-readable warnings accumulated by the most recent `extract()` call
         self.warnings: list[str] = []
+        self._failures_in_a_row = 0
 
     def extract(self, footnotes: list[Footnote]) -> list[Footnote]:
         """Return copies of `footnotes` with `.segments` filled in."""
         self.warnings = []
+        self._failures_in_a_row = 0
         order = [fn.number for fn in footnotes]
         results: dict[int, Footnote] = {fn.number: fn.model_copy(deep=True) for fn in footnotes}
         # Footnotes fully resolved so far (across all batches, in call order), used both to build
@@ -313,54 +321,83 @@ class Extractor:
         resolved: dict[int, Footnote] = {}
         system_prompt = _load_system_prompt()
 
+        n_batches = (len(footnotes) + self.batch_size - 1) // self.batch_size
         for start in range(0, len(footnotes), self.batch_size):
             batch = footnotes[start : start + self.batch_size]
-            user_prompt = self._build_user_prompt(batch, self._build_index(resolved))
-            n_batches = (len(footnotes) + self.batch_size - 1) // self.batch_size
             log.info(
                 "asking %s for footnotes %d-%d (batch %d/%d)...",
                 self.provider, batch[0].number, batch[-1].number, start // self.batch_size + 1, n_batches,
             )
-            t0 = time.monotonic()
-            try:
-                response = self.provider.generate_json(
-                    system=system_prompt, user=user_prompt, output_model=ExtractionBatch
-                )
-            except LLMError as e:
-                numbers = ", ".join(str(fn.number) for fn in batch)
-                log.warning("extraction failed for footnotes [%s] after %.1fs: %s", numbers, time.monotonic() - t0, e)
-                self.warnings.append(f"extraction failed for footnotes [{numbers}]: {e}; left unchanged")
-                continue
-            log.info("  got %d footnotes back in %.1fs", len(response.footnotes), time.monotonic() - t0)
-
-            by_number = {lf.number: lf for lf in response.footnotes}
-            answered = sum(1 for fn in batch if by_number.get(fn.number) and by_number[fn.number].segments)
-            if answered * 2 < len(batch) and len(batch) > 1:
-                # The model answered for only a few of the batch; re-asking the whole batch is
-                # far cheaper than one call per missing footnote.
-                log.info("  only %d/%d footnotes answered; re-asking the batch", answered, len(batch))
-                try:
-                    retry = self.provider.generate_json(
-                        system=system_prompt, user=user_prompt, output_model=ExtractionBatch
-                    )
-                except LLMError:
-                    retry = None
-                if retry is not None:
-                    better = {lf.number: lf for lf in retry.footnotes}
-                    if sum(1 for fn in batch if better.get(fn.number) and better[fn.number].segments) > answered:
-                        by_number = better
-            for fn in batch:
-                llm_fn = by_number.get(fn.number)
-                if (llm_fn is None or not llm_fn.segments) and fn.original.text.strip():
-                    # Models occasionally skip a footnote in a long batch; ask again for it alone.
-                    llm_fn = self._retry_single(fn, resolved, system_prompt) or llm_fn
-                if llm_fn is None:
-                    self.warnings.append(f"footnote {fn.number}: missing from LLM response; left unchanged")
-                    continue
-                results[fn.number].segments = self._convert_verified(fn, llm_fn, resolved, system_prompt)
-                resolved[fn.number] = results[fn.number]
+            self._extract_batch(batch, results, resolved, system_prompt)
 
         return [results[n] for n in order]
+
+    def _request(self, user_prompt: str, system_prompt: str) -> ExtractionBatch | LLMError:
+        try:
+            response = self.provider.generate_json(system=system_prompt, user=user_prompt, output_model=ExtractionBatch)
+        except LLMError as e:
+            self._failures_in_a_row += 1
+            return e
+        self._failures_in_a_row = 0
+        return response
+
+    def _provider_down(self) -> bool:
+        return self._failures_in_a_row >= self.max_failures_in_a_row
+
+    def _give_up(self, batch: list[Footnote], results: dict[int, Footnote], error: LLMError) -> None:
+        numbers = ", ".join(str(fn.number) for fn in batch)
+        self.warnings.append(f"extraction failed for footnotes [{numbers}]: {error}; left unchanged")
+        for fn in batch:
+            results[fn.number].extraction_failed = "provider_error"
+
+    def _extract_batch(
+        self, batch: list[Footnote], results: dict[int, Footnote], resolved: dict[int, Footnote], system_prompt: str
+    ) -> None:
+        user_prompt = self._build_user_prompt(batch, self._build_index(resolved))
+        t0 = time.monotonic()
+        response = self._request(user_prompt, system_prompt)
+        if isinstance(response, LLMError):
+            numbers = ", ".join(str(fn.number) for fn in batch)
+            log.warning("extraction failed for footnotes [%s] after %.1fs: %s", numbers, time.monotonic() - t0, response)
+            if len(batch) > 1 and not self._provider_down():
+                # A failure on a big request is often the request, not the footnotes: ask again
+                # in smaller pieces (15 -> 5s -> one at a time) before giving up on any of them.
+                size = self.split_size if len(batch) > self.split_size else 1
+                log.info("  asking again in batches of %d", size)
+                for i in range(0, len(batch), size):
+                    if self._provider_down():
+                        self._give_up(batch[i:], results, response)
+                        break
+                    self._extract_batch(batch[i : i + size], results, resolved, system_prompt)
+                return
+            self._give_up(batch, results, response)
+            return
+        log.info("  got %d footnotes back in %.1fs", len(response.footnotes), time.monotonic() - t0)
+
+        by_number = {lf.number: lf for lf in response.footnotes}
+        answered = sum(1 for fn in batch if by_number.get(fn.number) and by_number[fn.number].segments)
+        if answered * 2 < len(batch) and len(batch) > 1:
+            # The model answered for only a few of the batch; re-asking the whole batch is
+            # far cheaper than one call per missing footnote.
+            log.info("  only %d/%d footnotes answered; re-asking the batch", answered, len(batch))
+            retry = self._request(user_prompt, system_prompt)
+            if not isinstance(retry, LLMError):
+                better = {lf.number: lf for lf in retry.footnotes}
+                if sum(1 for fn in batch if better.get(fn.number) and better[fn.number].segments) > answered:
+                    by_number = better
+        for fn in batch:
+            llm_fn = by_number.get(fn.number)
+            if (llm_fn is None or not llm_fn.segments) and fn.original.text.strip():
+                # Models occasionally skip a footnote in a long batch; ask again for it alone.
+                llm_fn = self._retry_single(fn, resolved, system_prompt) or llm_fn
+            if llm_fn is None:
+                self.warnings.append(f"footnote {fn.number}: missing from LLM response; left unchanged")
+                results[fn.number].extraction_failed = "not_returned"
+                continue
+            if not llm_fn.segments and fn.original.text.strip():
+                results[fn.number].extraction_failed = "not_returned"  # kept as written, below
+            results[fn.number].segments = self._convert_verified(fn, llm_fn, resolved, system_prompt)
+            resolved[fn.number] = results[fn.number]
 
     # ---- verification (see aglc/validate.py) ------------------------------------ #
 
@@ -415,21 +452,15 @@ class Extractor:
             "captured: in a citation field, a pinpoint, pinpoint_judges, the signal, or a text "
             "segment for commentary. Extract the footnote again."
         )
-        try:
-            response = self.provider.generate_json(system=system_prompt, user=user, output_model=ExtractionBatch)
-        except LLMError:
+        response = self._request(user, system_prompt)
+        if isinstance(response, LLMError):
             return None
         return next((lf for lf in response.footnotes if lf.number == fn.number and lf.segments), None)
 
     def _retry_single(self, fn: Footnote, resolved: dict[int, Footnote], system_prompt: str) -> LLMFootnote | None:
         log.info("  footnote %d came back empty; asking for it on its own", fn.number)
-        try:
-            response = self.provider.generate_json(
-                system=system_prompt,
-                user=self._build_user_prompt([fn], self._build_index(resolved)),
-                output_model=ExtractionBatch,
-            )
-        except LLMError:
+        response = self._request(self._build_user_prompt([fn], self._build_index(resolved)), system_prompt)
+        if isinstance(response, LLMError):
             return None
         match = next((lf for lf in response.footnotes if lf.number == fn.number), None)
         return match if match and match.segments else None
