@@ -124,7 +124,7 @@ AGLC_OWNER_NAME="Your Name"            # or your business name
 AGLC_CONTACT_EMAIL=hello@example.com    # shown as a mailto link
 AGLC_ABN="12 345 678 901"
 AGLC_STATE="New South Wales"            # whose law governs the terms
-AGLC_OWNER_ABOUT="A sentence or two about who you are and why you built it."
+AGLC_OWNER_ABOUT="..."                # optional; nothing shows on the About page when unset
 AGLC_LOG_RETENTION_DAYS=14              # and configure journald/your proxy to match
 AGLC_GST_REGISTERED=false               # true once registered: the price then "includes GST"
 ```

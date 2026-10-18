@@ -12,8 +12,9 @@ and analytics are set in one place:
     {{policy_date}}   POLICY_DATE below: when the policy pages last changed
     {{owner}} {{abn}} {{state}} {{contact}} {{owner_about}} {{log_retention}}
                       who runs the site, from $AGLC_OWNER_NAME, $AGLC_ABN, $AGLC_STATE,
-                      $AGLC_CONTACT_EMAIL (shown as a mailto link), $AGLC_OWNER_ABOUT and
-                      $AGLC_LOG_RETENTION_DAYS; an unset one shows as a visible TODO
+                      $AGLC_CONTACT_EMAIL (shown as a mailto link) and $AGLC_LOG_RETENTION_DAYS;
+                      an unset one shows as a visible TODO. $AGLC_OWNER_ABOUT is optional
+                      (nothing shows when it's unset)
     {{gst_note}}      from $AGLC_GST_REGISTERED (default: not registered)
     {{analytics_note}} whether analytics is on ($AGLC_PLAUSIBLE_DOMAIN)
     {{payment_provider}} "Stripe" when $AGLC_PAYMENTS=stripe, otherwise "Square"
@@ -48,7 +49,6 @@ OWNER_SETTINGS = {
     "owner": ("AGLC_OWNER_NAME", "your name or business name"),
     "abn": ("AGLC_ABN", "your ABN"),
     "state": ("AGLC_STATE", "the state or territory whose law applies, eg New South Wales"),
-    "owner_about": ("AGLC_OWNER_ABOUT", "a sentence or two about who you are and why you built this"),
 }
 
 WEB_DIR = Path(__file__).parent.parent / "web"
@@ -134,6 +134,11 @@ def _setting(var: str, what: str) -> str:
     return escape(value) if value else _todo(var, what)
 
 
+def owner_about() -> str:
+    """Optional: a line about who runs the site. Nothing at all when unset."""
+    return escape((os.environ.get("AGLC_OWNER_ABOUT") or "").strip())
+
+
 def contact_link() -> str:
     email = (os.environ.get("AGLC_CONTACT_EMAIL") or "").strip()
     if not email:
@@ -176,6 +181,7 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "retention_hours": f"{retention.retention_hours():g}",
         "policy_date": POLICY_DATE,
         **{key: _setting(var, what) for key, (var, what) in OWNER_SETTINGS.items()},
+        "owner_about": owner_about(),
         "contact": contact_link(),
         "gst_note": gst_note(),
         "analytics_note": analytics_note(),

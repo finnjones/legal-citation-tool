@@ -459,6 +459,13 @@ def test_owner_details_fill_the_legal_pages(monkeypatch):
     assert "Sam Example" in pages["/terms"] and "law of Victoria, Australia" in pages["/terms"]
     assert '<a href="mailto:hi@example.com">hi@example.com</a>' in pages["/refunds"]
     assert "kept for 14 days" in pages["/privacy"] and "A law student." in pages["/about"]
+    assert "12 345 678 901" in pages["/terms"] and "12 345 678 901" not in pages["/privacy"]  # ABN: Terms only
+
+
+def test_owner_about_is_optional(monkeypatch):
+    monkeypatch.setenv("AGLC_OWNER_NAME", "Sam Example")
+    about = client.get("/about").text
+    assert "made by Sam Example." in about and "AGLC_OWNER_ABOUT" not in about
 
 
 def test_owner_details_are_escaped(monkeypatch):
