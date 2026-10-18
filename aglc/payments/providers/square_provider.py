@@ -9,7 +9,11 @@ Settings (environment):
                                    (default: the URL the request arrived on, which is wrong
                                    behind a reverse proxy that rewrites it)
 
-Subscribe the webhook to `payment.created`, `payment.updated` and `refund.updated`.
+Subscribe the webhook to `payment.created`, `payment.updated` and `refund.updated`. A payment
+counts once `payment.updated` reports status COMPLETED; it is matched to our order by the
+Square order id that CreatePaymentLink returned (stored at checkout). `order.updated` isn't
+used: orders from payment links can stay OPEN after payment. Payment links made through the
+API are single-use, so billing keeps one pending link per document and reuses it.
 """
 
 from __future__ import annotations
@@ -92,7 +96,14 @@ class SquareProvider(PaymentProvider):
                     }
                 ],
             },
-            checkout_options={"redirect_url": redirect_url, "allow_tipping": False, "ask_for_shipping_address": False},
+            checkout_options={
+                "redirect_url": redirect_url,  # carries our own session id; only production appends orderId
+                "allow_tipping": False,
+                "ask_for_shipping_address": False,
+                # No documented default, so ask for wallets explicitly. The seller must also turn them
+                # on in Dashboard > Payment links > Settings.
+                "accepted_payment_methods": {"apple_pay": True, "google_pay": True},
+            },
             payment_note=f"Order {order_id}",
         )
         link = resp.payment_link

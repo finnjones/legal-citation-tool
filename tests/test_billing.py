@@ -423,3 +423,98 @@ def test_store_is_migrated_and_in_wal_mode(paid):
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert {"orders", "documents", "webhook_events"} <= tables
     store._migrate(store._connect())  # idempotent
+
+
+# ---- Square through the API (mocked SDK client) ------------------------------ #
+
+SQUARE_URL = "https://aglc.example/api/webhooks/square"
+
+
+@pytest.fixture
+def square(paid, monkeypatch):
+    """AGLC_PAYMENTS=square with a mocked Square client; returns the mock."""
+    monkeypatch.setenv("AGLC_PAYMENTS", "square")
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://aglc.example")
+    client = mock.MagicMock()
+    client.checkout.payment_links.create.return_value.payment_link.configure_mock(
+        id="link-1", url="https://square.link/u/abc", order_id="sq-order-1")
+    client.orders.get.return_value.order.configure_mock(tenders=[])  # unpaid until a test says otherwise
+    client.orders.get.return_value.order.total_money.configure_mock(amount=400, currency="AUD")
+    client.refunds.refund_payment.return_value.refund.configure_mock(id="sq-refund-1", status="PENDING")
+    get_payment_provider("square", client=client, location_id="LOC", signature_key="sig-key", webhook_url=SQUARE_URL)
+    return client
+
+
+def _square_webhook(client, *, order_id="sq-order-1", status="COMPLETED", payment_id="pay-1", amount=400,
+                    event_id=None, url=SQUARE_URL):
+    body = json.dumps({
+        "merchant_id": "M1", "type": "payment.updated", "event_id": event_id or f"evt-{status}-{order_id}-{payment_id}",
+        "data": {"type": "payment", "id": payment_id, "object": {"payment": {
+            "id": payment_id, "order_id": order_id, "status": status,
+            "amount_money": {"amount": amount, "currency": "AUD"},
+        }}},
+    }).encode()
+    return client.post("/api/webhooks/square", content=body,
+                       headers={SIGNATURE_HEADER: square_signature("sig-key", url, body)})
+
+
+def test_square_checkout_carries_our_session_id_and_reuses_the_link(square, client):
+    sid = _process(client).json()["id"]
+    first = _checkout(client, sid)
+    assert first["checkout_url"] == "https://square.link/u/abc"
+    assert _checkout(client, sid) == first  # links are single-use: one per document
+    assert square.checkout.payment_links.create.call_count == 1
+    options = square.checkout.payment_links.create.call_args.kwargs["checkout_options"]
+    assert options["redirect_url"] == f"https://aglc.example/?paid=1&session={sid}"
+    assert options["accepted_payment_methods"] == {"apple_pay": True, "google_pay": True}
+    assert get_store().order(first["order_id"])["provider_order_id"] == "sq-order-1"
+
+
+def test_square_webhook_matches_stored_order_id_on_completed_only(square, client):
+    sid = _process(client).json()["id"]
+    order_id = _checkout(client, sid)["order_id"]
+    assert _square_webhook(client, status="APPROVED").json()["outcome"] == "ignored"
+    assert _square_webhook(client, status="PENDING").json()["outcome"] == "ignored"
+    assert get_store().document(sid)["unlocked_at"] is None
+    assert _square_webhook(client, order_id="sq-someone-else").json()["outcome"] == "unknown_order"
+    assert get_store().document(sid)["unlocked_at"] is None
+    assert _square_webhook(client).json()["outcome"] == "unlocked"
+    assert get_store().order(order_id)["payment_id"] == "pay-1"
+    assert client.get(f"/api/download/{sid}").status_code == 200
+    # A later COMPLETED update for the same payment (new event id) doesn't unlock twice.
+    assert _square_webhook(client, event_id="evt-again").json()["outcome"] == "already_paid"
+
+
+def test_square_webhook_signed_for_another_url_is_rejected(square, client):
+    sid = _process(client).json()["id"]
+    _checkout(client, sid)
+    r = _square_webhook(client, url="http://testserver/api/webhooks/square")  # not the registered URL
+    assert r.status_code == 400
+    assert get_store().document(sid)["unlocked_at"] is None
+
+
+def test_square_reconciles_from_our_session_id_alone(square, client):
+    """No webhook and no orderId on the redirect: polling with our own session id unlocks."""
+    sid = _process(client).json()["id"]
+    order_id = _checkout(client, sid)["order_id"]
+    assert client.get(f"/api/entitlement/{sid}").json()["status"] == "pending"
+    billing._last_checked.clear()
+    square.orders.get.return_value.order.configure_mock(tenders=[mock.MagicMock(payment_id="pay-9")])
+    square.payments.get.return_value.payment.configure_mock(
+        id="pay-9", status="COMPLETED", amount_money=mock.MagicMock(amount=400))
+    assert client.get(f"/api/entitlement/{sid}").json()["unlocked"] is True
+    square.orders.get.assert_called_with("sq-order-1")
+    assert get_store().order(order_id)["payment_id"] == "pay-9"
+
+
+def test_square_refund_uses_the_webhook_payment_id(square, client):
+    sid = _process(client).json()["id"]
+    order_id = _checkout(client, sid)["order_id"]
+    shutil.rmtree(billing.sessions_dir() / sid)
+    assert _square_webhook(client, payment_id="pay-77").json()["outcome"] == "files_missing"
+    kwargs = square.refunds.refund_payment.call_args.kwargs
+    assert kwargs["payment_id"] == "pay-77"
+    assert kwargs["amount_money"] == {"amount": 400, "currency": "AUD"}
+    assert kwargs["idempotency_key"] == f"refund-{order_id}"
+    order = get_store().order(order_id)
+    assert (order["status"], order["refund_id"]) == ("refunded", "sq-refund-1")
