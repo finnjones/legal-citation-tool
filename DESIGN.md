@@ -230,7 +230,7 @@ Restrained: warm neutrals, one navy accent, and three semantic inks that only ev
 ### Named Rules
 **The Faithful Italics Rule.** Citation italics are content (case names, titles). Never fake them, never drop them in a diff, never set citation text in Inter.
 
-**The Wordmark Rule.** The brand name is a placeholder held in one constant (`BRAND` in `aglc/site.py`), set in the serif at 600. Swap it there; no logo mark, no icon.
+**The Wordmark Rule.** The brand name, Aforecite, is held in one constant (`BRAND` in `aglc/site.py`) and set in the serif at 600. Change it only there. The favicon is a plain page-and-footnote mark; there is no other logo.
 
 ## Layout
 

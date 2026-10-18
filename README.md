@@ -1,4 +1,4 @@
-# AGLC4 Citation Tool
+# Aforecite: AGLC4 Citation Tool
 
 Format legal citations in Word documents to the *Australian Guide to Legal Citation* (4th ed), including *Ibid*, (*n x*) subsequent references, short titles, signals, and a generated bibliography.
 

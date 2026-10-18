@@ -88,7 +88,7 @@ async def _lifespan(app: FastAPI):
         sweeper.cancel()
 
 
-app = FastAPI(title="AGLC4 Citation Tool API", lifespan=_lifespan)
+app = FastAPI(title="Aforecite API", lifespan=_lifespan)
 app.add_middleware(guards.GuardMiddleware)  # 413 over $AGLC_MAX_UPLOAD_MB, security headers
 app.include_router(billing.router)  # every route 404s unless AGLC_PAYMENTS is set
 app.mount("/assets", StaticFiles(directory=site.WEB_DIR / "assets", check_dir=False), name="assets")

@@ -89,7 +89,7 @@ def test_root_serves_html():
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<title>AGLC4 Citation Checker and Fixer for Word (.docx)</title>" in response.text
+    assert "<title>AGLC4 Footnote Generator &amp; Citation Checker for Word | Aforecite</title>" in response.text
     assert "{{" not in response.text  # every placeholder filled
     assert site.BRAND in response.text
 

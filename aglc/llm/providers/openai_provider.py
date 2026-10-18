@@ -160,7 +160,7 @@ class OpenRouterProvider(OpenAIProvider):
                 "with 'sk-or-'. Create one at https://openrouter.ai/keys"
             )
         # Optional app attribution shown on openrouter.ai
-        kwargs["default_headers"] = {"X-Title": "AGLC4 Citation Tool"}
+        kwargs["default_headers"] = {"X-Title": "Aforecite"}
         return kwargs
 
     def _create(self, system: str, user: str, response_format: dict[str, Any], structured: bool):

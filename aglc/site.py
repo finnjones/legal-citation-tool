@@ -31,8 +31,8 @@ from fastapi.responses import HTMLResponse
 
 from . import billing, retention
 
-#: The product's name. A placeholder until one is chosen; swap it here only.
-BRAND = "Wordmark"
+#: The product's name ("aforecited": cited above, which is what Ibid and (n x) do). Set here only.
+BRAND = "Aforecite"
 
 #: When the policy pages (privacy, terms, refunds) last changed: update it with them.
 POLICY_DATE = "18 October 2026"
