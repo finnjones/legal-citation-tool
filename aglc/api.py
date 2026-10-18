@@ -239,7 +239,9 @@ async def rerun_document(session_id: str) -> dict:
         raise HTTPException(status_code=409, detail="This document can't be re-run. Please process it again.")
 
     session_dir = billing.sessions_dir() / session_id
-    staged = session_dir / "output.rerun.docx"  # a paid document's .docx is only replaced once this works
+    # A paid document's .docx is only replaced once this works; one staging file per request,
+    # so two re-runs at once (a double click) can't write into the same file.
+    staged = session_dir / f"output.rerun.{uuid.uuid4().hex}.docx"
     with billing.processing_slot():
         billing.claim_rerun(session_id)  # 429 once the free re-runs are used up
         try:
