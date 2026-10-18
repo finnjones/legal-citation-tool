@@ -373,6 +373,9 @@ class Extraction(BaseModel):
 
     footnotes: list[Footnote]
     warnings: list[str] = Field(default_factory=list)
+    #: the provider failed several requests in a row (it looks down), so asking it again
+    #: straight away is pointless; the student can re-run later instead
+    provider_down: bool = False
 
 
 class ProcessResult(BaseModel):

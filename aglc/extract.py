@@ -345,6 +345,11 @@ class Extractor:
     def _provider_down(self) -> bool:
         return self._failures_in_a_row >= self.max_failures_in_a_row
 
+    @property
+    def provider_down(self) -> bool:
+        """Whether the most recent `extract()` ended with the provider apparently down."""
+        return self._provider_down()
+
     def _give_up(self, batch: list[Footnote], results: dict[int, Footnote], error: LLMError) -> None:
         numbers = ", ".join(str(fn.number) for fn in batch)
         self.warnings.append(f"extraction failed for footnotes [{numbers}]: {error}; left unchanged")

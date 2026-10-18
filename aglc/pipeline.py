@@ -47,12 +47,17 @@ def extract_footnotes(
 ) -> Extraction:
     extractor = Extractor(provider)
     if previous is None or only is None:
-        return Extraction(footnotes=extractor.extract(footnotes), warnings=extractor.warnings)
+        extracted = extractor.extract(footnotes)
+        return Extraction(footnotes=extracted, warnings=extractor.warnings, provider_down=extractor.provider_down)
     kept = {fn.number: fn for fn in previous.footnotes if fn.number not in only}
     redo = extractor.extract([fn for fn in footnotes if fn.number in only], context=list(kept.values()))
     merged = {**kept, **{fn.number: fn for fn in redo}}
     warnings = [m for m in previous.warnings if not (warning_footnotes(m) & only)] + extractor.warnings
-    return Extraction(footnotes=[merged[fn.number] for fn in footnotes if fn.number in merged], warnings=warnings)
+    return Extraction(
+        footnotes=[merged[fn.number] for fn in footnotes if fn.number in merged],
+        warnings=warnings,
+        provider_down=extractor.provider_down,
+    )
 
 
 def _render(extraction: Extraction, *, bibliography: bool) -> ProcessResult:
@@ -176,9 +181,12 @@ def failed_footnotes(result) -> set[int]:
 
 
 def whole_batch_failed(result, total: int, batch_size: int = 15) -> bool:
-    """Whether one request to the model failed for a whole batch (or the whole document)."""
+    """Whether every footnote in one of the batches sent to the model (1-15, 16-30, ...) went
+    unread, or the whole document did. Judged from the failed footnotes, not from a single
+    warning: a failed batch is split into smaller requests, each warning about only its part.
+    `result` is anything `failed_footnotes` takes."""
+    failed = failed_footnotes(result)
     return any(
-        len(warning_footnotes(message)) >= min(batch_size, total)
-        for message in _messages(result)
-        if _FAILED.match(message)
+        set(range(start + 1, min(start + batch_size, total) + 1)) <= failed
+        for start in range(0, total, batch_size)
     )

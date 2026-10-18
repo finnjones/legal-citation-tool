@@ -236,7 +236,7 @@ def extraction_report(full: dict) -> dict:
     failed = pipeline.failed_footnotes(full)
     total = len(full["footnotes"])
     too_many = len(failed) > _float_env("AGLC_MAX_FAILED_SHARE", 0.2) * total
-    payable = not failed or not (too_many or pipeline.whole_batch_failed(full["warnings"], total))
+    payable = not failed or not (too_many or pipeline.whole_batch_failed(full, total))
     return {"failed_footnotes": sorted(failed), "payable": payable}
 
 

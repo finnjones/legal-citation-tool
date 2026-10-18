@@ -238,7 +238,9 @@ async def process_document(
                 result: ProcessResult = await process()
                 # Nobody pays for footnotes the model failed to read: try those once more now.
                 failed = pipeline.failed_footnotes(result)
-                if failed and result.extraction is not None:
+                # Not when the provider looks down: the Extractor has already retried, and asking
+                # again at once only doubles the wait. The free re-run is there for later.
+                if failed and result.extraction is not None and not result.extraction.provider_down:
                     log.info("retrying %d footnotes the model failed to read", len(failed))
                     result = await process(previous=result.extraction, only=failed)
             full = _result_json(session_id, result)

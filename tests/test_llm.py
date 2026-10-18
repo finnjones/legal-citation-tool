@@ -551,7 +551,7 @@ def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
     assert req["model"] == "deepseek/deepseek-v4-flash"
     assert req["response_format"]["type"] == "json_schema"
     assert req["extra_body"] == {
-        "provider": {"require_parameters": True, "allow_fallbacks": True},
+        "provider": {"require_parameters": True, "allow_fallbacks": True, "ignore": ["DigitalOcean"]},
         "reasoning": {"enabled": False},
     }
 
@@ -703,8 +703,26 @@ def test_openrouter_retry_after_empty_reply_avoids_that_host(monkeypatch):
     )
     assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
     first, second = (r["extra_body"]["provider"] for r in completions.requests)
-    assert "ignore" not in first and first["allow_fallbacks"] is True
-    assert second["ignore"] == ["FlakyHost"]
+    assert first["ignore"] == ["DigitalOcean"] and first["allow_fallbacks"] is True
+    assert second["ignore"] == ["DigitalOcean", "FlakyHost"]
+
+
+def test_openrouter_ignored_hosts_come_from_the_environment(monkeypatch):
+    monkeypatch.setenv("AGLC_OPENROUTER_IGNORE", " HostA, HostB ,")
+    provider, completions = _scripted_provider(
+        monkeypatch, "openrouter:deepseek/deepseek-v4-flash", [_completion('{"name": "A", "age": 1}')]
+    )
+    provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert completions.requests[0]["extra_body"]["provider"]["ignore"] == ["HostA", "HostB"]
+
+
+def test_openrouter_ignore_list_can_be_turned_off(monkeypatch):
+    monkeypatch.setenv("AGLC_OPENROUTER_IGNORE", "")
+    provider, completions = _scripted_provider(
+        monkeypatch, "openrouter:deepseek/deepseek-v4-flash", [_completion('{"name": "A", "age": 1}')]
+    )
+    provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert "ignore" not in completions.requests[0]["extra_body"]["provider"]
 
 
 def test_openrouter_allows_failed_hosts_again_when_none_left(monkeypatch):
@@ -720,8 +738,8 @@ def test_openrouter_allows_failed_hosts_again_when_none_left(monkeypatch):
         [_completion("", host="OnlyHost"), no_endpoints, _completion('{"name": "A", "age": 1}', host="OnlyHost")],
     )
     assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
-    assert completions.requests[1]["extra_body"]["provider"]["ignore"] == ["OnlyHost"]
-    assert "ignore" not in completions.requests[2]["extra_body"]["provider"]
+    assert completions.requests[1]["extra_body"]["provider"]["ignore"] == ["DigitalOcean", "OnlyHost"]
+    assert "ignore" not in completions.requests[2]["extra_body"]["provider"]  # the default list too
 
 
 def test_openai_timeout_is_retried(monkeypatch):

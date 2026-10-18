@@ -693,6 +693,11 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 if (status === "refunded") {
                     setBanner("payment", banner("error", "Your payment has been refunded",
                         "This document's files were no longer available, so the payment was refunded automatically. Please check the document again."));
+                } else if (status === "expired") {
+                    setBanner("payment", "");
+                    showAppError("This document was deleted after the time our privacy policy states, so there is nothing left to unlock. "
+                        + "Please check it again. If you were charged for it, keep this page's address and contact us.");
+                    return;
                 } else if (status !== "unlocked") {
                     setBanner("payment", banner("error", "Payment not confirmed yet",
                         "Confirmation can take a minute. Refresh this page shortly. If you paid and it still hasn't unlocked, keep this page's address and contact us."));
@@ -712,7 +717,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     if (response.status === 404) return "missing";
                     if (response.ok) {
                         const { status } = await response.json();
-                        if (status === "unlocked" || status === "refunded") return status;
+                        // "expired": the retention sweep deleted it, so there's nothing left to wait for
+                        if (status === "unlocked" || status === "refunded" || status === "expired") return status;
                     }
                 } catch {}
                 await new Promise(r => setTimeout(r, 1500));

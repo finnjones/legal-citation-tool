@@ -563,6 +563,20 @@ def test_failed_footnote_detection():
     ]
     assert failed_footnotes(warnings) == {1, 2, 3, 7}  # left as written on purpose (8) isn't a failure
     assert whole_batch_failed(warnings, total=3) and not whole_batch_failed(warnings, total=40)
+
+
+def test_whole_batch_failed_counts_a_batch_that_was_split():
+    # Footnotes 16-30 failed as three split requests of 5, never as one warning about 15.
+    warnings = [
+        {"footnote": None, "message": f"extraction failed for footnotes [{', '.join(map(str, range(s, s + 5)))}]: x; left unchanged"}
+        for s in (16, 21, 26)
+    ]
+    assert whole_batch_failed(warnings, total=100)  # 15 of 100 is under the 20% share, still unpayable
+    assert not whole_batch_failed(warnings[:2], total=100)  # 16-25 only: part of a batch
+    full = {"footnotes": [{"number": n, "extraction_failed": "provider_error" if 16 <= n <= 30 else None}
+                          for n in range(1, 101)], "warnings": []}
+    assert whole_batch_failed(full, total=100)  # from the per-footnote reason alone
+    assert billing.extraction_report(full)["payable"] is False
     assert warning_footnotes("footnotes [1, 2]: x") == {1, 2} and warning_footnotes("footnote 12: x") == {12}
 
 
@@ -575,6 +589,13 @@ def test_failed_batch_is_retried_before_the_preview(model, paid, client):
     assert data["payable"] is True and data["failed_footnotes"] == []
     assert not any("extraction failed" in w["message"] for w in data["warnings"])
     assert sum(f["changed"] for f in data["footnotes"]) == 10
+
+
+def test_no_second_retry_before_the_preview_when_the_provider_is_down(model, paid, client):
+    model.mode = "fail"  # every request fails: the Extractor takes the provider to be down
+    data = _process(client).json()
+    assert paid.call_count == 1  # no second full pass straight after; the free re-run is for later
+    assert data["payable"] is False
 
 
 def test_unreadable_document_cannot_be_paid_for(model, client):

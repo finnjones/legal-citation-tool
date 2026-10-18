@@ -138,6 +138,15 @@ class OpenRouterProvider(OpenAIProvider):
 
     api_key_env = "OPENROUTER_API_KEY"
     default_base_url = "https://openrouter.ai/api/v1"
+    #: upstream hosts never routed to unless $AGLC_OPENROUTER_IGNORE says otherwise: DigitalOcean
+    #: sent fast empty replies for DeepSeek V4.1 Flash in testing (Oct 2026)
+    default_ignored_hosts = ("DigitalOcean",)
+
+    def __init__(self, model: str, **options: Any) -> None:
+        super().__init__(model, **options)
+        #: from $AGLC_OPENROUTER_IGNORE (comma-separated OpenRouter provider names; empty for
+        #: none), else the default; dropped for the rest of the run if it leaves no host at all
+        self._ignored_hosts = _ignored_hosts(options.get("ignore"), self.default_ignored_hosts)
 
     def _client_kwargs(self) -> dict[str, Any]:
         kwargs = super()._client_kwargs()
@@ -160,11 +169,13 @@ class OpenRouterProvider(OpenAIProvider):
         try:
             return super()._create(system, user, response_format, structured)
         except (openai.NotFoundError, openai.BadRequestError):
-            if not self._failed_hosts:
+            excluded = [*self._ignored_hosts, *self._failed_hosts]
+            if not excluded:
                 raise
-            # Ruling out the hosts that failed may leave none that serve this model; let
-            # OpenRouter use any of them again rather than fail outright.
-            log.info("%s: no other upstream host available; allowing %s again", self, ", ".join(self._failed_hosts))
+            # Ruling out these hosts may leave none that serve this model; let OpenRouter use
+            # any of them again rather than fail outright.
+            log.info("%s: no other upstream host available; allowing %s again", self, ", ".join(excluded))
+            self._ignored_hosts = []
             self._failed_hosts.clear()
             return super()._create(system, user, response_format, structured)
 
@@ -172,9 +183,10 @@ class OpenRouterProvider(OpenAIProvider):
         # Only route to upstream hosts that honour response_format, so JSON mode is enforced,
         # and let OpenRouter fall through to another host when one is down.
         routing: dict[str, Any] = {"require_parameters": True, "allow_fallbacks": True}
-        if self._failed_hosts:
-            # a host that just sent an empty reply: send the retry somewhere else
-            routing["ignore"] = list(self._failed_hosts)
+        # hosts known to misbehave, plus any that just sent an empty reply (send the retry elsewhere)
+        excluded = list(dict.fromkeys([*self._ignored_hosts, *self._failed_hosts]))
+        if excluded:
+            routing["ignore"] = excluded
         body: dict[str, Any] = {"provider": routing}
         # Extraction doesn't benefit from "thinking": on reasoning models like DeepSeek V4
         # Flash it made a 3-footnote batch take ~90s instead of ~7s with equally valid output.
@@ -185,6 +197,14 @@ class OpenRouterProvider(OpenAIProvider):
         elif reasoning in ("low", "medium", "high"):
             body["reasoning"] = {"effort": reasoning}
         return body
+
+
+def _ignored_hosts(option: str | list[str] | None, default: tuple[str, ...]) -> list[str]:
+    value = option if option is not None else os.environ.get("AGLC_OPENROUTER_IGNORE")
+    if value is None:
+        return list(default)
+    names = value.split(",") if isinstance(value, str) else value
+    return [n.strip() for n in names if n.strip()]
 
 
 @register_provider("openai-compatible")

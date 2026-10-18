@@ -70,6 +70,11 @@ model to ask when the first gives up:
 AGLC_LLM_FALLBACK=openrouter:<model id>   # any provider:model; only used on failure
 ```
 
+On OpenRouter, some upstream hosts are skipped altogether: `AGLC_OPENROUTER_IGNORE` is a
+comma-separated list of OpenRouter provider names, by default `DigitalOcean` (it sent fast empty
+replies for DeepSeek V4.1 Flash in testing). Set it empty to use every host. If skipping them
+leaves no host for the model, they are allowed again rather than failing.
+
 A footnote left unchanged because extraction failed (rather than deliberately left for
 review) has `extraction_failed` set (`"provider_error"` or `"not_returned"`) in the result
 and in the web API's footnote objects.
