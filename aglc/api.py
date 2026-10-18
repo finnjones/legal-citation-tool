@@ -146,14 +146,10 @@ async def process_document(
 
         # Process in thread pool
         output_file = session_dir / "output.docx"
-        process = lambda: run_in_threadpool(  # noqa: E731
-            pipeline.process_docx,
-            input_file,
-            output_file,
-            model,
-            bibliography=bibliography,
-            track_changes=track_changes,
-            fix_body=fix_body,
+        options = {"model": model, "bibliography": bibliography, "track_changes": track_changes, "fix_body": fix_body}
+        process = lambda **again: run_in_threadpool(  # noqa: E731
+            pipeline.process_docx, input_file, output_file, model,
+            bibliography=bibliography, track_changes=track_changes, fix_body=fix_body, **again,
         )
         if paid:
             await run_in_threadpool(billing.check_footnote_cap, input_file)  # 413, before any LLM call
@@ -161,39 +157,15 @@ async def process_document(
                 billing.start_document(session_id, file.filename, visitor)
                 started = True
                 result: ProcessResult = await process()
-        else:
-            result = await process()
-
-        # Format response
-        footnotes = []
-        for fn in result.footnotes:
-            footnotes.append(
-                {
-                    "number": fn.number,
-                    "original": fn.original.to_markup(),
-                    "original_html": _richtext_to_html(fn.original),
-                    "formatted": fn.formatted.to_markup(),
-                    "formatted_html": _richtext_to_html(fn.formatted),
-                    "changed": fn.changed,
-                }
-            )
-
-        bibliography = []
-        for section in result.bibliography:
-            entries = [_richtext_to_html(entry) for entry in section.entries]
-            bibliography.append({"heading": section.heading, "entries": entries})
-
-        warnings = [{"footnote": w.footnote, "message": w.message} for w in result.warnings]
-
-        full = {
-            "id": session_id,
-            "footnotes": footnotes,
-            "bibliography": bibliography,
-            "warnings": warnings,
-            "body_fixes": [{"footnote": b.footnote, "message": b.message, "applied": b.applied}
-                           for b in result.body_fixes],
-        }
-        return billing.save_result(session_id, file.filename, full) if paid else full
+                # Nobody pays for footnotes the model failed to read: try those once more now.
+                failed = pipeline.failed_footnotes(result)
+                if failed and result.extraction is not None:
+                    log.info("retrying %d footnotes the model failed to read", len(failed))
+                    result = await process(previous=result.extraction, only=failed)
+            full = _result_json(session_id, result)
+            return billing.save_result(session_id, file.filename, full, extraction=result.extraction, options=options)
+        result = await process()
+        return _result_json(session_id, result)
 
     except Exception as e:
         # Clean up on error
@@ -204,6 +176,74 @@ async def process_document(
             raise
         log.exception("processing %s failed", file.filename)
         raise HTTPException(status_code=_status_for(e), detail=_describe(e)) from e
+
+
+@app.post("/api/rerun/{session_id}")
+async def rerun_document(session_id: str) -> dict:
+    """Re-run extraction, free, for just the footnotes the model failed to read (payments on).
+
+    Doesn't use the daily free quota; limited to billing.MAX_RERUNS per document; a paid
+    document stays unlocked. Returns the updated preview (or full result, once paid for).
+    """
+    if not billing.enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    session_id = billing.check_session_id(session_id)
+    full, extraction, options = billing.rerun_inputs(session_id)
+    failed = pipeline.failed_footnotes(full["warnings"])
+    if not failed:
+        return billing.view(session_id, full)
+    if extraction is None:
+        raise HTTPException(status_code=409, detail="This document can't be re-run. Please process it again.")
+
+    session_dir = billing.sessions_dir() / session_id
+    staged = session_dir / "output.rerun.docx"  # a paid document's .docx is only replaced once this works
+    with billing.processing_slot():
+        billing.claim_rerun(session_id)  # 429 once the free re-runs are used up
+        try:
+            result = await run_in_threadpool(
+                pipeline.process_docx, session_dir / "input.docx", staged, options.get("model"),
+                bibliography=options.get("bibliography", True), track_changes=options.get("track_changes", True),
+                fix_body=options.get("fix_body", True), previous=extraction, only=failed,
+            )
+        except Exception as e:
+            staged.unlink(missing_ok=True)
+            log.exception("re-running %s failed", session_id)
+            raise HTTPException(status_code=_status_for(e), detail=_describe(e)) from e
+    staged.replace(session_dir / "output.docx")
+    return billing.save_result(session_id, full["filename"], _result_json(session_id, result),
+                               extraction=result.extraction)
+
+
+def _result_json(session_id: str, result: ProcessResult) -> dict:
+    """The API's view of a ProcessResult."""
+    footnotes = []
+    for fn in result.footnotes:
+        footnotes.append(
+            {
+                "number": fn.number,
+                "original": fn.original.to_markup(),
+                "original_html": _richtext_to_html(fn.original),
+                "formatted": fn.formatted.to_markup(),
+                "formatted_html": _richtext_to_html(fn.formatted),
+                "changed": fn.changed,
+            }
+        )
+
+    bibliography = []
+    for section in result.bibliography:
+        entries = [_richtext_to_html(entry) for entry in section.entries]
+        bibliography.append({"heading": section.heading, "entries": entries})
+
+    warnings = [{"footnote": w.footnote, "message": w.message} for w in result.warnings]
+
+    return {
+        "id": session_id,
+        "footnotes": footnotes,
+        "bibliography": bibliography,
+        "warnings": warnings,
+        "body_fixes": [{"footnote": b.footnote, "message": b.message, "applied": b.applied}
+                       for b in result.body_fixes],
+    }
 
 
 @app.get("/api/download/{session_id}")

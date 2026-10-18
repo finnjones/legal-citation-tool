@@ -268,6 +268,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
         .switch:has(input:checked) { color: var(--ink); }
         .strip .btn-primary { margin-left: auto; max-width: 100%; }
         #downloadLabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32ch; }
+        #downloadLabel.wrap { white-space: normal; max-width: 44ch; text-align: left; }
 
         .general-notes {
             background: var(--sheet); border-radius: 3px; box-shadow: var(--shadow);
@@ -435,8 +436,12 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
         let currentFilter = "all";
         let config = { payments: false };
         let locked = false;
+        let unreadable = 0;   // footnotes the AI model failed to read
+        let mustRerun = false; // too many unread to pay for: offer a free re-run instead
+        let rerunsLeft = 0;
         const ICON_DOWNLOAD = `<path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/>`;
         const ICON_LOCK = `<rect x="3" y="7" width="10" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>`;
+        const ICON_RETRY = `<path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/>`;
 
         window.addEventListener("error", (e) => showError(`Unexpected error: ${e.message}`));
         window.addEventListener("unhandledrejection", (e) => showError(`Unexpected error: ${e.reason?.message || e.reason}`));
@@ -546,8 +551,35 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
 
         function setDownloadButton() {
             const price = config.price?.display || "";
-            document.getElementById("downloadIcon").innerHTML = locked ? ICON_LOCK : ICON_DOWNLOAD;
-            document.getElementById("downloadLabel").textContent = locked ? `Unlock and download (${price})` : `Download ${downloadName()}`;
+            const button = document.getElementById("downloadButton");
+            const label = document.getElementById("downloadLabel");
+            const n = `${unreadable} footnote${unreadable === 1 ? "" : "s"}`;
+            button.disabled = mustRerun && rerunsLeft === 0;
+            document.getElementById("downloadIcon").innerHTML = mustRerun ? ICON_RETRY : locked ? ICON_LOCK : ICON_DOWNLOAD;
+            label.textContent = mustRerun
+                ? (rerunsLeft ? `Something went wrong reading ${n}. Try again (free)` : `Couldn't read ${n}`)
+                : locked ? `Unlock and download (${price})` : `Download ${downloadName()}`;
+            label.classList.toggle("wrap", mustRerun);
+            button.title = label.textContent;
+        }
+
+        async function rerunDocument() {
+            const button = document.getElementById("downloadButton");
+            button.disabled = true;
+            document.getElementById("downloadLabel").textContent = `Reading ${unreadable} footnote${unreadable === 1 ? "" : "s"} again…`;
+            clearMessages();
+            try {
+                const response = await fetch(`/api/rerun/${encodeURIComponent(currentSessionId)}`, { method: "POST" });
+                const body = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(body.detail || "Couldn't re-run the document");
+                displayResults(body);
+                showNotice(body.failed_footnotes?.length
+                    ? `${body.failed_footnotes.length} footnote${body.failed_footnotes.length === 1 ? " still couldn't" : "s still couldn't"} be read.`
+                    : "Every footnote has now been read.");
+            } catch (error) {
+                showError(error.message);
+                setDownloadButton();
+            }
         }
 
         function setupUpload() {
@@ -591,7 +623,11 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
 
         function setupControls() {
             document.getElementById("processButton").addEventListener("click", processDocument);
-            document.getElementById("downloadButton").addEventListener("click", () => locked ? startCheckout() : downloadDocument());
+            document.getElementById("downloadButton").addEventListener("click", () =>
+                mustRerun ? rerunDocument() : locked ? startCheckout() : downloadDocument());
+            document.getElementById("warnings").addEventListener("click", (e) => {
+                if (e.target.closest("[data-rerun]")) rerunDocument();
+            });
             document.getElementById("markupToggle").addEventListener("change", (e) => {
                 document.getElementById("footnotes").classList.toggle("markup", e.target.checked);
                 renderCitationBodies();
@@ -651,6 +687,9 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
 
         function displayResults(result) {
             locked = Boolean(result.locked);
+            unreadable = (result.failed_footnotes || []).length;
+            mustRerun = result.payable === false;
+            rerunsLeft = result.reruns_left ?? 0;
             document.getElementById("downloadButton").disabled = false;
             const refers = new Map();
             const general = [];
@@ -688,11 +727,22 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                 text: b.footnote ? `Footnote ${b.footnote}: ${b.message}` : b.message,
                 check: b.applied === false,
             }));
-            const paywall = locked ? `
+            const n = `${unreadable} footnote${unreadable === 1 ? "" : "s"}`;
+            const paywall = mustRerun ? `
+                <div class="general-notes paywall">
+                    <p><span class="stamp refer" style="--tilt:-2deg">Not read</span><span>The AI model couldn't read <strong>${n}</strong>, so ${unreadable === 1 ? "it is" : "they are"} left as written. ${rerunsLeft
+                        ? "Try again free; you won't be asked to pay until they've been read."
+                        : "The free re-runs are used up. Please process the document again later."}</span></p>
+                </div>` : locked ? `
                 <div class="general-notes paywall">
                     <p><span class="stamp" style="--tilt:-2deg">Preview</span><span>${result.locked_count
                         ? `The first ${config.preview_footnotes ?? 3} corrected footnotes are shown in full. <strong>${result.locked_count} more</strong> ${result.locked_count === 1 ? "is" : "are"} stamped but hidden`
-                        : "Every correction is shown above"}${result.bibliography_entries ? `, and the bibliography (${result.bibliography_entries} ${result.bibliography_entries === 1 ? "entry" : "entries"}) is ready` : ""}. Unlock for ${escapeHtml(result.price?.display || config.price?.display || "")} to see everything and download the .docx.</span></p>
+                        : "Every correction is shown in full below"}${result.bibliography_entries ? `, and the bibliography (${result.bibliography_entries} ${result.bibliography_entries === 1 ? "entry" : "entries"}) is ready` : ""}. Unlock for ${escapeHtml(result.price?.display || config.price?.display || "")} to see everything and download the .docx.${unreadable
+                        ? ` ${n} couldn't be read and ${unreadable === 1 ? "is" : "are"} left as written; you can re-run ${unreadable === 1 ? "it" : "them"} free after unlocking.` : ""}</span></p>
+                </div>` : unreadable && config.payments ? `
+                <div class="general-notes paywall">
+                    <p><span class="stamp refer" style="--tilt:-2deg">Not read</span><span>${n} couldn't be read and ${unreadable === 1 ? "is" : "are"} left as written. ${rerunsLeft
+                        ? `<button class="filter" type="button" data-rerun>Re-run ${unreadable === 1 ? "it" : "them"} free</button>` : ""}</span></p>
                 </div>` : "";
             document.getElementById("warnings").innerHTML = paywall + (general.length ? `
                 <div class="general-notes">

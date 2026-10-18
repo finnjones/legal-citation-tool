@@ -354,8 +354,17 @@ class BibliographySection(BaseModel):
     entries: list[RichText]
 
 
+class Extraction(BaseModel):
+    """What the LLM stage produced, before normalising: kept so that the footnotes it failed
+    to read can be extracted again without paying for the rest twice."""
+
+    footnotes: list[Footnote]
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ProcessResult(BaseModel):
     footnotes: list[FootnoteResult]
     bibliography: list[BibliographySection] = Field(default_factory=list)
     warnings: list[Warning_] = Field(default_factory=list)
     body_fixes: list[BodyFix] = Field(default_factory=list)
+    extraction: Extraction | None = Field(default=None, exclude=True)

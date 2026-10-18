@@ -75,6 +75,10 @@ MIGRATIONS: list[str] = [
         value TEXT NOT NULL
     );
     """,
+    # 2: free re-runs of footnotes the model failed to read
+    """
+    ALTER TABLE documents ADD COLUMN reruns INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 
@@ -168,6 +172,13 @@ class Store:
                 "UPDATE documents SET status = ?, footnote_count = ? WHERE session_id = ?",
                 (status, footnote_count, session_id),
             )
+
+    def claim_rerun(self, session_id: str, limit: int) -> bool:
+        """Use one of the document's free re-runs; False when they are used up."""
+        with self.transaction() as conn:
+            return conn.execute(
+                "UPDATE documents SET reruns = reruns + 1 WHERE session_id = ? AND reruns < ?", (session_id, limit)
+            ).rowcount == 1
 
     def document(self, session_id: str) -> sqlite3.Row | None:
         with self.read() as conn:

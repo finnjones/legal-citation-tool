@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
+from collections.abc import Iterable
 from pathlib import Path
 
 from .document import render_document
 from .docx_io import read_footnotes, write_document
 from .extract import Extractor
 from .llm.base import LLMProvider, get_provider
-from .models import CitationSegment, Footnote, ProcessResult, Warning_
+from .models import CitationSegment, Extraction, Footnote, ProcessResult, Warning_
 from .formatters import formatter_for
 from .normalise import normalise_citation
 from .validate import check_footnote_rendering
@@ -23,13 +25,39 @@ def process_footnotes(
     provider: LLMProvider | str | None = None,
     *,
     bibliography: bool = True,
+    previous: Extraction | None = None,
+    only: set[int] | None = None,
 ) -> ProcessResult:
+    """Extract, normalise and render. With `previous` and `only`, extract just the footnotes
+    numbered in `only` again and reuse `previous` for the rest."""
     if not isinstance(provider, LLMProvider):
         provider = get_provider(provider)
-    extractor = Extractor(provider)
-    extracted = extractor.extract(footnotes)
+    extraction = extract_footnotes(footnotes, provider, previous=previous, only=only)
+    result = _render(extraction, bibliography=bibliography)
+    result.extraction = extraction
+    return result
 
-    warnings: list[Warning_] = [Warning_(message=m) for m in extractor.warnings]
+
+def extract_footnotes(
+    footnotes: list[Footnote],
+    provider: LLMProvider,
+    *,
+    previous: Extraction | None = None,
+    only: set[int] | None = None,
+) -> Extraction:
+    extractor = Extractor(provider)
+    if previous is None or only is None:
+        return Extraction(footnotes=extractor.extract(footnotes), warnings=extractor.warnings)
+    kept = {fn.number: fn for fn in previous.footnotes if fn.number not in only}
+    redo = extractor.extract([fn for fn in footnotes if fn.number in only], context=list(kept.values()))
+    merged = {**kept, **{fn.number: fn for fn in redo}}
+    warnings = [m for m in previous.warnings if not (warning_footnotes(m) & only)] + extractor.warnings
+    return Extraction(footnotes=[merged[fn.number] for fn in footnotes if fn.number in merged], warnings=warnings)
+
+
+def _render(extraction: Extraction, *, bibliography: bool) -> ProcessResult:
+    extracted = [fn.model_copy(deep=True) for fn in extraction.footnotes]  # normalising edits in place
+    warnings: list[Warning_] = [Warning_(message=m) for m in extraction.warnings]
     for fn in extracted:
         for seg in fn.segments:
             if isinstance(seg, CitationSegment):
@@ -75,11 +103,15 @@ def process_docx(
     bibliography: bool = True,
     track_changes: bool = True,
     fix_body: bool = True,
+    previous: Extraction | None = None,
+    only: set[int] | None = None,
 ) -> ProcessResult:
+    """Process `src` into `dst`. With `previous` and `only`, re-extract just those footnotes
+    (see process_footnotes); everything after extraction is redone for the whole document."""
     t0 = time.monotonic()
     footnotes = read_footnotes(src)
     log.info("read %d footnotes from %s", len(footnotes), Path(src).name)
-    result = process_footnotes(footnotes, provider, bibliography=bibliography)
+    result = process_footnotes(footnotes, provider, bibliography=bibliography, previous=previous, only=only)
     changed = sum(f.changed for f in result.footnotes)
     log.info("formatted: %d footnotes changed, %d warnings", changed, len(result.warnings))
     result.body_fixes = write_document(
@@ -94,3 +126,53 @@ def process_docx(
         log.info("body text: %d fixes", len(result.body_fixes))
     log.info("wrote %s (%.1fs total)", Path(dst).name, time.monotonic() - t0)
     return result
+
+
+# --------------------------------------------------------------------------- #
+# Footnotes the LLM failed to read
+# --------------------------------------------------------------------------- #
+# Detected from the Extractor's warnings for now. Swap these for a structured per-footnote
+# reason once extraction reports one; callers only use these two functions.
+
+_FAILED = re.compile(r"^extraction failed for footnotes \[([\d,\s]+)\]", re.I)
+_MISSING = re.compile(r"^footnote (\d+): (missing from LLM response|LLM returned no segments)", re.I)
+
+
+def warning_footnotes(message: str) -> set[int]:
+    """The footnote numbers an extractor warning is about ('footnote 3: ...', 'footnotes [1, 2]')."""
+    if m := re.match(r"^footnote (\d+):", message, re.I):
+        return {int(m[1])}
+    if m := re.search(r"footnotes \[([\d,\s]+)\]", message, re.I):
+        return {int(n) for n in m[1].split(",") if n.strip()}
+    return set()
+
+
+def _messages(result) -> Iterable[str]:
+    for w in result.warnings if hasattr(result, "warnings") else result:
+        if isinstance(w, str):
+            yield w
+        elif isinstance(w, dict):
+            yield w.get("message") or ""
+        else:
+            yield w.message
+
+
+def failed_footnotes(result) -> set[int]:
+    """Footnotes the model failed to read (left as written because extraction failed, not
+    because the tool chose to). `result` is a ProcessResult or a list of warnings."""
+    failed: set[int] = set()
+    for message in _messages(result):
+        if m := _FAILED.match(message):
+            failed |= {int(n) for n in m[1].split(",") if n.strip()}
+        elif m := _MISSING.match(message):
+            failed.add(int(m[1]))
+    return failed
+
+
+def whole_batch_failed(result, total: int, batch_size: int = 15) -> bool:
+    """Whether one request to the model failed for a whole batch (or the whole document)."""
+    return any(
+        len(warning_footnotes(message)) >= min(batch_size, total)
+        for message in _messages(result)
+        if _FAILED.match(message)
+    )

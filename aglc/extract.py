@@ -302,15 +302,16 @@ class Extractor:
         #: human-readable warnings accumulated by the most recent `extract()` call
         self.warnings: list[str] = []
 
-    def extract(self, footnotes: list[Footnote]) -> list[Footnote]:
-        """Return copies of `footnotes` with `.segments` filled in."""
+    def extract(self, footnotes: list[Footnote], context: list[Footnote] | None = None) -> list[Footnote]:
+        """Return copies of `footnotes` with `.segments` filled in. `context` is footnotes already
+        extracted (eg when re-running only the ones that failed), for resolving '(n x)'."""
         self.warnings = []
         order = [fn.number for fn in footnotes]
         results: dict[int, Footnote] = {fn.number: fn.model_copy(deep=True) for fn in footnotes}
         # Footnotes fully resolved so far (across all batches, in call order), used both to build
         # the prior-source index and to resolve subsequent references, including references from
         # later footnotes in the *same* batch back to earlier ones in that batch.
-        resolved: dict[int, Footnote] = {}
+        resolved: dict[int, Footnote] = {fn.number: fn for fn in context or [] if fn.segments and fn.number not in results}
         system_prompt = _load_system_prompt()
 
         for start in range(0, len(footnotes), self.batch_size):

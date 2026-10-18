@@ -14,6 +14,11 @@ the entitlement) unlocks it and the .docx download.
 Free processing is limited before any LLM call: per browser and per IP address per day,
 a global daily cap, a footnote cap and a cap on concurrent jobs. If a paid document's
 files have gone, the payment is refunded automatically.
+
+Nobody pays for footnotes the model failed to read. Failed footnotes are retried once
+before the preview; if more than $AGLC_MAX_FAILED_SHARE of them (or a whole batch) still
+failed, the document isn't `payable` and checkout refuses it (409) until a free re-run
+(POST /api/rerun/{session_id}, MAX_RERUNS per document, paid or not) reads them.
 """
 
 from __future__ import annotations
@@ -39,7 +44,9 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
+from . import pipeline
 from .docx_io import read_footnotes
+from .models import Extraction
 from .payments import (
     PaymentError,
     Product,
@@ -58,6 +65,7 @@ PRODUCTS: dict[str, Product] = {
 }
 
 PREVIEW_FULL = 3  # changed footnotes shown in full before paying
+MAX_RERUNS = 2  # free re-runs of failed footnotes per document
 ANON_COOKIE = "aglc_anon"
 _REFUND_OUTCOMES = {"duplicate_payment", "files_missing"}
 
@@ -89,7 +97,14 @@ def _files_present(session_id: str) -> bool:
     return (d / "output.docx").is_file() and (d / "result.json").is_file()
 
 
-def _check_session_id(session_id: str) -> str:
+def _float_env(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name) or default)
+    except ValueError:
+        return default
+
+
+def check_session_id(session_id: str) -> str:
     try:
         return str(uuid.UUID(session_id))
     except ValueError:
@@ -196,6 +211,15 @@ def processing_slot() -> Iterator[None]:
 # --------------------------------------------------------------------------- #
 
 
+def extraction_report(full: dict) -> dict:
+    """Which footnotes the model failed to read, and whether the document can be paid for."""
+    failed = pipeline.failed_footnotes(full["warnings"])
+    total = len(full["footnotes"])
+    too_many = len(failed) > _float_env("AGLC_MAX_FAILED_SHARE", 0.2) * total
+    payable = not failed or not (too_many or pipeline.whole_batch_failed(full["warnings"], total))
+    return {"failed_footnotes": sorted(failed), "payable": payable}
+
+
 def start_document(session_id: str, filename: str, visitor: Visitor) -> None:
     get_store().add_document(session_id, filename, ip_hash=visitor.ip_hash, anon_id=visitor.anon_id)
 
@@ -204,12 +228,47 @@ def fail_document(session_id: str) -> None:
     get_store().finish_document(session_id, status="failed")
 
 
-def save_result(session_id: str, filename: str, full: dict) -> dict:
-    """Keep the full result server-side and return what the page may see now."""
+def save_result(session_id: str, filename: str, full: dict, *,
+                extraction: Extraction | None = None, options: dict | None = None) -> dict:
+    """Keep the full result server-side (with what a re-run needs) and return what the page
+    may see now."""
+    d = _session_dir(session_id)
     full = {**full, "filename": filename}
-    (_session_dir(session_id) / "result.json").write_text(json.dumps(full))
+    if extraction is not None:
+        (d / "extraction.json").write_text(extraction.model_dump_json())
+    if options is not None:
+        (d / "options.json").write_text(json.dumps(options))
+    (d / "result.json").write_text(json.dumps(full))
     get_store().finish_document(session_id, status="ready", footnote_count=len(full["footnotes"]))
-    return preview(full)
+    return view(session_id, full)
+
+
+def view(session_id: str, full: dict) -> dict:
+    """The full result once unlocked, else the preview; with the extraction report."""
+    doc = get_store().document(session_id)
+    shown = {**full, "locked": False} if doc["unlocked_at"] else preview(full)
+    return {**shown, "id": session_id, **extraction_report(full),
+            "reruns_left": max(0, MAX_RERUNS - doc["reruns"])}
+
+
+def rerun_inputs(session_id: str) -> tuple[dict, Extraction | None, dict]:
+    """The saved result, extraction and processing options of a document (404 if gone)."""
+    doc = get_store().document(session_id)
+    full = _load_result(session_id) if doc else None
+    if full is None:
+        raise HTTPException(404, "Session not found or expired")
+    d = _session_dir(session_id)
+    try:
+        extraction = Extraction.model_validate_json((d / "extraction.json").read_text())
+        options = json.loads((d / "options.json").read_text())
+    except (OSError, ValueError):
+        extraction, options = None, {}
+    return full, extraction, options
+
+
+def claim_rerun(session_id: str) -> None:
+    if not get_store().claim_rerun(session_id, MAX_RERUNS):
+        raise HTTPException(429, f"This document has already been re-run {MAX_RERUNS} times.")
 
 
 def preview(full: dict) -> dict:
@@ -423,7 +482,7 @@ def _public_base(request: Request) -> str:
 @router.post("/api/checkout")
 def create_checkout(body: CheckoutRequest, request: Request) -> dict:
     _require_enabled()
-    session_id = _check_session_id(body.session_id)
+    session_id = check_session_id(body.session_id)
     store = get_store()
     doc = store.document(session_id)
     if doc is None or doc["status"] != "ready":
@@ -432,6 +491,8 @@ def create_checkout(body: CheckoutRequest, request: Request) -> dict:
         return {"unlocked": True}
     if not _files_present(session_id):
         raise HTTPException(410, "This document has expired. Please process it again.")
+    if not extraction_report(_load_result(session_id))["payable"]:
+        raise HTTPException(409, "Some footnotes couldn't be read. Re-run them (free) before unlocking.")
 
     for order in store.orders_for(session_id):  # don't make a second link for the same document
         if order["status"] == "pending" and order["checkout_url"]:
@@ -477,7 +538,7 @@ async def receive_webhook(provider: str, request: Request) -> dict:
 @router.get("/api/entitlement/{session_id}")
 def get_entitlement(session_id: str) -> dict:
     _require_enabled()
-    session_id = _check_session_id(session_id)
+    session_id = check_session_id(session_id)
     store = get_store()
     doc = store.document(session_id)
     if doc is None:
@@ -500,7 +561,7 @@ def get_entitlement(session_id: str) -> dict:
 @router.get("/api/results/{session_id}")
 def get_results(session_id: str) -> dict:
     _require_enabled()
-    session_id = _check_session_id(session_id)
+    session_id = check_session_id(session_id)
     doc = get_store().document(session_id)
     full = _load_result(session_id) if doc else None
     if doc is None or (full is None and not doc["unlocked_at"]):
@@ -508,7 +569,7 @@ def get_results(session_id: str) -> dict:
     if doc["unlocked_at"] and not _files_present(session_id):
         _refund_missing(session_id)
         raise HTTPException(410, "This document's files are no longer available. Your payment has been refunded.")
-    return {**full, "id": session_id, "locked": False} if doc["unlocked_at"] else {**preview(full), "id": session_id}
+    return view(session_id, full)
 
 
 # ---- Stand-in checkout page for AGLC_PAYMENTS=fake (local demos and tests) -- #

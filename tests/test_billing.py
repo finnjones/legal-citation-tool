@@ -15,16 +15,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from aglc import api, billing, pipeline
+from aglc.pipeline import failed_footnotes, warning_footnotes, whole_batch_failed
 from aglc.llm import get_provider
 from aglc.payments import WebhookSignatureError, get_payment_provider, reset_payment_providers
 from aglc.payments.providers.square_provider import SIGNATURE_HEADER, SquareProvider, square_signature
-from aglc.store import MIGRATIONS, get_store
+from aglc.store import MIGRATIONS, Store, get_store
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ESSAY = FIXTURES / "sample_essay.docx"
 EXTRACTION = (FIXTURES / "sample_essay_extraction.json").read_text()
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-_real_process_docx = pipeline.process_docx
 
 
 @pytest.fixture
@@ -36,10 +36,9 @@ def paid(monkeypatch, tmp_path):
     billing._last_checked.clear()
     billing._semaphore = None
 
-    def process(src, dst, model, **kwargs):
-        return _real_process_docx(src, dst, get_provider("fake:e2e", responses=[EXTRACTION]), **kwargs)
-
-    with mock.patch("aglc.pipeline.process_docx", side_effect=process) as m:
+    # The mock counts pipeline runs (one get_provider call each) and can be told to fail.
+    with mock.patch("aglc.pipeline.get_provider",
+                    side_effect=lambda *a, **k: get_provider("fake:e2e", responses=[EXTRACTION])) as m:
         yield m
     reset_payment_providers()
 
@@ -518,3 +517,149 @@ def test_square_refund_uses_the_webhook_payment_id(square, client):
     assert kwargs["idempotency_key"] == f"refund-{order_id}"
     order = get_store().order(order_id)
     assert (order["status"], order["refund_id"]) == ("refunded", "sq-refund-1")
+
+
+# ---- footnotes the model failed to read ----------------------------------------- #
+
+
+class Model:
+    """A fake LLM that can fail: 'ok', 'fail' (every request), 'fail_once' (the first
+    request), or 'skip10' (answers without footnote 10)."""
+
+    def __init__(self, mode="ok"):
+        self.mode, self.requests = mode, 0
+
+    def __call__(self, system, user, schema):
+        self.requests += 1
+        if self.mode == "fail" or (self.mode == "fail_once" and self.requests <= 3):  # 3 attempts per request
+            return "the model returned nothing useful"
+        if self.mode == "skip10":
+            data = json.loads(EXTRACTION)
+            data["footnotes"] = [f for f in data["footnotes"] if f["number"] != 10]
+            return json.dumps(data)
+        return EXTRACTION
+
+
+@pytest.fixture
+def model(paid):
+    m = Model()
+    paid.side_effect = lambda *a, **k: get_provider("fake:flaky", responses=m)
+    return m
+
+
+def _rerun(client, sid):
+    return client.post(f"/api/rerun/{sid}")
+
+
+def test_failed_footnote_detection():
+    warnings = [
+        {"footnote": None, "message": "extraction failed for footnotes [1, 2, 3]: no reply; left unchanged"},
+        {"footnote": None, "message": "footnote 7: missing from LLM response; left unchanged"},
+        {"footnote": None, "message": "footnote 8: left unchanged for manual review; the extraction kept dropping '9'"},
+        {"footnote": 4, "message": "unknown court"},
+    ]
+    assert failed_footnotes(warnings) == {1, 2, 3, 7}  # left as written on purpose (8) isn't a failure
+    assert whole_batch_failed(warnings, total=3) and not whole_batch_failed(warnings, total=40)
+    assert warning_footnotes("footnotes [1, 2]: x") == {1, 2} and warning_footnotes("footnote 12: x") == {12}
+
+
+def test_failed_batch_is_retried_before_the_preview(model, paid, client):
+    model.mode = "fail_once"
+    data = _process(client).json()
+    assert paid.call_count == 2  # the first run, then the retry of the failed footnotes
+    assert data["payable"] is True and data["failed_footnotes"] == []
+    assert not any("extraction failed" in w["message"] for w in data["warnings"])
+    assert sum(f["changed"] for f in data["footnotes"]) == 10
+
+
+def test_unreadable_document_cannot_be_paid_for(model, client):
+    model.mode = "fail"
+    data = _process(client).json()
+    assert data["payable"] is False and data["failed_footnotes"] == list(range(1, 11))
+    assert data["reruns_left"] == billing.MAX_RERUNS
+    r = client.post("/api/checkout", json={"session_id": data["id"]})
+    assert r.status_code == 409 and "re-run" in r.json()["detail"].lower()
+    assert client.get(f"/api/results/{data['id']}").json()["payable"] is False
+    assert get_store().orders_for(data["id"]) == []
+
+
+def test_rerun_reads_the_failed_footnotes_and_makes_it_payable(model, client):
+    model.mode = "fail"
+    sid = _process(client).json()["id"]
+    model.mode = "ok"
+    data = _rerun(client, sid).json()
+    assert data["payable"] is True and data["failed_footnotes"] == [] and data["reruns_left"] == 1
+    assert data["locked"] is True
+    full = json.loads((billing.sessions_dir() / sid / "result.json").read_text())
+    assert "Connection to Country" in full["footnotes"][9]["formatted"]
+    assert _checkout(client, sid)["checkout_url"]
+
+
+def test_partial_failure_below_threshold_is_payable(model, client, monkeypatch):
+    model.mode = "skip10"
+    data = _process(client).json()
+    assert data["failed_footnotes"] == [10] and data["payable"] is True  # 1 of 10 <= 20%
+    assert _checkout(client, data["id"])["checkout_url"]
+    monkeypatch.setenv("AGLC_MAX_FAILED_SHARE", "0.05")
+    assert client.get(f"/api/results/{data['id']}").json()["payable"] is False
+
+
+def test_paid_document_can_be_rerun_without_paying_again(model, client, fake):
+    model.mode = "skip10"
+    sid, order_id, poid = _paid_session(client, fake)
+    assert _webhook(client, fake, poid)[0].json()["outcome"] == "unlocked"
+    model.mode = "ok"
+    data = _rerun(client, sid).json()
+    assert data["locked"] is False and data["failed_footnotes"] == []
+    assert "Connection to Country" in data["footnotes"][9]["formatted"]
+    assert get_store().document(sid)["unlocked_at"] is not None
+    assert [o["id"] for o in get_store().orders_for(sid)] == [order_id]
+    assert fake.checkouts[poid].refunds == []
+    d = client.get(f"/api/download/{sid}")
+    assert d.status_code == 200 and d.content[:2] == b"PK"
+
+
+def test_rerun_limit_holds(model, client):
+    model.mode = "fail"
+    sid = _process(client).json()["id"]
+    assert _rerun(client, sid).json()["reruns_left"] == 1
+    assert _rerun(client, sid).json()["reruns_left"] == 0
+    r = _rerun(client, sid)
+    assert r.status_code == 429 and "re-run" in r.json()["detail"]
+
+
+def test_rerun_with_nothing_to_read_is_free_and_unlimited(model, client):
+    sid = _process(client).json()["id"]
+    for _ in range(billing.MAX_RERUNS + 1):
+        assert _rerun(client, sid).json()["reruns_left"] == billing.MAX_RERUNS
+
+
+def test_reruns_dont_use_the_free_quota(model, client, monkeypatch):
+    monkeypatch.setenv("AGLC_FREE_PER_DAY", "1")
+    model.mode = "fail"
+    sid = _process(client).json()["id"]
+    assert _rerun(client, sid).status_code == 200
+    model.mode = "ok"
+    assert _rerun(client, sid).json()["payable"] is True
+    assert _process(client).status_code == 429  # the one free preview was the first upload
+
+
+def test_rerun_unknown_session(paid, client):
+    assert _rerun(client, "00000000-0000-4000-8000-000000000000").status_code == 404
+    assert _rerun(client, "nope").status_code == 422
+
+
+def test_rerun_is_off_without_payments(client):
+    assert _rerun(client, "00000000-0000-4000-8000-000000000000").status_code == 404
+
+
+def test_store_upgrades_a_version_1_database(tmp_path):
+    import sqlite3 as sq
+    path = tmp_path / "old.db"
+    with sq.connect(path) as conn:
+        for statement in filter(str.strip, MIGRATIONS[0].split(";")):
+            conn.execute(statement)
+        conn.execute("PRAGMA user_version = 1")
+        conn.execute("INSERT INTO documents (session_id, filename, day, created_at) VALUES ('s', 'f', 'd', 'c')")
+    store = Store(path)
+    assert store.document("s")["reruns"] == 0

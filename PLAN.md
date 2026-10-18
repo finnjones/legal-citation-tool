@@ -67,6 +67,10 @@ aglc/billing.py           /api/config, /api/checkout, /api/webhooks/{provider},
 - If a paid document's files are missing, or a document is paid for twice, it is refunded.
 - Free processing is limited before any LLM call: per browser and per salted, daily-rotated
   IP hash, a global daily cap, a footnote cap and a concurrency cap.
+- Nobody pays for footnotes the model failed to read (`pipeline.failed_footnotes`). They are
+  re-extracted once before the preview, reusing the saved `Extraction` for the rest. If more
+  than `AGLC_MAX_FAILED_SHARE` (or a whole batch) still failed, the document isn't `payable`
+  and checkout returns 409. `POST /api/rerun/{id}` re-reads them free (2 per document, paid or not).
 
 ## AGLC4 coverage
 
