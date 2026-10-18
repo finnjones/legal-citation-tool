@@ -24,6 +24,7 @@ failed, the document isn't `payable` and checkout refuses it (409) until a free 
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import logging
 import os
@@ -44,7 +45,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
-from . import pipeline
+from . import pipeline, retention
 from .docx_io import read_footnotes
 from .models import Extraction
 from .payments import (
@@ -134,11 +135,29 @@ class Visitor:
 
 
 def _client_ip(request: Request) -> str | None:
-    """$AGLC_CLIENT_IP_HEADER (eg CF-Connecting-IP, X-Forwarded-For) behind a reverse proxy."""
+    """$AGLC_CLIENT_IP_HEADER (eg CF-Connecting-IP) behind a reverse proxy, else the peer
+    address (which uvicorn --proxy-headers takes from X-Forwarded-For). Only trustworthy when
+    the proxy is the only way in: see DEPLOY.md.
+
+    For X-Forwarded-For the *last* address is used: that is the one the nearest proxy
+    added; anything before it was sent by the client and can be made up. An IPv6 address
+    counts as its /64, since one connection is usually given a whole /64 to pick from."""
     header = os.environ.get("AGLC_CLIENT_IP_HEADER")
+    ip = None
     if header and request.headers.get(header):
-        return request.headers[header].split(",")[0].strip()
-    return request.client.host if request.client else None
+        ip = request.headers[header].split(",")[-1].strip()
+    elif request.client:
+        ip = request.client.host
+    if not ip:
+        return None
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip
+    mapped = getattr(addr, "ipv4_mapped", None)
+    if addr.version == 6 and mapped is None:
+        return str(ipaddress.ip_network(f"{addr}/64", strict=False))
+    return str(mapped or addr)
 
 
 def _visitor(request: Request) -> Visitor:
@@ -251,9 +270,21 @@ def view(session_id: str, full: dict) -> dict:
             "reruns_left": max(0, MAX_RERUNS - doc["reruns"])}
 
 
+def _expired_message() -> str:
+    return (f"This document was deleted {retention.retention_hours():g} hours after it was processed"
+            " (or paid for), as our privacy policy says. Please process it again.")
+
+
+def _require_not_purged(doc: sqlite3.Row | None) -> None:
+    """410 for a document the retention sweep deleted (no refund: that's the policy)."""
+    if doc is not None and doc["purged_at"]:
+        raise HTTPException(410, _expired_message())
+
+
 def rerun_inputs(session_id: str) -> tuple[dict, Extraction | None, dict]:
     """The saved result, extraction and processing options of a document (404 if gone)."""
     doc = get_store().document(session_id)
+    _require_not_purged(doc)
     full = _load_result(session_id) if doc else None
     if full is None:
         raise HTTPException(404, "Session not found or expired")
@@ -306,6 +337,7 @@ def require_unlocked(session_id: str) -> None:
     doc = get_store().document(session_id)
     if doc is None:
         raise HTTPException(404, "Session not found or output not ready")
+    _require_not_purged(doc)
     if not doc["unlocked_at"]:
         raise HTTPException(402, f"Unlock this document ({PRODUCTS['document'].display}) to download it.")
     if not _files_present(session_id):
@@ -403,7 +435,7 @@ def _refund(order_id: str) -> None:
         log.error("automatic refund of order %s failed: %s", order_id, e)
         store.update_order(order_id, status="refund_failed", note=f"{order['note']}; refund failed: {e}")
         return
-    log.warning("refunded order %s (%s): %s", order_id, refund.refund_id, order["note"])
+    log.warning("refunded order %s: %s", order_id, order["note"])
     store.update_order(order_id, status="refunded", refund_id=refund.refund_id, refunded_at=now())
 
 
@@ -452,6 +484,14 @@ def _reconcile(session_id: str) -> None:
             _refund(order["id"])
 
 
+def reconcile_quietly(session_id: str) -> None:
+    """_reconcile for the retention sweep, which must carry on whatever the provider says."""
+    try:
+        _reconcile(session_id)
+    except Exception:
+        log.exception("could not check the pending orders of a document before deleting it")
+
+
 # --------------------------------------------------------------------------- #
 # Routes
 # --------------------------------------------------------------------------- #
@@ -461,10 +501,12 @@ router = APIRouter()
 
 @router.get("/api/config")
 async def get_config() -> dict:
+    # retention_hours: how long uploads and results are kept (quoted by the privacy page)
     if not enabled():
-        return {"payments": False}
+        return {"payments": False, "retention_hours": retention.retention_hours()}
     return {
         "payments": True,
+        "retention_hours": retention.retention_hours(),
         "provider": configured_payment_provider(),
         "price": _price(),
         "preview_footnotes": PREVIEW_FULL,
@@ -485,6 +527,7 @@ def create_checkout(body: CheckoutRequest, request: Request) -> dict:
     session_id = check_session_id(body.session_id)
     store = get_store()
     doc = store.document(session_id)
+    _require_not_purged(doc)
     if doc is None or doc["status"] != "ready":
         raise HTTPException(404, "Session not found or output not ready")
     if doc["unlocked_at"]:
@@ -496,6 +539,7 @@ def create_checkout(body: CheckoutRequest, request: Request) -> dict:
 
     for order in store.orders_for(session_id):  # don't make a second link for the same document
         if order["status"] == "pending" and order["checkout_url"]:
+            store.update_order(order["id"])  # touched: the retention window runs from the latest checkout
             return {"checkout_url": order["checkout_url"], "order_id": order["id"]}
 
     product = PRODUCTS["document"]
@@ -508,7 +552,7 @@ def create_checkout(body: CheckoutRequest, request: Request) -> dict:
             order_id=order_id, product=product, redirect_url=f"{_public_base(request)}/?paid=1&session={session_id}"
         )
     except PaymentError as e:
-        log.error("checkout for %s failed: %s", session_id, e)
+        log.error("checkout for order %s failed: %s", order_id, e)
         store.update_order(order_id, status="failed", note=str(e))
         raise HTTPException(502, "The payment provider is unavailable. Please try again shortly.") from e
     store.update_order(order_id, checkout_id=session.checkout_id, checkout_url=session.url,
@@ -563,6 +607,7 @@ def get_results(session_id: str) -> dict:
     _require_enabled()
     session_id = check_session_id(session_id)
     doc = get_store().document(session_id)
+    _require_not_purged(doc)
     full = _load_result(session_id) if doc else None
     if doc is None or (full is None and not doc["unlocked_at"]):
         raise HTTPException(404, "Session not found or expired")

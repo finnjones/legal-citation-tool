@@ -79,7 +79,21 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE documents ADD COLUMN reruns INTEGER NOT NULL DEFAULT 0;
     """,
+    # 3: retention (aglc/retention.py): when a document's files were deleted
+    """
+    ALTER TABLE documents ADD COLUMN purged_at TEXT;
+    CREATE INDEX documents_created ON documents(created_at);
+    """,
 ]
+
+# A document whose retention window (see aglc/retention.py) ended before :cutoff: uploaded,
+# paid for (if it was) and last sent to a still-pending checkout all before then.
+_EXPIRED = """
+    d.purged_at IS NULL AND d.created_at < :cutoff
+    AND (d.unlocked_at IS NULL OR d.unlocked_at < :cutoff)
+    AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.session_id = d.session_id
+                    AND o.status = 'pending' AND o.updated_at >= :cutoff)
+"""
 
 
 def now() -> str:
@@ -183,6 +197,25 @@ class Store:
     def document(self, session_id: str) -> sqlite3.Row | None:
         with self.read() as conn:
             return conn.execute("SELECT * FROM documents WHERE session_id = ?", (session_id,)).fetchone()
+
+    def expired_documents(self, cutoff: str) -> list[tuple[str, bool]]:
+        """(session id, has an old pending order) for each document past its window."""
+        with self.read() as conn:
+            rows = conn.execute(
+                f"SELECT d.session_id, EXISTS (SELECT 1 FROM orders o WHERE o.session_id = d.session_id"
+                f" AND o.status = 'pending') AS pending FROM documents d WHERE {_EXPIRED}",
+                {"cutoff": cutoff},
+            ).fetchall()
+        return [(r["session_id"], bool(r["pending"])) for r in rows]
+
+    def purge_document(self, session_id: str, cutoff: str) -> bool:
+        """Mark a document deleted (and forget its filename) if it is still past its window,
+        checked in the same transaction a webhook would unlock it in. True if marked."""
+        with self.transaction() as conn:
+            return conn.execute(
+                f"UPDATE documents AS d SET purged_at = :now, filename = '' WHERE d.session_id = :sid AND {_EXPIRED}",
+                {"now": now(), "sid": session_id, "cutoff": cutoff},
+            ).rowcount == 1
 
     def free_uses_today(self, *, ip_hash: str | None, anon_id: str | None) -> tuple[int, int, int]:
         """Documents processed today and not paid for: (by this IP, by this browser, by everyone).

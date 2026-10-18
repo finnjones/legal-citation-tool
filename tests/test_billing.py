@@ -84,7 +84,7 @@ def _paid_session(client, fake):
 
 
 def test_payments_off_by_default(client):
-    assert client.get("/api/config").json() == {"payments": False}
+    assert client.get("/api/config").json() == {"payments": False, "retention_hours": 24}
     assert client.post("/api/checkout", json={"session_id": "x"}).status_code == 404
     assert client.post("/api/webhooks/fake", content=b"{}").status_code == 404
 

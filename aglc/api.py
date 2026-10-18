@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import shutil
 import tempfile
 import uuid
 import zipfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
@@ -16,7 +18,10 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import billing, pipeline
+from lxml.etree import XMLSyntaxError
+
+from . import billing, guards, pipeline, retention
+from .docx_io import UnsafeDocxError
 from .llm.base import LLMError, available_providers, default_spec, get_provider
 from .models import ProcessResult
 
@@ -25,29 +30,51 @@ from .config import load_env
 log = logging.getLogger("aglc")
 
 
+_NOT_A_DOCX = (zipfile.BadZipFile, KeyError, UnsafeDocxError, XMLSyntaxError)
+
+
 def _status_for(e: Exception) -> int:
-    if isinstance(e, (zipfile.BadZipFile, KeyError, ValueError)):
-        return 400  # not a valid .docx, or a malformed model spec
+    if isinstance(e, (*_NOT_A_DOCX, ValueError)):
+        return 400  # not a valid (or safe) .docx, or a malformed model spec
     if isinstance(e, LLMError) or type(e).__module__.split(".")[0] in ("openai", "anthropic", "google"):
         return 502  # the AI provider failed (bad key, no credit, model unavailable...)
     return 500
 
 
 def _describe(e: Exception) -> str:
-    if isinstance(e, (zipfile.BadZipFile, KeyError)):
+    """What the client is told. Never the exception's own text (it can carry provider
+    responses, paths or footnote text); that goes to the server log."""
+    if isinstance(e, _NOT_A_DOCX):
         return "That file isn't a valid Word (.docx) document."
-    if _status_for(e) == 502:
-        return f"The AI model request failed: {e}"
-    return f"Error processing document: {e}"
+    status = _status_for(e)
+    if status == 400:
+        return "The request couldn't be processed. Check the file and options, then try again."
+    if status == 502:
+        return "The AI model request failed. Please try again in a minute (the server log has the details)."
+    return "Error processing document. Please try again (the server log has the details)."
 
 load_env()
-
-app = FastAPI(title="AGLC4 Citation Tool API")
-app.include_router(billing.router)  # every route 404s unless AGLC_PAYMENTS is set
 
 # Temporary directory for uploads and outputs
 _TEMP_DIR = Path(tempfile.gettempdir()) / "aglc_sessions"
 _TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Delete documents past $AGLC_RETENTION_HOURS now and every few minutes (aglc/retention.py)."""
+    guards.install_log_redaction()
+    sweeper = asyncio.create_task(retention.run_periodically(_TEMP_DIR))
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+
+
+app = FastAPI(title="AGLC4 Citation Tool API", lifespan=_lifespan)
+app.add_middleware(guards.GuardMiddleware)  # 413 over $AGLC_MAX_UPLOAD_MB, security headers
+app.include_router(billing.router)  # every route 404s unless AGLC_PAYMENTS is set
+guards.install_log_redaction()
 
 
 def _sessions_dir() -> Path:
@@ -87,12 +114,28 @@ async def root() -> FileResponse:
 
 @app.get("/api/providers")
 async def get_providers() -> dict:
-    """Get available LLM providers and the default."""
+    """Get available LLM providers and the default (local use only: with payments on the
+    server alone picks the model, so there is nothing to choose from)."""
+    if billing.enabled():
+        raise HTTPException(status_code=404, detail="Not found")
     try:
         providers = available_providers()
         return {"providers": providers, "default": default_spec()}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing providers: {str(e)}")
+        log.exception("listing providers failed")
+        raise HTTPException(status_code=500, detail="Error listing providers") from e
+
+
+async def _save_upload(file: UploadFile, dest: Path) -> None:
+    """Copy the upload to `dest` in chunks; 413 once it passes $AGLC_MAX_UPLOAD_MB (the
+    middleware has already refused bodies far over it)."""
+    limit, size = guards.max_upload_bytes(), 0
+    with open(dest, "wb") as f:
+        while chunk := await file.read(1024 * 1024):
+            size += len(chunk)
+            if size > limit:
+                raise HTTPException(status_code=413, detail=guards.too_large_message())
+            f.write(chunk)
 
 
 @app.post("/api/process")
@@ -124,6 +167,8 @@ async def process_document(
 
     paid = billing.enabled()
     visitor = billing.admit(request, response) if paid else None  # free-use quotas: 429
+    if paid:
+        model = None  # the server's $AGLC_LLM (and $AGLC_LLM_FALLBACK) only: it pays for the calls
 
     # Create session directory
     session_id = str(uuid.uuid4())
@@ -137,9 +182,7 @@ async def process_document(
 
         # Save upload
         input_file = session_dir / "input.docx"
-        with open(input_file, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        await _save_upload(file, input_file)
 
         # Store original filename for download
         (session_dir / "original_filename.txt").write_text(original_stem)
@@ -174,7 +217,7 @@ async def process_document(
             billing.fail_document(session_id)
         if isinstance(e, HTTPException):
             raise
-        log.exception("processing %s failed", file.filename)
+        log.exception("processing session %s failed", session_id[:8])
         raise HTTPException(status_code=_status_for(e), detail=_describe(e)) from e
 
 
@@ -201,13 +244,13 @@ async def rerun_document(session_id: str) -> dict:
         billing.claim_rerun(session_id)  # 429 once the free re-runs are used up
         try:
             result = await run_in_threadpool(
-                pipeline.process_docx, session_dir / "input.docx", staged, options.get("model"),
+                pipeline.process_docx, session_dir / "input.docx", staged, None,  # the server's model
                 bibliography=options.get("bibliography", True), track_changes=options.get("track_changes", True),
                 fix_body=options.get("fix_body", True), previous=extraction, only=failed,
             )
         except Exception as e:
             staged.unlink(missing_ok=True)
-            log.exception("re-running %s failed", session_id)
+            log.exception("re-running session %s failed", session_id[:8])
             raise HTTPException(status_code=_status_for(e), detail=_describe(e)) from e
     staged.replace(session_dir / "output.docx")
     return billing.save_result(session_id, full["filename"], _result_json(session_id, result),

@@ -55,8 +55,38 @@ def _local(el) -> str:
     return etree.QName(el).localname
 
 
+class UnsafeDocxError(ValueError):
+    """The upload is not a .docx this tool will open: a zip bomb, or XML with a DTD."""
+
+
+# Generous for a real essay (a 10 MB .docx of text and images unpacks to well under this),
+# small enough that a zip bomb is refused before anything is decompressed.
+MAX_ENTRIES = 2000
+MAX_UNCOMPRESSED = 200 * 1024 * 1024
+
+# OOXML never carries a DTD, so entities are never resolved and the network is never used:
+# no XXE, no billion laughs.
+_XML_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
+
+
 def _parse_xml(data: bytes):
-    return etree.fromstring(data)
+    root = etree.fromstring(data, _XML_PARSER)
+    docinfo = root.getroottree().docinfo
+    if docinfo.doctype or docinfo.internalDTD is not None:
+        raise UnsafeDocxError("XML parts with a DTD are not accepted")
+    return root
+
+
+def _open_docx(path: str | Path) -> zipfile.ZipFile:
+    """Open a .docx, refusing (UnsafeDocxError) one whose central directory declares too many
+    entries or too much uncompressed data. zipfile never inflates an entry past its declared
+    size (and checks its CRC), so the declared sizes bound what reading it can cost."""
+    z = zipfile.ZipFile(path)
+    infos = z.infolist()
+    if len(infos) > MAX_ENTRIES or sum(i.file_size for i in infos) > MAX_UNCOMPRESSED:
+        z.close()
+        raise UnsafeDocxError("the document unpacks to too much data")
+    return z
 
 
 def _serialize(root) -> bytes:
@@ -181,7 +211,7 @@ def _richtext_from_footnote(fn_elem) -> RichText:
 def read_footnotes(path: str | Path) -> list[Footnote]:
     """Read all real footnotes (skip separator/continuation footnotes) in document
     order, numbered 1..n, preserving italics as RichText runs."""
-    with zipfile.ZipFile(path) as z:
+    with _open_docx(path) as z:
         doc_root = _parse_xml(z.read(DOCUMENT_PATH))
         fn_root = _parse_xml(z.read(FOOTNOTES_PATH)) if FOOTNOTES_PATH in z.namelist() else None
 
@@ -591,7 +621,7 @@ def write_document(
     dst = Path(dst)
     date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    with zipfile.ZipFile(src) as zin:
+    with _open_docx(src) as zin:
         names = zin.namelist()
         infos = {n: zin.getinfo(n) for n in names}
         data = {n: zin.read(n) for n in names}
