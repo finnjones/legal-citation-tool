@@ -179,6 +179,76 @@ em { font-style: italic; }
 }
 .link-button:hover { text-decoration-thickness: 2px; }
 
+/* ---- Guides (/guides): worked examples, index list, call to action ------ */
+
+.prose .crumbs { font-size: 0.875rem; color: var(--muted); margin: 0 0 20px; }
+.prose .crumbs a { color: var(--muted); }
+.prose cite { font-style: italic; }
+
+.g-example {
+    margin-top: 20px; background: var(--sheet); border: 1px solid var(--hairline); border-radius: 8px;
+    padding: 6px 20px 8px;
+}
+.g-example figcaption { padding: 12px 0 4px; font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
+.g-row {
+    display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 0 16px; align-items: baseline;
+    padding: 10px 0; border-top: 1px solid var(--hairline);
+}
+.g-row:first-of-type { border-top: 0; }
+.g-solo { grid-template-columns: minmax(0, 1fr); }
+.g-sub { padding-bottom: 0; }
+.g-sub + .g-row { border-top: 0; }
+figcaption + .g-row { border-top: 0; }
+.g-no {
+    text-align: right; font-family: var(--font-serif); font-weight: 600; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+.g-label { font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
+.g-cite { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.6; overflow-wrap: anywhere; margin: 0; }
+.prose .g-example .g-cite { margin-top: 0; }
+.g-cite em { font-style: italic; }
+.g-was { color: var(--muted); }
+.g-redline del {
+    color: var(--deletion); text-decoration: line-through; text-decoration-thickness: 1px;
+    background: var(--deletion-wash); border-radius: 4px;
+}
+.g-redline ins {
+    color: var(--insertion); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+    background: var(--insertion-wash); border-radius: 4px;
+}
+.g-key {
+    padding: 8px 0 6px; border-top: 1px solid var(--hairline); color: var(--muted); font-size: 0.8125rem;
+    display: flex; flex-wrap: wrap; gap: 4px 20px;
+}
+.g-key del { color: var(--deletion); background: var(--deletion-wash); border-radius: 4px; }
+.g-key ins {
+    color: var(--insertion); text-decoration: underline; text-underline-offset: 3px;
+    background: var(--insertion-wash); border-radius: 4px;
+}
+
+.prose .g-index { list-style: none; padding: 0; margin-top: 28px; border-top: 1px solid var(--hairline); }
+.prose .g-index li { margin: 0; border-bottom: 1px solid var(--hairline); }
+.prose .g-index a {
+    display: block; padding: 16px 0; text-decoration: none; color: var(--ink);
+}
+.prose .g-index .g-name {
+    display: block; font-family: var(--font-serif); font-size: 1.25rem; font-weight: 600; color: var(--accent);
+    letter-spacing: -0.01em;
+}
+.prose .g-index a:hover .g-name { text-decoration: underline; text-underline-offset: 3px; }
+.prose .g-index .g-sum { display: block; margin-top: 2px; color: var(--muted); }
+
+.prose .g-related { list-style: none; padding: 0; }
+.prose .g-related li { margin-top: 4px; }
+
+.g-cta {
+    margin-top: 48px; padding: 24px; background: var(--sheet); border: 1px solid var(--hairline);
+    border-radius: 8px; box-shadow: var(--shadow-card);
+}
+.prose .g-cta h2 { margin-top: 0; font-size: 1.375rem; }
+.prose .g-cta p { color: var(--muted); }
+.prose .g-cta .btn { margin-top: 16px; }
+
 /* ---- Prose (static pages, FAQ answers) --------------------------------- */
 
 .prose { max-width: 68ch; }
@@ -210,6 +280,10 @@ em { font-style: italic; }
     :root { --gutter: 16px; }
     .page-main { padding-top: 40px; }
     .prose h1 { font-size: 2rem; }
+    .g-example { padding-left: 16px; padding-right: 16px; }
+    .g-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .g-no { text-align: left; }
+    .g-no::before { content: "Footnote "; font-family: var(--font-ui); font-size: 0.8125rem; font-weight: 500; }
     .site-footer { margin-top: 64px; }
 }
 

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+    {{> head}}
+    <title>{{title}} | {{brand}}</title>
+    <meta name="description" content="{{description}}">
+    <link rel="canonical" href="{{base_url}}{{path}}">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="{{brand}}">
+    <meta property="og:title" content="{{title}} | {{brand}}">
+    <meta property="og:description" content="{{description}}">
+    <meta property="og:url" content="{{base_url}}{{path}}">
+    <meta property="og:image" content="{{base_url}}/assets/og.png">
+    <meta property="og:locale" content="en_AU">
+</head>
+<body>
+    {{> header}}
+    <main id="main" class="page-main">
+        <div class="container">
+            <article class="prose">
+{{crumbs}}
+{{content}}
+
+                <h2>The Guide is the authority</h2>
+                <p>This page paraphrases and illustrates the rules, with worked examples from the <cite>Australian Guide to Legal Citation</cite> (4th ed). For the full text, read the Guide itself, which the Melbourne University Law Review Association publishes free online: <a href="https://law.unimelb.edu.au/mulr/aglc/about" rel="noopener">AGLC4 on the Melbourne Law School site</a>. {{brand}} isn't affiliated with or endorsed by the Melbourne University Law Review Association.</p>
+{{related}}
+                <section class="g-cta" aria-labelledby="ctaTitle">
+                    <h2 id="ctaTitle">Fix these in your essay automatically</h2>
+                    <p>Upload your Word essay. {{brand}} rewrites each footnote to AGLC4, adds Ibid, (n&nbsp;x) and short titles where they belong, and shows every change as a Word tracked change.</p>
+                    <a class="btn btn-primary" href="/#uploadCard">Check my footnotes</a>
+                </section>
+            </article>
+        </div>
+    </main>
+    {{> footer}}
+</body>
+</html>

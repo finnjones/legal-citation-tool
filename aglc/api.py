@@ -135,6 +135,27 @@ async def static_page(request: Request) -> HTMLResponse:
     return site.page(request.url.path.strip("/"), request)
 
 
+@app.get("/guides")
+async def guides_index(request: Request) -> HTMLResponse:
+    return site.guides_index(request)
+
+
+@app.get("/guides/{slug}")
+async def guide_page(slug: str, request: Request) -> HTMLResponse:
+    """One AGLC4 guide page; an unknown slug is a 404."""
+    return site.guide(slug, request)
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap(request: Request) -> Response:
+    return site.sitemap(request)
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots(request: Request) -> Response:
+    return site.robots(request)
+
+
 @app.get("/api/sample")
 async def sample_essay() -> FileResponse:
     """The demo essay (examples/test_essay.docx), so "Try a sample essay" needs no upload."""

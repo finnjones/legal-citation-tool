@@ -549,3 +549,261 @@ def test_price_on_the_page_comes_from_the_server():
     text = client.get("/").text
     assert f"{billing.PRODUCTS['document'].display} per document" in text
     assert f"first {billing.PREVIEW_FULL} fixes free" in text
+
+
+# ---- Tests: the AGLC4 guides, sitemap and robots.txt ------------------------------ #
+
+GUIDE_PATHS = [f"/guides/{slug}" for slug in site.GUIDES]
+_REPO = Path(__file__).parent.parent
+
+
+@pytest.mark.parametrize("path", GUIDE_PATHS)
+def test_each_guide_renders(path):
+    response = client.get(path)
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    text = response.text
+    guide = site.GUIDES[path.rsplit("/", 1)[1]]
+    assert "{{" not in text
+    assert site.BRAND in text
+    assert f"<title>{guide.title} | {site.BRAND}</title>" in text
+    assert f'<link rel="canonical" href="http://testserver{path}">' in text
+    assert f'<meta name="description" content="{guide.description}">' in text
+    assert text.count("<h1") == 1 and text.count("<h2") >= 3
+    assert 'href="/#uploadCard"' in text  # the call to action goes to the home page's upload
+    assert "https://law.unimelb.edu.au/mulr/aglc/about" in text
+    assert "isn't affiliated with or endorsed by the Melbourne University Law Review Association" in text
+    assert 'href="/guides"' in text and 'href="/privacy"' in text  # the shared header, footer and index link
+
+
+def test_guide_titles_and_descriptions_are_distinct():
+    titles = [g.title for g in site.GUIDES.values()] + [site.GUIDES_INDEX_TITLE]
+    assert len(set(titles)) == len(titles)
+    descriptions = [g.description for g in site.GUIDES.values()] + [site.GUIDES_INDEX_DESCRIPTION]
+    assert len(set(descriptions)) == len(descriptions)
+    assert "Ibid in AGLC4: when and how to use it | Aforecite" in client.get("/guides/ibid").text
+
+
+def test_guide_urls_use_the_public_url(monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://cite.example.com/")
+    text = client.get("/guides/ibid").text
+    assert '<link rel="canonical" href="https://cite.example.com/guides/ibid">' in text
+    assert '<meta property="og:url" content="https://cite.example.com/guides/ibid">' in text
+
+
+def test_guides_index_lists_every_guide():
+    response = client.get("/guides")
+    assert response.status_code == 200
+    text = response.text
+    assert "{{" not in text and site.BRAND in text
+    assert f"<title>{site.GUIDES_INDEX_TITLE} | {site.BRAND}</title>" in text
+    assert '<link rel="canonical" href="http://testserver/guides">' in text
+    for slug, guide in site.GUIDES.items():
+        assert f'href="/guides/{slug}"' in text and guide.name in text
+    assert 'href="/#uploadCard"' in text
+
+
+def test_a_guide_links_to_the_other_guides_but_not_itself():
+    text = client.get("/guides/ibid").text
+    assert 'href="/guides/subsequent-references"' in text and 'href="/guides/bibliography"' in text
+    assert 'href="/guides/ibid"' not in text
+
+
+@pytest.mark.parametrize("slug", ["nope", "index", "ibid.html", "..%2Fprivacy", "IBID"])
+def test_unknown_guide_is_404(slug):
+    assert client.get(f"/guides/{slug}").status_code == 404
+
+
+def test_the_site_links_to_the_guides():
+    assert 'href="/guides"' in client.get("/privacy").text  # the footer partial
+    landing = client.get("/").text
+    assert 'href="/guides"' in landing  # the footer, and a link from "What it fixes"
+    assert "Read the rules with worked examples.</a>" in landing
+
+
+def test_sitemap_lists_every_public_page_and_is_valid_xml():
+    import xml.etree.ElementTree as ET
+
+    response = client.get("/sitemap.xml")
+    assert response.status_code == 200
+    assert "xml" in response.headers["content-type"]
+    root = ET.fromstring(response.text)
+    ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    assert root.tag == "{http://www.sitemaps.org/schemas/sitemap/0.9}urlset"
+    locs = [loc.text for loc in root.findall("s:url/s:loc", ns)]
+    paths = ["/", "/about", "/privacy", "/terms", "/refunds", "/guides", *GUIDE_PATHS]
+    assert locs == ["http://testserver" + path for path in paths]
+    assert len(set(locs)) == len(locs)
+    for path in paths:  # everything the sitemap names really exists
+        assert client.get(path).status_code == 200
+
+
+def test_sitemap_uses_the_public_url(monkeypatch):
+    import xml.etree.ElementTree as ET
+
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://cite.example.com/")
+    root = ET.fromstring(client.get("/sitemap.xml").text)
+    locs = [el.text for el in root.iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")]
+    assert locs[0] == "https://cite.example.com/" and "https://cite.example.com/guides/ibid" in locs
+    assert all(loc.startswith("https://cite.example.com/") for loc in locs)
+
+
+def test_robots_txt_allows_the_site_but_not_the_api():
+    response = client.get("/robots.txt")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    lines = response.text.splitlines()
+    assert "User-agent: *" in lines and "Disallow: /api/" in lines
+    assert "Disallow: /" not in lines and not any(line.startswith("Disallow: /guides") for line in lines)
+    assert "Sitemap: http://testserver/sitemap.xml" in lines
+
+
+def test_robots_txt_names_the_sitemap_on_the_public_url(monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://cite.example.com")
+    assert "Sitemap: https://cite.example.com/sitemap.xml" in client.get("/robots.txt").text.splitlines()
+
+
+# ---- Guard tests: the guides may only cite rules and examples this repo knows -------- #
+
+from html.parser import HTMLParser  # noqa: E402
+
+_RULE_CITE = re.compile(r"\brr? (\d+(?:\.\d+)+(?:(?:,| and) \d+(?:\.\d+)+)*)")
+_NUMBER = re.compile(r"\d+(?:\.\d+)+")
+
+
+class _GuideText(HTMLParser):
+    """Splits a guide page into its prose and its citation examples (<p class="g-cite ...">)."""
+
+    def __init__(self):
+        super().__init__()
+        self.prose: list[str] = []
+        self.examples: list[dict] = []  # {"kind": "was"|"redline"|"plain", "with_del", "with_ins"}
+        self._cur: dict | None = None
+        self._skip: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        classes = (dict(attrs).get("class") or "").split()
+        if tag in ("script", "style"):
+            self._skip.append(tag)
+        if tag == "p" and "g-cite" in classes:
+            kind = "was" if "g-was" in classes else "redline" if "g-redline" in classes else "plain"
+            self._cur = {"kind": kind, "with_del": "", "with_ins": "", "open": []}
+            self.examples.append(self._cur)
+        elif self._cur is not None and tag in ("del", "ins"):
+            self._cur["open"].append(tag)
+
+    def handle_endtag(self, tag):
+        if self._skip and tag == self._skip[-1]:
+            self._skip.pop()
+        if self._cur is None:
+            return
+        if tag == "p":
+            self._cur = None
+        elif tag in ("del", "ins") and self._cur["open"]:
+            self._cur["open"].pop()
+
+    def handle_data(self, data):
+        if self._skip:
+            return
+        if self._cur is None:
+            self.prose.append(data)
+            return
+        if "ins" not in self._cur["open"]:
+            self._cur["with_del"] += data  # the "as written" text: everything but insertions
+        if "del" not in self._cur["open"]:
+            self._cur["with_ins"] += data  # the AGLC4 text: everything but deletions
+
+
+def _guide_parts(path: str) -> _GuideText:
+    parser = _GuideText()
+    parser.feed(client.get(path).text)
+    return parser
+
+
+def _flat(text: str) -> str:
+    """Plain comparison text: no italics markup, one kind of space, no closing full stop."""
+    text = text.replace("\xa0", " ").replace("*", "")
+    return re.sub(r"\s+", " ", text).strip().rstrip(".").strip()
+
+
+def _rule_numbers(text: str) -> list[str]:
+    text = text.replace("\xa0", " ")
+    return [n for m in _RULE_CITE.finditer(text) for n in _NUMBER.findall(m[1])]
+
+
+def _known_rule_numbers() -> set[str]:
+    """Rule numbers the repo itself uses: in the formatter and document code (on lines that
+    cite a rule), and as the 'rule' of a golden example from the Guide."""
+    known: set[str] = set()
+    for path in (_REPO / "aglc").rglob("*.py"):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if re.search(r"\brr? ?\d", line):
+                known.update(_NUMBER.findall(line))
+    for path in (_REPO / "tests" / "aglc4_examples").glob("*.json"):
+        known.update(entry["rule"] for entry in json.loads(path.read_text(encoding="utf-8")))
+    return known
+
+
+def _example_corpus() -> str:
+    """Everything the guides' examples may come from: the golden examples (the Guide's own)
+    and the other tests. This file is left out so that it can't vouch for itself."""
+    pieces = []
+    for path in (_REPO / "tests" / "aglc4_examples").glob("*.json"):
+        for entry in json.loads(path.read_text(encoding="utf-8")):
+            pieces.append(entry.get("expected_full", ""))
+            pieces += [fn["expected"] for fn in entry.get("footnotes", [])]
+    for path in (_REPO / "tests").glob("test_*.py"):
+        if path.name != Path(__file__).name:
+            pieces.append(path.read_text(encoding="utf-8"))
+    return _flat("\n".join(pieces))
+
+
+def test_rule_number_guard_catches_an_invented_rule():
+    assert _rule_numbers("see r\xa09.9.9, and rr 1.4.3 and 1.1.6; also ch 2 and s 5, 10") == ["9.9.9", "1.4.3", "1.1.6"]
+    assert "9.9.9" not in _known_rule_numbers()
+    assert {"1.4.1", "1.4.3", "1.4.4", "1.1.6", "1.13", "3.1.4"} <= _known_rule_numbers()
+
+
+@pytest.mark.parametrize("path", GUIDE_PATHS)
+def test_guide_rule_numbers_are_ones_the_repo_knows(path):
+    prose = "".join(_guide_parts(path).prose)
+    unknown = sorted(set(_rule_numbers(prose)) - _known_rule_numbers())
+    assert not unknown, f"{path} cites rules that appear nowhere in aglc/ or tests/aglc4_examples: {unknown}"
+    code = "\n".join(p.read_text(encoding="utf-8") for p in (_REPO / "aglc").rglob("*.py"))
+    for chapter in re.findall(r"\b[Cc]hapters? (\d+)", prose):
+        assert re.search(rf"\bch(?:apter)? {chapter}\b", code), f"{path} cites chapter {chapter}"
+
+
+def test_guides_cite_rules_at_all():
+    cited = {n for path in GUIDE_PATHS for n in _rule_numbers("".join(_guide_parts(path).prose))}
+    assert {"1.4.1", "1.4.3", "1.4.4", "1.1.6", "1.13", "3.1.4"} <= cited
+
+
+@pytest.mark.parametrize("path", GUIDE_PATHS)
+def test_guide_examples_are_from_the_golden_examples_or_the_tests(path):
+    corpus = _example_corpus()
+    examples = _guide_parts(path).examples
+    assert examples
+    for ex in examples:
+        if ex["kind"] == "was":
+            continue
+        shown = _flat(ex["with_ins"])
+        assert shown in corpus, f"{path}: example not found in tests/: {shown!r}"
+
+
+@pytest.mark.parametrize("path", GUIDE_PATHS)
+def test_guide_before_and_after_examples_are_real_and_consistent(path):
+    from aglc.docx_io import read_footnotes
+
+    sample = _REPO / "tests" / "fixtures" / "sample_essay.docx"
+    originals = {_flat(f.original.to_markup()) for f in read_footnotes(sample)}
+    examples = _guide_parts(path).examples
+    for i, ex in enumerate(examples):
+        if ex["kind"] == "was":
+            # "As written" is a footnote from the sample essay, which test_end_to_end runs through the tool
+            assert _flat(ex["with_del"]) in originals, f"{path}: not a sample-essay footnote: {ex['with_del']!r}"
+            assert examples[i + 1]["kind"] == "redline"
+        if ex["kind"] == "redline":
+            # the redline, read without its insertions, is the line above it
+            assert examples[i - 1]["kind"] == "was"
+            assert _flat(ex["with_del"]) == _flat(examples[i - 1]["with_del"])
