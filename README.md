@@ -160,7 +160,17 @@ Hosting it publicly with payments on: see [DEPLOY.md](DEPLOY.md).
 ### HTTP API
 
 #### `GET /`
-Serves the web UI.
+Serves the web UI: the landing page and the tool are one page (`web/index.html`).
+
+#### `GET /privacy`, `/terms`, `/refunds`, `/about`
+Static pages (`web/pages/`), wrapped in `web/page.html`. Unknown facts are marked `[TODO: …]`.
+The brand name is one constant, `BRAND` in `aglc/site.py`, filled into every page.
+
+#### `GET /api/sample`
+The demo essay (`examples/test_essay.docx`), used by "Try a sample essay".
+
+#### `GET /status`
+`{"status": "ok", "version": "0.1.0", "payments": false}` for uptime checks.
 
 #### `GET /api/providers`
 ```json
@@ -211,13 +221,13 @@ Download the processed `.docx` file from a session.
 
 ### Web UI
 
-1. **Upload**: Drag-and-drop or click to select a `.docx` file
-2. **Configure**: Choose LLM, enable/disable tracked changes and bibliography
-3. **Process**: Click the "Process" button; results appear below
-4. **Review**: View summary, changed footnotes (highlighted), warnings, and bibliography
-5. **Download**: Click "Download" to save the processed `.docx`
+1. **Upload**: drop a `.docx` (10 MB max) on the drop zone, or click it (or press Enter); "Try a sample essay" uses the demo essay
+2. **Process**: "Check my footnotes" shows named stages while the AI model reads the footnotes
+3. **Review**: each footnote's original next to the AGLC4 result, marked Amended, Check or Unchanged; "Show changes" turns on the redline, "Next Check" jumps to the next footnote to look at
+4. **Download**: the `.docx` with every edit as a Word tracked change (with payments on, after unlocking)
 
-The UI is responsive and works on phones; light/dark mode follows system preference.
+The design system is in `DESIGN.md`. The UI works on phones; light/dark mode follows the system.
+Analytics (Plausible, cookieless) are off unless `AGLC_PLAUSIBLE_DOMAIN` is set.
 
 ## Architecture
 

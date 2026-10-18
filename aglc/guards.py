@@ -26,7 +26,8 @@ def max_upload_bytes() -> int:
 
 
 def too_large_message() -> str:
-    return f"That file is too large. The limit is {max_upload_bytes() / (1024 * 1024):g} MB."
+    return (f"That file is over {max_upload_bytes() / (1024 * 1024):g} MB. "
+            "Try saving a copy without images, then upload that.")
 
 
 class GuardMiddleware:

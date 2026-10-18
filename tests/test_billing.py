@@ -113,14 +113,17 @@ def test_process_returns_locked_preview(paid, client):
     assert [f["number"] for f in data["footnotes"]] == [f["number"] for f in full["footnotes"]]
     shown = [f for f in data["footnotes"] if f["changed"] and not f.get("locked")]
     assert [f["number"] for f in shown] == [f["number"] for f in changed[:3]]
+    by_number = {f["number"]: f for f in full["footnotes"]}
     for f in data["footnotes"]:
-        if f.get("locked"):
-            assert set(f) == {"number", "changed", "locked"}
+        if f.get("locked"):  # the student's original is shown, never the result
+            assert set(f) == {"number", "changed", "locked", "original", "original_html"}
+            assert f["original_html"] == by_number[f["number"]]["original_html"]
     assert data["locked_count"] == len(changed) - 3
     # All warnings; the bibliography is withheld but counted.
     assert data["warnings"] == full["warnings"]
     assert data["bibliography"] == [] and data["bibliography_entries"] > 0
-    assert "Mabo" not in json.dumps(data["footnotes"][-1])
+    last = data["footnotes"][-1]
+    assert by_number[last["number"]]["formatted"] not in json.dumps(last)
 
 
 def test_download_is_402_until_paid(paid, client):
@@ -627,7 +630,7 @@ def test_rerun_limit_holds(model, client):
     assert _rerun(client, sid).json()["reruns_left"] == 1
     assert _rerun(client, sid).json()["reruns_left"] == 0
     r = _rerun(client, sid)
-    assert r.status_code == 429 and "re-run" in r.json()["detail"]
+    assert r.status_code == 429 and "free re-reads" in r.json()["detail"]
 
 
 def test_rerun_with_nothing_to_read_is_free_and_unlimited(model, client):

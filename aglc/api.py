@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import shutil
 import tempfile
 import uuid
@@ -15,12 +16,12 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from lxml.etree import XMLSyntaxError
 
-from . import billing, guards, pipeline, retention
+from . import __version__, billing, guards, pipeline, retention, site
 from .docx_io import UnsafeDocxError
 from .llm.base import LLMError, available_providers, default_spec, get_provider
 from .models import ProcessResult
@@ -42,16 +43,32 @@ def _status_for(e: Exception) -> int:
 
 
 def _describe(e: Exception) -> str:
-    """What the client is told. Never the exception's own text (it can carry provider
+    """What the page is told. Never the exception's own text (it can carry provider
     responses, paths or footnote text); that goes to the server log."""
     if isinstance(e, _NOT_A_DOCX):
-        return "That file isn't a valid Word (.docx) document."
+        return "That file isn't a valid Word (.docx) document. Open it in Word and save it as .docx, then try again."
     status = _status_for(e)
     if status == 400:
-        return "The request couldn't be processed. Check the file and options, then try again."
+        return "That document couldn't be read. Check it opens in Word as a .docx, then try again."
     if status == 502:
-        return "The AI model request failed. Please try again in a minute (the server log has the details)."
-    return "Error processing document. Please try again (the server log has the details)."
+        return "The AI model didn't respond. Nothing has been charged; please try again in a minute."
+    return "Something went wrong processing your document. Nothing has been charged; please try again."
+
+
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+_WRONG_TYPE = {
+    ".doc": "That's an older Word .doc file. Open it in Word, choose File > Save As > Word Document (.docx), then upload that.",
+    ".pdf": "That's a PDF. This tool edits Word documents: upload the .docx you wrote the essay in.",
+    ".pages": "That's a Pages file. In Pages, choose File > Export To > Word, then upload the .docx.",
+    ".odt": "That's an OpenDocument file. Save it as Word (.docx), then upload that.",
+    ".rtf": "That's an RTF file. Save it as Word (.docx), then upload that.",
+}
+
+
+def wrong_type_message(filename: str | None) -> str:
+    suffix = Path(filename or "").suffix.lower()
+    return _WRONG_TYPE.get(suffix, "This tool reads Word documents (.docx) only. Save your essay as .docx, then upload that.")
 
 load_env()
 
@@ -74,6 +91,7 @@ async def _lifespan(app: FastAPI):
 app = FastAPI(title="AGLC4 Citation Tool API", lifespan=_lifespan)
 app.add_middleware(guards.GuardMiddleware)  # 413 over $AGLC_MAX_UPLOAD_MB, security headers
 app.include_router(billing.router)  # every route 404s unless AGLC_PAYMENTS is set
+app.mount("/assets", StaticFiles(directory=site.WEB_DIR / "assets", check_dir=False), name="assets")
 guards.install_log_redaction()
 
 
@@ -98,15 +116,31 @@ def _clean_provider(spec: str | None) -> str | None:
 
 
 @app.get("/")
-async def root() -> FileResponse:
-    """Serve the web UI."""
-    web_dir = Path(__file__).parent.parent / "web"
-    index_file = web_dir / "index.html"
+async def root(request: Request) -> HTMLResponse:
+    """Serve the web UI (the landing page and the tool are one page)."""
+    return site.index(request)
 
-    if not index_file.exists():
-        raise HTTPException(status_code=404, detail="index.html not found")
 
-    return FileResponse(index_file, media_type="text/html")
+@app.get("/privacy")
+@app.get("/terms")
+@app.get("/refunds")
+@app.get("/about")
+async def static_page(request: Request) -> HTMLResponse:
+    return site.page(request.url.path.strip("/"), request)
+
+
+@app.get("/api/sample")
+async def sample_essay() -> FileResponse:
+    """The demo essay (examples/test_essay.docx), so "Try a sample essay" needs no upload."""
+    if not site.SAMPLE_ESSAY.is_file():
+        raise HTTPException(status_code=404, detail="The sample essay isn't available")
+    return FileResponse(site.SAMPLE_ESSAY, media_type=DOCX_TYPE, filename="sample-essay.docx")
+
+
+@app.get("/status")
+async def service_status() -> dict:
+    """For uptime checks: the server is up and whether payments are on."""
+    return {"status": "ok", "version": __version__, "payments": billing.enabled()}
 
 
 # ---- API endpoints --------------------------------------------------------- #
@@ -123,7 +157,7 @@ async def get_providers() -> dict:
         return {"providers": providers, "default": default_spec()}
     except Exception as e:
         log.exception("listing providers failed")
-        raise HTTPException(status_code=500, detail="Error listing providers") from e
+        raise HTTPException(status_code=500, detail="Couldn't list the AI model providers.") from e
 
 
 async def _save_upload(file: UploadFile, dest: Path) -> None:
@@ -163,7 +197,9 @@ async def process_document(
     """
     # Validate file type
     if not file.filename or not file.filename.lower().endswith(".docx"):
-        raise HTTPException(status_code=400, detail="File must be a .docx document")
+        raise HTTPException(status_code=400, detail=wrong_type_message(file.filename))
+    if file.size is not None and file.size > guards.max_upload_bytes():
+        raise HTTPException(status_code=413, detail=guards.too_large_message())
 
     paid = billing.enabled()
     visitor = billing.admit(request, response) if paid else None  # free-use quotas: 429
@@ -281,7 +317,7 @@ def _result_json(session_id: str, result: ProcessResult) -> dict:
         entries = [_richtext_to_html(entry) for entry in section.entries]
         bibliography.append({"heading": section.heading, "entries": entries})
 
-    warnings = [{"footnote": w.footnote, "message": w.message} for w in result.warnings]
+    warnings = [{"footnote": w.footnote, "message": _public_warning(w.message)} for w in result.warnings]
 
     return {
         "id": session_id,
@@ -335,6 +371,15 @@ async def download_document(session_id: str) -> FileResponse:
 
 
 # ---- Utilities ------------------------------------------------------------ #
+
+
+_FAILED_DETAIL = re.compile(r"^(extraction failed for footnotes \[[\d,\s]+\]):.*?(; left unchanged)$", re.I | re.S)
+
+
+def _public_warning(message: str) -> str:
+    """Drop the provider's error text from a failed-extraction warning (the extractor logs it).
+    pipeline.failed_footnotes still recognises what is left."""
+    return _FAILED_DETAIL.sub(r"\1\2", message)
 
 
 def _richtext_to_html(richtext) -> str:

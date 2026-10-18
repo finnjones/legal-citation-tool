@@ -117,7 +117,7 @@ def test_zip_bomb_by_total_size_is_refused(paid, client, monkeypatch):
     bomb = _docx_with(ESSAY, add={"word/media/zeros.bin": b"\0" * (3 * 1024 * 1024)})
     assert len(bomb) < 100_000  # it really is small on the wire
     r = _upload(client, bomb)
-    assert r.status_code == 400 and r.json()["detail"] == "That file isn't a valid Word (.docx) document."
+    assert r.status_code == 400 and r.json()["detail"].startswith("That file isn't a valid Word (.docx) document.")
     paid.assert_not_called()  # refused before any AI model call
 
 

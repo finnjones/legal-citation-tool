@@ -1,470 +1,682 @@
 <!DOCTYPE html>
 <!--
-THESIS: The essay is lodged like a brief and every footnote is entered in a register and stamped. This refuses the SaaS dropzone-plus-table.
-OWN-WORLD: Cool registry-counter grey ground, near-white sheets, one buff backsheet tied with pink tape, violet stamp ink, refer red. Serif citations, system-sans UI, a typed Courier line on the backsheet only.
-STORY: A student lodges an essay, sees every footnote stamped AMENDED / UNCHANGED / REFER, checks the redline where they doubt it, and downloads.
-FIRST VIEWPORT: Masthead; backsheet (drop zone, options, Process) left, "how it works" right. Results add a pinned strip (filters, markup, Download) over the register.
-FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit (the register previews the document; Download commits). Seed 53960d8c.
+THESIS: The page is the tool. The hero holds the upload, and the first proof is three real footnotes in redline. It refuses both the SaaS gradient hero and the costume of court ephemera.
+OWN-WORLD: Chambers. Warm paper ground, white sheets, ink-navy text, one navy accent; 1px hairlines and one tonal step for structure; Source Serif 4 for headlines and every citation, Inter for UI; quiet word badges (Amended / Check / Unchanged); red strikes deletions, green underlines insertions, amber means Check.
+STORY: A law student near a deadline sees what this does, sees it done to real footnotes, learns the AI only reads and tested code formats, sees the price, drops the essay, reviews every change and downloads tracked changes.
+FIRST VIEWPORT: Header with the serif wordmark. Left: the headline, one sentence, three plain facts. Right: the upload card (drop zone, limits, two options, Check my footnotes, privacy line, Try a sample essay).
+FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview before commit; the register previews the document and Download commits.
 -->
-<html lang="en">
+<html lang="en-AU">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AGLC4 Citation Tool</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400;1,8..60,600&display=swap" rel="stylesheet">
+    {{> head}}
+    <title>AGLC4 Citation Checker and Fixer for Word (.docx)</title>
+    <meta name="description" content="Upload your Word essay and every footnote is fixed to AGLC4: Ibid, (n x), short titles and an optional bibliography, returned as Word tracked changes. {{price}} per document; the first {{preview_full}} fixes are free.">
+    <link rel="canonical" href="{{base_url}}/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{brand}}">
+    <meta property="og:title" content="AGLC4 Citation Checker and Fixer for Word (.docx)">
+    <meta property="og:description" content="Fix every AGLC4 footnote in your essay, as Word tracked changes. {{price}} per document, first {{preview_full}} fixes free, no account.">
+    <meta property="og:url" content="{{base_url}}/">
+    <meta property="og:image" content="{{base_url}}/assets/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="A footnote before and after AGLC4 formatting, shown as a tracked change.">
+    <meta property="og:locale" content="en_AU">
+    <meta name="twitter:card" content="summary_large_image">
     <style>
-        :root {
-            --ground: oklch(0.93 0.008 150);
-            --sheet: oklch(0.995 0.002 100);
-            --sheet-2: oklch(0.97 0.004 150);
-            --ink: oklch(0.22 0.02 260);
-            --ink-2: oklch(0.46 0.02 260);
-            --rule: oklch(0.86 0.01 250);
-            --buff: oklch(0.87 0.055 82);
-            --buff-deep: oklch(0.8 0.065 78);
-            --buff-ink: oklch(0.3 0.04 60);
-            --buff-ink-2: oklch(0.42 0.045 65);
-            --tape: oklch(0.74 0.12 2);
-            --tape-deep: oklch(0.64 0.13 2);
-            --stamp: oklch(0.45 0.16 295);
-            --stamp-wash: oklch(0.45 0.16 295 / 0.08);
-            --refer: oklch(0.52 0.19 25);
-            --refer-wash: oklch(0.52 0.19 25 / 0.07);
-            --focus: oklch(0.55 0.16 295);
-            --shadow: 0 1px 1px oklch(0.3 0.02 250 / 0.06), 0 3px 10px -2px oklch(0.3 0.02 250 / 0.12);
-            --shadow-board: 0 2px 2px oklch(0.3 0.04 60 / 0.1), 0 10px 24px -8px oklch(0.3 0.04 60 / 0.3);
-
-            --font-cite: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
-            --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-            --font-typed: "Courier Prime", "Courier New", monospace;
-            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-            color-scheme: light;
+        /* ---- Hero ---------------------------------------------------------- */
+        .hero { padding: 72px 0 96px; }
+        .hero .container {
+            display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+            grid-template-areas: "copy card" "facts card"; grid-template-rows: auto 1fr;
+            gap: 0 64px; align-items: start;
         }
-
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme="light"]) {
-                --ground: oklch(0.18 0.012 260);
-                --sheet: oklch(0.23 0.012 260);
-                --sheet-2: oklch(0.205 0.012 260);
-                --ink: oklch(0.93 0.008 250);
-                --ink-2: oklch(0.72 0.015 250);
-                --rule: oklch(0.33 0.014 260);
-                --buff: oklch(0.44 0.05 75);
-                --buff-deep: oklch(0.38 0.05 72);
-                --buff-ink: oklch(0.95 0.02 85);
-                --buff-ink-2: oklch(0.85 0.03 80);
-                --tape: oklch(0.62 0.11 2);
-                --tape-deep: oklch(0.54 0.11 2);
-                --stamp: oklch(0.76 0.12 295);
-                --stamp-wash: oklch(0.76 0.12 295 / 0.1);
-                --refer: oklch(0.74 0.15 25);
-                --refer-wash: oklch(0.74 0.15 25 / 0.1);
-                --focus: oklch(0.76 0.12 295);
-                --shadow: 0 1px 1px oklch(0 0 0 / 0.3), 0 3px 10px -2px oklch(0 0 0 / 0.4);
-                --shadow-board: 0 2px 2px oklch(0 0 0 / 0.3), 0 10px 24px -8px oklch(0 0 0 / 0.55);
-                color-scheme: dark;
-            }
+        .hero-copy { grid-area: copy; }
+        .facts { grid-area: facts; }
+        .upload-card { grid-area: card; }
+        .hero h1 {
+            font-family: var(--font-serif); font-weight: 600;
+            font-size: clamp(2.125rem, 1.4rem + 2.6vw, 3.25rem); line-height: 1.1; letter-spacing: -0.018em;
+            text-wrap: balance; max-width: 15ch;
         }
-
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: var(--font-ui);
-            font-size: 0.9375rem;
-            line-height: 1.5;
-            background-color: var(--ground);
-            color: var(--ink);
-            -webkit-font-smoothing: antialiased;
+        .hero .lede { margin-top: 20px; font-size: 1.125rem; line-height: 1.6; color: var(--muted); max-width: 52ch; }
+        .hero .lede cite { color: var(--ink); }
+        .facts { list-style: none; margin-top: 32px; border-top: 1px solid var(--hairline); max-width: 52ch; }
+        .facts li {
+            display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px;
+            padding: 14px 0; border-bottom: 1px solid var(--hairline); font-size: 0.9375rem;
         }
+        .facts svg { width: 20px; height: 20px; color: var(--accent); margin-top: 2px; }
+        .facts strong { font-weight: 600; }
 
-        :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-
-        .container { max-width: 1080px; margin: 0 auto; padding: 0 24px 64px; }
-
-        /* Masthead */
-        .masthead {
-            display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
-            padding: 28px 0 22px; margin-bottom: 28px; border-bottom: 1px solid var(--rule);
+        /* ---- Upload card --------------------------------------------------- */
+        .upload-card {
+            background: var(--sheet); border: 1px solid var(--hairline); border-radius: 8px;
+            box-shadow: var(--shadow-card); padding: 24px;
         }
-        h1 { font-size: 1.0625rem; font-weight: 700; letter-spacing: -0.01em; }
-        h1 span { font-weight: 400; color: var(--ink-2); }
-        .masthead p { color: var(--ink-2); font-size: 0.8125rem; }
-        .masthead p cite { font-family: var(--font-cite); font-size: 0.9375rem; }
-
-        /* Lodge row */
-        .lodge { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; align-items: start; }
-
-        /* The backsheet: the one board in the world */
-        .backsheet {
-            position: relative;
-            background-color: var(--buff);
-            color: var(--buff-ink);
-            border-radius: 3px;
-            box-shadow: var(--shadow-board);
-            padding: 28px 28px 28px 76px;
-            transition: background-color 0.25s var(--ease-out);
-        }
-        .backsheet::before { /* pink tape */
-            content: ""; position: absolute; top: 0; bottom: 0; left: 30px; width: 16px;
-            background: linear-gradient(90deg, var(--tape-deep), var(--tape) 30%, var(--tape) 70%, var(--tape-deep));
-            box-shadow: 1px 0 2px oklch(0.3 0.05 20 / 0.25);
-        }
-        .backsheet.dragover { background-color: var(--buff-deep); }
-
         .dropzone {
-            display: block;
-            border: 1.5px dashed color-mix(in oklch, var(--buff-ink) 35%, transparent);
-            border-radius: 3px;
-            padding: 20px 20px 22px;
-            cursor: pointer;
-            transition: border-color 0.2s, background-color 0.2s;
+            width: 100%; display: grid; justify-items: center; gap: 6px; text-align: center;
+            padding: 32px 20px; border-radius: 8px;
+            border: 1.5px dashed color-mix(in srgb, var(--muted) 70%, var(--sheet-2)); background: var(--sheet-2);
+            transition: border-color 0.15s, background-color 0.15s;
         }
-        .dropzone:hover, .backsheet.dragover .dropzone {
-            border-color: var(--buff-ink);
-            background-color: color-mix(in oklch, var(--sheet) 12%, transparent);
+        .dropzone svg { width: 28px; height: 28px; color: var(--accent); margin-bottom: 6px; }
+        .dropzone:hover, .upload-card.dragover .dropzone { border-color: var(--accent); background: var(--accent-wash); }
+        .dz-title { font-weight: 600; font-size: 1.0625rem; overflow-wrap: anywhere; }
+        .dz-sub { color: var(--muted); font-size: 0.875rem; }
+        .upload-card.has-file .dropzone { border-style: solid; border-color: var(--accent); }
+        .limits { margin-top: 12px; text-align: center; color: var(--muted); font-size: 0.875rem; }
+        .options { border: 0; margin-top: 20px; display: grid; gap: 4px; }
+        .option {
+            display: flex; align-items: center; gap: 10px; min-height: 32px;
+            font-size: 0.9375rem; cursor: pointer; width: fit-content;
         }
-        .dropzone:has(:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
-        .file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+        .option input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex: none; }
+        .option small { color: var(--muted); font-size: 0.8125rem; }
+        .upload-card .btn-primary { margin-top: 20px; }
+        .privacy-note { margin-top: 12px; color: var(--muted); font-size: 0.8125rem; text-align: center; }
+        .privacy-note a { color: var(--muted); }
+        .sample { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); text-align: center; font-size: 0.875rem; color: var(--muted); }
 
-        .matter-label {
-            font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-            color: var(--buff-ink-2); margin-bottom: 6px;
+        /* Processing stages */
+        .progress h2 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+        .progress > p { margin-top: 4px; color: var(--muted); font-size: 0.875rem; }
+        .stages { list-style: none; margin-top: 20px; display: grid; gap: 2px; }
+        .stage {
+            display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+            padding: 10px 0; color: var(--muted); font-size: 0.9375rem;
         }
-        .matter-title {
-            font-family: var(--font-typed); font-size: 1.25rem; font-weight: 700; line-height: 1.3;
-            overflow-wrap: anywhere; min-height: 1.3em;
-        }
-        .matter-title.empty { font-weight: 400; color: var(--buff-ink-2); }
-        .matter-hint { margin-top: 8px; font-size: 0.875rem; color: var(--buff-ink-2); }
-        .matter-hint u { text-underline-offset: 3px; }
-
-        .particulars { margin-top: 22px; display: grid; gap: 14px; }
-        .field-label {
-            display: block; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em;
-            text-transform: uppercase; color: var(--buff-ink-2); margin-bottom: 6px;
-        }
-
-        .options { display: flex; flex-wrap: wrap; gap: 8px 24px; }
-        .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9375rem; }
-        .check input { width: 17px; height: 17px; accent-color: var(--stamp); cursor: pointer; }
-
-        .actions { margin-top: 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-        .status {
-            font-family: var(--font-typed); font-size: 0.875rem; color: var(--buff-ink-2);
-            min-height: 1.3em;
-        }
-
-        button { font-family: var(--font-ui); font-size: 0.9375rem; cursor: pointer; }
-        .btn-primary {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: var(--ink); color: var(--sheet);
-            border: 1px solid var(--ink); border-radius: 4px;
-            padding: 10px 18px; font-weight: 600;
-            box-shadow: 0 1px 2px oklch(0.2 0.02 260 / 0.25);
-            transition: transform 0.12s var(--ease-out), background-color 0.2s, box-shadow 0.2s;
-        }
-        .btn-primary:hover:not(:disabled) { background: color-mix(in oklch, var(--ink) 85%, var(--stamp)); }
-        .btn-primary:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
-        .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
-        .btn-primary svg { width: 16px; height: 16px; flex: none; }
-
-        .busy-rule { /* indeterminate progress: a typist's dotted rule */
-            display: none; height: 2px; margin-top: 18px; border-radius: 1px;
-            background: repeating-linear-gradient(90deg, var(--buff-ink) 0 6px, transparent 6px 12px);
-            background-size: 24px 2px; opacity: 0.55;
-            animation: typing 0.9s linear infinite;
-        }
-        .backsheet.busy .busy-rule { display: block; }
-        @keyframes typing { to { background-position: 24px 0; } }
-
-        .backsheet > .stamp { position: absolute; bottom: 26px; right: 24px; }
-
-        /* How it works */
-        .how { padding-top: 6px; }
-        .how h2 { font-size: 0.9375rem; font-weight: 700; margin-bottom: 12px; }
-        .how ol { list-style: none; counter-reset: how; display: grid; gap: 14px; }
-        .how li { counter-increment: how; display: grid; grid-template-columns: 22px 1fr; gap: 4px 8px; color: var(--ink-2); max-width: 44ch; }
-        .how li::before { content: counter(how); font-family: var(--font-cite); font-weight: 600; color: var(--ink); }
-        .how li strong { color: var(--ink); font-weight: 600; }
-
-        /* Messages */
-        .error {
-            display: none; margin-top: 24px; padding: 14px 18px;
-            background: var(--refer-wash); color: var(--ink);
-            border: 1px solid color-mix(in oklch, var(--refer) 40%, transparent); border-radius: 4px;
-        }
-        .error strong { color: var(--refer); margin-right: 6px; }
-        .notice {
-            display: none; margin-top: 24px; padding: 14px 18px;
-            background: var(--stamp-wash); color: var(--ink);
-            border: 1px solid color-mix(in oklch, var(--stamp) 35%, transparent); border-radius: 4px;
-            font-family: var(--font-typed);
-        }
-
-        /* Stamps */
-        .stamp {
-            --tilt: -3deg;
-            display: inline-block; justify-self: end; align-self: start;
-            font-family: var(--font-ui); font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.14em;
-            text-transform: uppercase; white-space: nowrap; line-height: 1;
-            color: var(--stamp);
-            padding: 6px 8px 5px;
-            border: 2px solid currentColor; border-radius: 3px;
-            box-shadow: inset 0 0 0 1.5px var(--sheet), inset 0 0 0 2.5px currentColor;
-            transform: rotate(var(--tilt));
-            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 1.9'/%3E%3C/filter%3E%3Crect width='120' height='40' filter='url(%23n)'/%3E%3C/svg%3E");
-            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 1.9'/%3E%3C/filter%3E%3Crect width='120' height='40' filter='url(%23n)'/%3E%3C/svg%3E");
-        }
-        .stamp.refer { color: var(--refer); }
-        .stamp.unchanged { color: var(--ink-2); opacity: 0.8; }
-        .stamp.received { box-shadow: inset 0 0 0 1.5px var(--buff), inset 0 0 0 2.5px currentColor; text-align: center; }
-        .stamp.received small { display: block; margin-top: 4px; font-size: 0.625rem; letter-spacing: 0.1em; }
-
+        .stage + .stage { border-top: 1px solid var(--hairline); }
+        .stage .mark { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--hairline-strong); display: grid; place-items: center; }
+        .stage .mark svg { width: 12px; height: 12px; opacity: 0; }
+        .stage .time { font-variant-numeric: tabular-nums; font-size: 0.8125rem; }
+        .stage.current { color: var(--ink); font-weight: 500; }
+        .stage.current .mark { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 3.5px, transparent 4px); }
+        .stage.done { color: var(--ink); }
+        .stage.done .mark { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+        .stage.done .mark svg { opacity: 1; }
         @media (prefers-reduced-motion: no-preference) {
-            .stamp.land { animation: land 0.32s var(--ease-out) both; animation-delay: var(--delay, 0ms); }
+            .stage.current .mark { animation: pulse 1.6s var(--ease-out) infinite; }
         }
-        @keyframes land {
-            0% { opacity: 0; transform: rotate(var(--tilt)) scale(1.5); }
-            60% { opacity: 1; }
-            100% { opacity: 1; transform: rotate(var(--tilt)) scale(1); }
+        @keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--accent-wash); } }
+
+        /* ---- Banners --------------------------------------------------------- */
+        .banner {
+            border: 1px solid var(--hairline); background: var(--sheet); border-radius: 8px;
+            padding: 16px 20px; display: grid; gap: 6px; font-size: 0.9375rem;
+        }
+        .banner + .banner { margin-top: 12px; }
+        .banner .label { font-weight: 600; }
+        .banner.check { border-color: color-mix(in srgb, var(--check) 35%, var(--hairline)); background: color-mix(in srgb, var(--check-wash) 60%, var(--sheet)); }
+        .banner.check .label { color: var(--check); }
+        .banner.ok .label { color: var(--accent); }
+        .banner.error { border-color: var(--hairline-strong); }
+        .banner p { max-width: 75ch; }
+        .banner .actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 8px; }
+        .banner ul { padding-left: 1.2em; display: grid; gap: 4px; }
+        .upload-card .banner { margin-top: 16px; }
+        .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+        .copy-row code {
+            font-family: var(--font-ui); font-size: 0.8125rem; background: var(--sheet-2); border: 1px solid var(--hairline);
+            border-radius: 4px; padding: 4px 8px; overflow-wrap: anywhere; color: var(--muted); max-width: 100%;
         }
 
-        /* Register */
-        .results-section { display: none; margin-top: 48px; }
-        .register-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-        h2.section-title { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.015em; }
-        .register-head p { color: var(--ink-2); font-size: 0.875rem; }
-
-        .strip {
-            position: sticky; top: 0; z-index: 5;
-            display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
-            padding: 10px 0; margin-bottom: 14px;
-            background: color-mix(in oklch, var(--ground) 92%, transparent);
-            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            border-bottom: 1px solid var(--rule);
+        /* ---- Landing sections ---------------------------------------------- */
+        .section { padding: 96px 0; border-top: 1px solid var(--hairline); }
+        .section-head { max-width: 62ch; margin-bottom: 40px; }
+        .section h2 {
+            font-family: var(--font-serif); font-size: 1.875rem; font-weight: 600; line-height: 1.2;
+            letter-spacing: -0.012em; text-wrap: balance;
         }
-        .filters { display: flex; gap: 4px; flex-wrap: wrap; }
-        .filter {
-            display: inline-flex; align-items: baseline; gap: 6px;
-            padding: 6px 11px; border-radius: 4px;
-            background: transparent; color: var(--ink-2); border: 1px solid transparent;
-            font-weight: 500; transition: background-color 0.15s, color 0.15s;
-        }
-        .filter:hover { color: var(--ink); background: var(--sheet-2); }
-        .filter[aria-pressed="true"] { color: var(--ink); background: var(--sheet); border-color: var(--rule); box-shadow: var(--shadow); }
-        .filter .count { font-variant-numeric: tabular-nums; font-weight: 700; }
-        .filter[data-filter="amended"] .count { color: var(--stamp); }
-        .filter[data-filter="refer"] .count { color: var(--refer); }
-        .filter:disabled { opacity: 0.45; cursor: default; }
-        .filter:disabled:hover { background: transparent; color: var(--ink-2); }
+        .section-head p { margin-top: 12px; color: var(--muted); font-size: 1.0625rem; }
 
-        .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--ink-2); font-weight: 500; }
-        .switch input { appearance: none; -webkit-appearance: none; width: 30px; height: 18px; border-radius: 9px; background: var(--rule); position: relative; cursor: pointer; transition: background-color 0.2s; }
-        .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--sheet); box-shadow: 0 1px 2px oklch(0 0 0 / 0.25); transition: transform 0.2s var(--ease-out); }
-        .switch input:checked { background: var(--stamp); }
-        .switch input:checked::after { transform: translateX(12px); }
-        .switch:has(input:checked) { color: var(--ink); }
-        .strip .btn-primary { margin-left: auto; max-width: 100%; }
-        #downloadLabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32ch; }
-        #downloadLabel.wrap { white-space: normal; max-width: 44ch; text-align: left; }
-
-        .general-notes {
-            background: var(--sheet); border-radius: 3px; box-shadow: var(--shadow);
-            padding: 14px 20px; margin-bottom: 14px; display: grid; gap: 6px;
+        .steps { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; counter-reset: step; }
+        .steps li { counter-increment: step; border-top: 1px solid var(--ink); padding-top: 20px; }
+        .steps li::before {
+            content: counter(step); display: block; font-family: var(--font-serif); font-size: 1.5rem; font-weight: 600;
+            line-height: 1; color: var(--accent); margin-bottom: 16px;
         }
-        .general-notes p { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: baseline; }
+        .steps h3 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; }
+        .steps p { margin-top: 8px; color: var(--muted); font-size: 0.9375rem; }
 
-        .register { list-style: none; background: var(--sheet); border-radius: 3px; box-shadow: var(--shadow); }
-        .entry {
-            display: grid; grid-template-columns: 56px minmax(0, 1fr) 118px; gap: 0 16px;
-            padding: 18px 20px 18px 0; border-top: 1px solid var(--rule);
+        .coverage { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+        .coverage caption { text-align: left; }
+        .coverage th, .coverage td { text-align: left; vertical-align: top; padding: 16px 16px 16px 0; border-top: 1px solid var(--hairline); }
+        .coverage thead th { font-size: 0.8125rem; font-weight: 500; color: var(--muted); padding-top: 0; border-top: 0; }
+        .coverage tbody th { font-weight: 600; width: 22%; }
+        .coverage td.rules { color: var(--muted); white-space: nowrap; width: 18%; font-variant-numeric: tabular-nums; }
+        .coverage tbody tr:last-child > * { border-bottom: 1px solid var(--hairline); }
+        .flags { margin-top: 56px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 40px; }
+        .flags h3 { font-family: var(--font-serif); font-size: 1.375rem; font-weight: 600; line-height: 1.3; }
+        .flags h3 + p { margin-top: 8px; color: var(--muted); font-size: 0.9375rem; }
+        .flags ul { list-style: none; border-top: 1px solid var(--hairline); }
+        .flags li { padding: 14px 0; border-bottom: 1px solid var(--hairline); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: baseline; font-size: 0.9375rem; }
+
+        .pricing-card {
+            max-width: 560px; background: var(--sheet); border: 1px solid var(--hairline); border-radius: 8px; padding: 32px;
         }
-        .entry:first-child { border-top: 0; }
+        .pricing-card .price { font-family: var(--font-serif); font-size: 2.5rem; font-weight: 600; line-height: 1.1; letter-spacing: -0.015em; }
+        .pricing-card .price span { font-family: var(--font-ui); font-size: 1rem; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+        .pricing-card .sub { margin-top: 8px; font-size: 1.0625rem; }
+        .pricing-card ul { list-style: none; margin-top: 24px; border-top: 1px solid var(--hairline); }
+        .pricing-card li { padding: 12px 0; border-bottom: 1px solid var(--hairline); display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; font-size: 0.9375rem; }
+        .pricing-card li svg { width: 18px; height: 18px; color: var(--accent); margin-top: 3px; }
+        .pricing-card .btn { margin-top: 24px; }
+        .refund-line { margin-top: 16px; color: var(--muted); font-size: 0.875rem; max-width: 560px; }
+
+        .faq { max-width: 760px; border-top: 1px solid var(--hairline); }
+        .faq details { border-bottom: 1px solid var(--hairline); }
+        .faq summary {
+            list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 16px; align-items: center;
+            padding: 18px 0; font-weight: 600; font-size: 1.0625rem; min-height: 44px;
+        }
+        .faq summary::-webkit-details-marker { display: none; }
+        .faq summary svg { width: 18px; height: 18px; color: var(--muted); flex: none; transition: transform 0.2s var(--ease-out); }
+        .faq details[open] summary svg { transform: rotate(45deg); }
+        .faq .answer { padding: 0 0 20px; color: var(--muted); max-width: 68ch; display: grid; gap: 10px; }
+        .faq .answer strong { color: var(--ink); font-weight: 600; }
+
+        /* ---- Register (shared by the example and the results) --------------- */
+        .register { background: var(--sheet); border: 1px solid var(--hairline); border-radius: 8px; }
+        .register-head, .entry {
+            display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr) 112px; gap: 0 24px;
+            padding: 0 20px 0 0;
+        }
+        .register-head {
+            font-size: 0.8125rem; font-weight: 500; color: var(--muted);
+            background: var(--sheet-2); border-bottom: 1px solid var(--hairline); border-radius: 8px 8px 0 0;
+        }
+        .register-head > span { padding: 10px 0; }
+        .register-head > span:first-child { text-align: right; padding-right: 16px; }
+        .entry { border-top: 1px solid var(--hairline); padding-top: 18px; padding-bottom: 18px; }
+        .register-head + .entry, .entry:first-child { border-top: 0; }
         .entry[hidden] { display: none; }
-        .entry.refer { background: var(--refer-wash); }
-        .margin-no {
-            text-align: right; padding-right: 14px; border-right: 1px solid var(--rule);
-            font-family: var(--font-cite); font-size: 0.9375rem; font-weight: 600; color: var(--ink-2);
-            font-variant-numeric: tabular-nums; line-height: 1.65;
+        .entry.gap { display: grid; padding-top: 10px; padding-bottom: 10px; color: var(--muted); font-size: 0.875rem; background: var(--sheet-2); }
+        .entry.gap .e-no { font-size: 1rem; line-height: 1.5; }
+        .entry.gap > span:last-child { grid-column: 2 / -1; }
+        .entry:focus-visible { outline-offset: -2px; }
+        .e-no {
+            text-align: right; padding-right: 16px; font-family: var(--font-serif); font-weight: 600;
+            color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.7;
         }
-        .cite { font-family: var(--font-cite); font-size: 1.0625rem; line-height: 1.55; max-width: 72ch; overflow-wrap: anywhere; }
+        .e-label { display: none; font-size: 0.8125rem; font-weight: 500; color: var(--muted); margin-bottom: 2px; }
+        .cite { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.6; overflow-wrap: anywhere; }
         .cite em { font-style: italic; }
-        .was {
-            font-size: 0.9375rem; color: var(--ink-2); margin-bottom: 6px;
-            text-decoration: line-through; text-decoration-thickness: 1px;
-            text-decoration-color: color-mix(in oklch, var(--ink-2) 55%, transparent);
+        .e-orig .cite { color: var(--muted); }
+        .e-status { justify-self: end; padding-top: 3px; }
+        .entry .placeholder { font-family: var(--font-ui); font-size: 0.875rem; color: var(--muted); line-height: 1.7; display: flex; gap: 8px; align-items: baseline; }
+        .entry .placeholder svg { width: 14px; height: 14px; flex: none; align-self: center; }
+        .notes { margin-top: 10px; display: grid; gap: 6px; font-size: 0.875rem; }
+        .notes p { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: baseline; }
+        .notes p::before { content: "Check"; font-weight: 600; color: var(--check); }
+        .chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .chip {
+            display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px;
+            font-size: 0.75rem; font-weight: 500; color: var(--muted);
+            border: 1px solid var(--hairline); border-radius: 4px; white-space: nowrap; font-variant-numeric: tabular-nums;
         }
-        .sr-only, .was-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-        .entry.unchanged .cite.now { color: var(--ink-2); }
-        .register.markup .was { display: none; }
-        .now ins { text-decoration: underline; text-decoration-color: var(--stamp); text-decoration-thickness: 2px; text-underline-offset: 3px; background: var(--stamp-wash); color: inherit; }
-        .now del { color: var(--ink-2); text-decoration-thickness: 1px; }
-        .now del + ins, .now ins + del { margin-left: 0.25em; }
-        .missing { font-family: var(--font-ui); font-size: 0.8125rem; font-weight: 600; color: var(--refer); background: var(--refer-wash); padding: 1px 4px; border-radius: 2px; }
-        .notes { margin-top: 10px; display: grid; gap: 4px; font-size: 0.875rem; color: var(--ink); max-width: 72ch; }
-        .notes p::before { content: "Warning: "; font-weight: 700; color: var(--refer); }
-        .entry .stamp { margin-top: 2px; }
-        .locked-note {
-            display: inline-block; font-family: var(--font-ui); font-size: 0.875rem; color: var(--ink-2);
-            padding: 2px 10px; border: 1px dashed var(--rule); border-radius: 3px;
-        }
-        .paywall strong { font-weight: 600; }
-        .bibliography .locked-note { margin-top: 2px; }
 
-        .empty-filter { padding: 28px 20px; color: var(--ink-2); text-align: center; }
-
-        /* Bibliography */
-        .bibliography-wrap { margin-top: 48px; }
-        .bibliography { background: var(--sheet); border-radius: 3px; box-shadow: var(--shadow); padding: 28px 32px 32px; margin-top: 12px; }
-        .bibliography h3 {
-            font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-            color: var(--ink-2); margin: 28px 0 12px;
+        .badge {
+            display: inline-flex; align-items: center; min-height: 24px; padding: 4px 7px; border-radius: 4px;
+            font-size: 0.75rem; font-weight: 600; line-height: 1; letter-spacing: 0.01em; white-space: nowrap;
+            border: 1px solid currentColor;
         }
+        .badge.amended { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+        .badge.check { color: var(--check); border-color: color-mix(in srgb, var(--check) 45%, transparent); background: var(--check-wash); }
+        .badge.unchanged { color: var(--muted); border-color: var(--hairline-strong); }
+
+        /* Redline */
+        .now del { color: var(--deletion); text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: var(--deletion); background: var(--deletion-wash); border-radius: 4px; }
+        .now ins {
+            color: var(--insertion); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+            background: var(--insertion-wash); border-radius: 4px;
+        }
+        .now del + ins, .now ins + del { margin-left: 0.2em; }
+
+        .example-note { margin-top: 16px; color: var(--muted); font-size: 0.875rem; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+        .key { display: inline-flex; gap: 6px; align-items: baseline; }
+        .key del { color: var(--deletion); background: var(--deletion-wash); }
+        .key ins { color: var(--insertion); text-decoration: underline; text-underline-offset: 3px; background: var(--insertion-wash); }
+
+        /* ---- Results view ---------------------------------------------------- */
+        #app { padding: 48px 0 0; }
+        .doc-head { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: end; justify-content: space-between; margin-bottom: 24px; }
+        .doc-head h1 { font-family: var(--font-serif); font-size: 1.875rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.012em; overflow-wrap: anywhere; }
+        .doc-head p { color: var(--muted); margin-top: 6px; font-size: 0.9375rem; }
+        .doc-head .relink { margin-top: 10px; font-size: 0.875rem; color: var(--muted); }
+        #banners:not(:empty) { margin-bottom: 24px; }
+
+        .toolbar {
+            position: sticky; top: 0; z-index: 10;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+            padding: 12px 0; margin-bottom: 16px;
+            background: color-mix(in srgb, var(--paper) 94%, transparent);
+            border-bottom: 1px solid var(--hairline);
+        }
+        .filters { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--sheet); border: 1px solid var(--hairline); border-radius: 8px; }
+        .filter {
+            display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 10px; border-radius: 6px;
+            font-size: 0.875rem; font-weight: 500; color: var(--muted);
+        }
+        .filter:hover:not(:disabled) { color: var(--ink); background: var(--sheet-2); }
+        .filter[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+        .filter .count { font-variant-numeric: tabular-nums; font-weight: 600; }
+        .filter:disabled { opacity: 0.5; cursor: default; }
+        .switch { display: inline-flex; align-items: center; gap: 10px; min-height: 32px; font-size: 0.875rem; font-weight: 500; cursor: pointer; }
+        .switch input {
+            appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 999px; flex: none;
+            background: var(--muted); position: relative; cursor: pointer; transition: background-color 0.15s;
+        }
+        .switch input::after {
+            content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+            background: var(--thumb, #fff); transition: transform 0.2s var(--ease-out);
+        }
+        .switch input:checked { background: var(--accent); }
+        .switch input:checked::after { transform: translateX(14px); }
+        .toolbar .spacer { flex: 1; }
+        .toolbar .btn { min-height: 36px; padding: 7px 14px; font-size: 0.875rem; }
+        .toolbar .btn-primary { min-height: 36px; }
+        #downloadLabel { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .empty-filter { padding: 32px 20px; color: var(--muted); text-align: center; }
+
+        .bib-wrap { margin-top: 56px; }
+        .bib-head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+        .bib-head h2 { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 600; }
+        .bibliography { background: var(--sheet); border: 1px solid var(--hairline); border-radius: 8px; padding: 28px 32px 32px; }
+        .bibliography h3 { font-size: 0.8125rem; font-weight: 600; color: var(--muted); margin: 28px 0 12px; }
         .bibliography h3:first-child { margin-top: 0; }
-        .bibliography-entry { font-family: var(--font-cite); font-size: 1.0625rem; line-height: 1.55; padding-left: 2em; text-indent: -2em; margin-bottom: 8px; max-width: 75ch; }
+        .bib-entry { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.6; padding-left: 2em; text-indent: -2em; max-width: 75ch; }
+        .bib-entry + .bib-entry { margin-top: 8px; }
+        .bibliography .placeholder { color: var(--muted); font-size: 0.9375rem; }
 
-        footer { margin-top: 56px; color: var(--ink-2); font-size: 0.8125rem; }
-
-        @media (max-width: 820px) {
-            .lodge { grid-template-columns: 1fr; gap: 28px; }
-            .masthead { flex-direction: column; gap: 4px; }
+        .paybar {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+            background: var(--sheet); border-top: 1px solid var(--hairline); box-shadow: var(--shadow-bar);
         }
-        @media (max-width: 560px) {
-            .container { padding: 0 16px 48px; }
-            .backsheet { padding: 22px 18px 22px 52px; }
-            .backsheet::before { left: 18px; width: 14px; }
-            .backsheet > .stamp { position: static; display: inline-block; margin-top: 18px; }
-            .entry { grid-template-columns: 40px minmax(0, 1fr); padding-right: 16px; }
-            .margin-no { padding-right: 10px; grid-row: span 2; }
-            .entry .stamp { grid-column: 2; justify-self: start; margin-top: 12px; }
-            .strip { position: static; backdrop-filter: none; -webkit-backdrop-filter: none; }
-            .strip .btn-primary { margin-left: 0; width: 100%; justify-content: center; }
-            .bibliography { padding: 22px 18px; }
+        .paybar .container { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; padding-top: 12px; padding-bottom: 12px; }
+        .paybar p { font-size: 0.875rem; color: var(--muted); }
+        .paybar p strong { color: var(--ink); font-weight: 600; }
+        body.has-paybar { padding-bottom: var(--sticky-bottom, 88px); }
+        body.has-paybar .site-footer { margin-bottom: 0; }
+
+        [data-view="results"] #landing, [data-view="results"] .hero { display: none; }
+        [data-view="landing"] #app { display: none; }
+
+        /* ---- Responsive ------------------------------------------------------ */
+        @media (max-width: 960px) {
+            .hero .container { grid-template-columns: 1fr; grid-template-areas: "copy" "card" "facts"; gap: 32px; }
+            .facts { margin-top: 8px; }
+            .hero h1 { max-width: 20ch; }
+            .upload-card { max-width: 560px; }
+            .steps { grid-template-columns: 1fr; gap: 32px; }
+            .flags { grid-template-columns: 1fr; gap: 20px; }
+        }
+        @media (max-width: 760px) {
+            .register-head { display: none; }
+            .entry {
+                grid-template-columns: minmax(0, 1fr) auto; gap: 12px 12px; padding: 16px;
+                grid-template-areas: "no status" "orig orig" "result result";
+            }
+            .e-no { grid-area: no; text-align: left; padding: 0; }
+            .e-no::before { content: "Footnote "; font-family: var(--font-ui); font-weight: 500; font-size: 0.875rem; }
+            .e-status { grid-area: status; padding: 0; }
+            .e-orig { grid-area: orig; }
+            .e-result { grid-area: result; padding-top: 12px; border-top: 1px dashed var(--hairline); }
+            .e-label { display: block; }
+            .entry.gap { grid-template-areas: none; grid-template-columns: auto minmax(0, 1fr); padding: 10px 16px; }
+            .entry.gap > span:last-child { grid-column: 2; }
+            .coverage thead { display: none; }
+            .coverage, .coverage tbody, .coverage tr, .coverage th, .coverage td { display: block; width: auto !important; }
+            .coverage tr { border-top: 1px solid var(--hairline); padding: 16px 0; }
+            .coverage tbody tr:last-child { border-bottom: 1px solid var(--hairline); }
+            .coverage th, .coverage td { border: 0 !important; padding: 0; }
+            .coverage td { margin-top: 6px; }
+            .coverage td.rules { white-space: normal; font-size: 0.875rem; }
+        }
+        @media (max-width: 600px) {
+            .hero { padding: 40px 0 64px; }
+            .section { padding: 64px 0; }
+            .upload-card { padding: 16px; }
+            .dropzone { padding: 24px 16px; }
+            .pricing-card { padding: 24px 20px; }
+            .toolbar { position: static; gap: 10px 14px; }
+            .toolbar .spacer { display: none; }
+            .toolbar .btn-primary { width: 100%; }
+            .filters { width: 100%; }
+            .filter { flex: 1 1 auto; justify-content: center; padding: 4px 6px; }
+            .bibliography { padding: 20px 16px; }
+            .paybar .btn { width: 100%; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header class="masthead">
-            <h1>AGLC4 <span>Citation Tool</span></h1>
-            <p>Format legal citations in Word documents to the <cite>Australian Guide to Legal Citation</cite></p>
-        </header>
+<body data-view="landing">
+    {{> header}}
 
-        <main>
-            <section class="lodge" aria-label="Lodge a document">
-                <div class="backsheet" id="uploadSection">
-                    <label class="dropzone" for="fileInput">
-                        <div class="matter-label">In the matter of</div>
-                        <div class="matter-title empty upload-text" id="matterTitle">No document lodged</div>
-                        <div class="matter-hint upload-subtext" id="matterHint">Drop your .docx file here or <u>click to select</u>. Maximum 10 MB</div>
-                        <input type="file" id="fileInput" class="file-input" accept=".docx" />
-                    </label>
-
-                    <div class="particulars">
-                        <div>
-                            <span class="field-label">Output</span>
-                            <div class="options">
-                                <label class="check"><input type="checkbox" id="trackChanges" checked /> Track changes</label>
-                                <label class="check"><input type="checkbox" id="bibliography" checked /> Generate bibliography</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="actions">
-                        <button class="btn-primary" id="processButton">Process</button>
-                        <span class="status" id="loading" aria-hidden="true"></span>
-                        <span class="sr-only" id="announce" role="status" aria-live="polite"></span>
-                    </div>
-                    <div class="busy-rule" aria-hidden="true"></div>
+    <main id="main">
+        <section class="hero" aria-labelledby="heroTitle">
+            <div class="container">
+                <div class="hero-copy">
+                    <h1 id="heroTitle">Fix every AGLC4 footnote in your essay, as Word tracked changes</h1>
+                    <p class="lede">Upload your .docx. Each citation is rewritten to the <cite>Australian Guide to Legal Citation</cite> (4th ed), with Ibid, (n&nbsp;x) and short titles, and you see every change before you download.</p>
                 </div>
+                <ul class="facts">
+                    <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span><strong>Accept or reject each edit in Word.</strong> Nothing is changed silently.</span></li>
+                    <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span><strong>Nothing is guessed.</strong> A footnote it can't fully account for is left as you wrote it and marked Check.</span></li>
+                    <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span><strong>Formatting only.</strong> Your argument, quotations and sources are never touched.</span></li>
+                </ul>
 
-                <aside class="how" id="how">
-                    <h2>How it works</h2>
-                    <ol>
-                        <li><span><strong>An AI model reads each footnote</strong> and pulls out its parts: names, years, reports, pinpoints.</span></li>
-                        <li><span><strong>Tested AGLC4 rules</strong> rebuild every citation, adding <em>Ibid</em>, (n x) references and short titles.</span></li>
-                        <li><span><strong>Nothing is dropped or invented.</strong> A footnote that can't be fully accounted for is left exactly as you wrote it and marked Refer.</span></li>
-                        <li id="howDownload"><span><strong>Review, then download</strong> your .docx with every edit as a Word tracked change.</span></li>
-                    </ol>
-                </aside>
+                <div class="upload-card" id="uploadCard">
+                    <div id="uploadForm">
+                        <button type="button" class="dropzone" id="dropzone" aria-describedby="limits">
+                            <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h9.5L21 8v16.5H7z"/><path d="M16.5 3.5V8H21"/><path d="M14 20.5v-8m-3.5 3.5L14 12.5l3.5 3.5"/></svg>
+                            <span class="dz-title" id="dzTitle">Choose your essay</span>
+                            <span class="dz-sub" id="dzSub">or drop a .docx file here</span>
+                        </button>
+                        <input type="file" id="fileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+                        <p class="limits" id="limits">.docx up to 10 MB<span data-paid> · {{price}} per document · first {{preview_full}} fixes free</span></p>
+
+                        <fieldset class="options">
+                            <legend class="sr-only">What to include</legend>
+                            <label class="option"><input type="checkbox" id="trackChanges" checked> Show edits as tracked changes</label>
+                            <label class="option"><input type="checkbox" id="bibliography" checked> Add a bibliography</label>
+                        </fieldset>
+
+                        <button type="button" class="btn btn-primary btn-block" id="processButton">Check my footnotes</button>
+                        <p class="privacy-note">Only your footnotes are sent to the AI model. <a href="/privacy">How your file is handled</a></p>
+                        <p class="sample">No essay handy? <button type="button" class="link-button" id="sampleButton">Try a sample essay</button></p>
+                    </div>
+
+                    <div class="progress" id="progress" hidden>
+                        <h2 id="progressTitle">Checking your essay</h2>
+                        <p>Usually under a minute. Keep this tab open.</p>
+                        <ol class="stages" id="stages" aria-live="polite"></ol>
+                    </div>
+
+                    <div id="uploadError" hidden></div>
+                </div>
+            </div>
+        </section>
+
+        <div id="landing">
+            <section class="section" id="example" aria-labelledby="exampleTitle">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 id="exampleTitle">Three footnotes, before and after</h2>
+                        <p>Real output from the formatter on four footnotes in a row. The first citation of a case gets its short title; the next becomes Ibid, and a later one (n&nbsp;x).</p>
+                    </div>
+                    <div class="register" role="list" aria-label="Example footnotes">
+                        <div class="register-head" aria-hidden="true"><span>No.</span><span>As written</span><span>AGLC4</span><span></span></div>
+                        <article class="entry" role="listitem">
+                            <div class="e-no">1</div>
+                            <div class="e-orig"><span class="e-label">As written</span><p class="cite"><em>Mabo v Queensland (No 2)</em> (1992) 175 C.L.R. 1 at 42 per Brennan J.</p></div>
+                            <div class="e-result"><span class="e-label">AGLC4</span>
+                                <p class="cite now" data-redline><em>Mabo v Queensland [No 2]</em> (1992) 175 CLR 1, 42 (Brennan J) (‘<em>Mabo</em>’).</p>
+                                <div class="chips"><span class="chip" title="AGLC4 rule 1.4.4: short titles">r 1.4.4 Short title</span></div>
+                            </div>
+                            <div class="e-status"><span class="badge amended">Amended</span></div>
+                        </article>
+                        <article class="entry" role="listitem">
+                            <div class="e-no">2</div>
+                            <div class="e-orig"><span class="e-label">As written</span><p class="cite">Ibid, at 45.</p></div>
+                            <div class="e-result"><span class="e-label">AGLC4</span>
+                                <p class="cite now" data-redline>Ibid 45.</p>
+                                <div class="chips"><span class="chip" title="AGLC4 rule 1.4.3: Ibid">r 1.4.3 Ibid</span></div>
+                            </div>
+                            <div class="e-status"><span class="badge amended">Amended</span></div>
+                        </article>
+                        <p class="entry gap" role="listitem"><span class="e-no">3</span><span>Cites a different source (an Act), so footnote 4 can't be Ibid.</span></p>
+                        <article class="entry" role="listitem">
+                            <div class="e-no">4</div>
+                            <div class="e-orig"><span class="e-label">As written</span><p class="cite"><em>Mabo</em>, above n 1, 60.</p></div>
+                            <div class="e-result"><span class="e-label">AGLC4</span>
+                                <p class="cite now" data-redline><em>Mabo</em> (n 1) 60.</p>
+                                <div class="chips"><span class="chip" title="AGLC4 rule 1.4.1: subsequent references">r 1.4.1 (n&nbsp;x)</span></div>
+                            </div>
+                            <div class="e-status"><span class="badge amended">Amended</span></div>
+                        </article>
+                    </div>
+                    <p class="example-note">
+                        <span class="key"><del>Struck</del> removed</span>
+                        <span class="key"><ins>Underlined</ins> added</span>
+                        <span>In your .docx, the same edits are Word tracked changes.</span>
+                    </p>
+                </div>
             </section>
 
-            <div class="error" id="errorMessage" role="alert"></div>
-            <div class="notice" id="noticeMessage" role="status" aria-live="polite"></div>
-
-            <section class="results-section" id="resultsSection" aria-labelledby="registerTitle">
-                <div class="register-head">
-                    <h2 class="section-title" id="registerTitle">Footnotes</h2>
-                    <p id="summary"></p>
-                </div>
-
-                <div class="strip">
-                    <div class="filters" role="group" aria-label="Show footnotes">
-                        <button class="filter" data-filter="all" aria-pressed="true">All <span class="count" id="countAll">0</span></button>
-                        <button class="filter" data-filter="amended" aria-pressed="false">Amended <span class="count" id="countAmended">0</span></button>
-                        <button class="filter" data-filter="refer" aria-pressed="false">Refer <span class="count" id="countRefer">0</span></button>
-                        <button class="filter" data-filter="unchanged" aria-pressed="false">Unchanged <span class="count" id="countUnchanged">0</span></button>
+            <section class="section" id="how" aria-labelledby="howTitle">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 id="howTitle">How it works</h2>
+                        <p>The AI model never writes your citations. It only reads them.</p>
                     </div>
-                    <label class="switch"><input type="checkbox" id="markupToggle" role="switch" /> Show markup</label>
-                    <button class="btn-primary" id="downloadButton">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="downloadIcon"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg>
+                    <ol class="steps">
+                        <li>
+                            <h3>The AI reads your footnotes</h3>
+                            <p>An AI model reads each footnote and pulls out its parts: names, years, report series, pinpoints. Only the footnotes are sent to it.</p>
+                        </li>
+                        <li>
+                            <h3>Tested code formats them</h3>
+                            <p>Ordinary code, checked against the <cite>Guide</cite>'s own worked examples, rebuilds every citation and decides where Ibid, (n&nbsp;x) and short titles go.</p>
+                        </li>
+                        <li>
+                            <h3>Nothing is guessed</h3>
+                            <p>The result is checked so nothing is dropped and no number is invented. If a footnote can't be fully accounted for, it is left as you wrote it and marked Check.</p>
+                        </li>
+                    </ol>
+                </div>
+            </section>
+
+            <section class="section" id="fixes" aria-labelledby="fixesTitle">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 id="fixesTitle">What it fixes</h2>
+                        <p>The rules below are covered by the formatter and its tests. Anything outside them is left as you wrote it.</p>
+                    </div>
+                    <table class="coverage">
+                        <caption class="sr-only">AGLC4 rules covered</caption>
+                        <thead><tr><th scope="col">Area</th><th scope="col">What it does</th><th scope="col">AGLC4 rules</th></tr></thead>
+                        <tbody>
+                            <tr><th scope="row">Across the essay</th><td>Ibid when a source repeats; short titles and (n&nbsp;x) for later references; several sources in one footnote; signals such as <em>See</em> and <em>Cf</em>; pinpoints and en dash ranges</td><td class="rules">rr 1.1.3, 1.1.6, 1.2, 1.4.1, 1.4.3, 1.4.4</td></tr>
+                            <tr><th scope="row">Cases</th><td>Party names (Re, Ex parte, the Crown, [No 2]); reported decisions with the right brackets and report series; medium neutral and unreported citations; pinpoints and judges</td><td class="rules">rr 2.1–2.4</td></tr>
+                            <tr><th scope="row">Legislation</th><td>Acts with title, year and jurisdiction; pinpoints such as s, ss, pt, div and sch; Bills; regulations and rules; constitutions</td><td class="rules">rr 3.1, 3.2, 3.4, 3.6</td></tr>
+                            <tr><th scope="row">Secondary sources</th><td>Authors and editors; journal articles; books and chapters; reports; newspapers; websites</td><td class="rules">rr 4.1, 5, 6, 7.1, 7.11, 7.15</td></tr>
+                            <tr><th scope="row">Treaties</th><td>Treaty series, parties, and dates signed and entered into force</td><td class="rules">ch 8</td></tr>
+                            <tr><th scope="row">Bibliography</th><td>An optional bibliography, sorted into AGLC4 categories, first author's name inverted</td><td class="rules">r 1.13</td></tr>
+                            <tr><th scope="row">Body text</th><td>Footnote numbers after punctuation; case names and Act titles italicised; ss with an en dash for section ranges</td><td class="rules">rr 1.1.2, 3.1.4</td></tr>
+                        </tbody>
+                    </table>
+
+                    <div class="flags">
+                        <div>
+                            <h3>What it marks Check</h3>
+                            <p>Check means look at this one yourself. Every Check item is shown free, before you pay.</p>
+                        </div>
+                        <ul>
+                            <li><span class="badge check">Check</span><span>An Ibid or (n&nbsp;x) with no pinpoint: add the page or paragraph you rely on (r 1.1.6).</span></li>
+                            <li><span class="badge check">Check</span><span>Something a citation needs but your footnote doesn't have, such as a year. It is marked <span class="missing">[MISSING: year]</span> in the result, never made up.</span></li>
+                            <li><span class="badge check">Check</span><span>A report series, court or jurisdiction it doesn't recognise.</span></li>
+                            <li><span class="badge check">Check</span><span>A footnote the AI model couldn't read, or may have read incompletely. It is left exactly as written.</span></li>
+                            <li><span class="badge check">Check</span><span>Body text it can spot but can't safely fix, such as a footnote number with no full stop before the next sentence.</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section" id="pricing" aria-labelledby="pricingTitle" data-paid>
+                <div class="container">
+                    <div class="section-head">
+                        <h2 id="pricingTitle">Pricing</h2>
+                    </div>
+                    <div class="pricing-card">
+                        <p class="price">{{price}} <span>per document</span></p>
+                        <p class="sub">No account, no subscription.</p>
+                        <ul>
+                            <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Free first: every footnote's status, every Check item, and the first {{preview_full}} fixes in full.</span></li>
+                            <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Pay once to unlock every correction, the bibliography and the .docx with tracked changes.</span></li>
+                            <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>If the AI model can't read more than a few of your footnotes, you aren't asked to pay until it has. Re-reading them is free.</span></li>
+                        </ul>
+                        <a class="btn btn-primary" href="#main" data-start>Check my footnotes</a>
+                    </div>
+                    <p class="refund-line">If a paid document can't be delivered, the payment is refunded automatically. For anything else, see <a href="/refunds">Refunds</a>.</p>
+                </div>
+            </section>
+
+            <section class="section" id="faq" aria-labelledby="faqTitle">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 id="faqTitle">Questions</h2>
+                    </div>
+                    <div class="faq">
+                        <details>
+                            <summary>Is this allowed under my university's academic integrity rules?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>It changes formatting only: the punctuation, order, italics and abbreviations of your citations. It never touches your argument, your quotations or your choice of sources, and it doesn't write anything for you.</p>
+                                <p>Rules about AI tools differ between universities and units. <strong>Check your unit's AI policy</strong> before you use it on assessed work, and ask your lecturer if you're unsure.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>What happens to my essay?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Your .docx is uploaded so your corrected copy can be made. Only the footnotes are sent to the AI model to be read; the body text is checked by our own code on our server.</p>
+                                <p>There's no account, so nothing is linked to your name. <a href="/privacy">The privacy page</a> says what is kept and for how long.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>What does Check mean?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Check marks a footnote you should look at yourself: a missing pinpoint, a detail your footnote doesn't have, an abbreviation it doesn't recognise, or a footnote the AI model couldn't read.</p>
+                                <p>Where something is missing, it is marked <span class="missing">[MISSING: …]</span> instead of being made up. A footnote that couldn't be read is left exactly as you wrote it.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>Can I accept or reject the changes?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Yes. With "Show edits as tracked changes" on, every edit is a Word tracked change, so you can review them one by one in Word's Review tab, or accept them all at once.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>Why not just use Obiter?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Obiter is a good tool for building citations as you write. Use it while drafting; use us when you're done, to check every footnote in the finished essay, add Ibid and (n&nbsp;x) where they belong, and fix the ones written by hand.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>Which file types work?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Word .docx files up to 10 MB, with real Word footnotes. If you write in Pages or Google Docs, export to Word (.docx) first. An older .doc file needs to be saved as .docx in Word.</p>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <section id="app" aria-labelledby="docTitle">
+            <div class="container">
+                <header class="doc-head">
+                    <div>
+                        <h1 id="docTitle">Your footnotes</h1>
+                        <p id="summary"></p>
+                        <p class="relink" id="relink" hidden></p>
+                    </div>
+                    <a class="btn btn-secondary" href="/">Check another document</a>
+                </header>
+
+                <div id="banners"></div>
+
+                <div class="toolbar" id="toolbar">
+                    <div class="filters" role="group" aria-label="Show footnotes">
+                        <button type="button" class="filter" data-filter="all" aria-pressed="true">All <span class="count" id="countAll">0</span></button>
+                        <button type="button" class="filter" data-filter="amended" aria-pressed="false">Amended <span class="count" id="countAmended">0</span></button>
+                        <button type="button" class="filter" data-filter="check" aria-pressed="false">Check <span class="count" id="countCheck">0</span></button>
+                        <button type="button" class="filter" data-filter="unchanged" aria-pressed="false">Unchanged <span class="count" id="countUnchanged">0</span></button>
+                    </div>
+                    <label class="switch"><input type="checkbox" id="markupToggle" role="switch"> Show changes</label>
+                    <button type="button" class="btn btn-secondary" id="nextCheck">Next Check</button>
+                    <span class="spacer"></span>
+                    <button type="button" class="btn btn-secondary" id="copyBib" hidden>Copy bibliography</button>
+                    <button type="button" class="btn btn-primary" id="downloadButton" hidden>
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg>
                         <span id="downloadLabel">Download .docx</span>
                     </button>
                 </div>
 
-                <div id="warnings"></div>
-                <ol class="register" id="footnotes"></ol>
+                <div class="register" id="register" role="list" aria-label="Footnotes"></div>
 
-                <div class="bibliography-wrap" id="bibliographyWrap" hidden>
-                    <h2 class="section-title">Bibliography</h2>
-                    <div id="bibliographyOut"></div>
-                </div>
-            </section>
-        </main>
+                <section class="bib-wrap" id="bibWrap" hidden aria-labelledby="bibTitle">
+                    <div class="bib-head"><h2 id="bibTitle">Bibliography</h2></div>
+                    <div class="bibliography" id="bibOut"></div>
+                </section>
+            </div>
+        </section>
+        <span class="sr-only" id="announce" role="status" aria-live="polite"></span>
+    </main>
 
-        <footer id="footer">Runs on your machine. Only your footnotes are sent, and only to the AI model set in your .env.</footer>
+    <div class="paybar" id="paybar" hidden>
+        <div class="container">
+            <p id="paybarText"></p>
+            <button type="button" class="btn btn-primary" id="paybarButton"></button>
+        </div>
     </div>
 
-    <script>
-        // State
-        let currentSessionId = null;
-        let currentFilename = null;
-        let processedFilename = null;
-        let selectedFile = null;
-        let currentFilter = "all";
-        let config = { payments: false };
-        let locked = false;
-        let unreadable = 0;   // footnotes the AI model failed to read
-        let mustRerun = false; // too many unread to pay for: offer a free re-run instead
-        let rerunsLeft = 0;
-        const ICON_DOWNLOAD = `<path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/>`;
-        const ICON_LOCK = `<rect x="3" y="7" width="10" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>`;
-        const ICON_RETRY = `<path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/>`;
+    {{> footer}}
 
-        window.addEventListener("error", (e) => showError(`Unexpected error: ${e.message}`));
-        window.addEventListener("unhandledrejection", (e) => showError(`Unexpected error: ${e.reason?.message || e.reason}`));
+    <script>
+        const MAX_BYTES = 10 * 1024 * 1024;
+        const STAGES = [
+            "Uploading your document",
+            "Reading footnotes with the AI model",
+            "Formatting to AGLC4",
+            "Checking nothing was dropped or invented",
+            "Writing Word tracked changes",
+        ];
+        const RULES = {
+            "1.1.6": "Pinpoint", "1.4.1": "(n x)", "1.4.3": "Ibid", "1.4.4": "Short title",
+        };
+        const RULE_TITLES = {
+            "1.1.6": "pinpoint references", "1.4.1": "subsequent references", "1.4.3": "Ibid", "1.4.4": "short titles",
+        };
+        const ICON_CHECK = `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg>`;
+        const ICON_LOCK = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="7" width="10" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>`;
+        const WRONG_TYPE = {
+            ".doc": "That's an older Word .doc file. Open it in Word, choose File > Save As > Word Document (.docx), then upload that.",
+            ".pdf": "That's a PDF. This tool edits Word documents: upload the .docx you wrote the essay in.",
+            ".pages": "That's a Pages file. In Pages, choose File > Export To > Word, then upload the .docx.",
+            ".odt": "That's an OpenDocument file. Save it as Word (.docx), then upload that.",
+            ".rtf": "That's an RTF file. Save it as Word (.docx), then upload that.",
+        };
+
+        let config = { payments: false };
+        let selectedFile = null;
+        let result = null;        // the last result from the server
+        let entries = [];
+        let currentFilter = "all";
+        let busy = false;
+
+        window.addEventListener("error", (e) => console.error(e.error || e.message));
+        window.addEventListener("unhandledrejection", (e) => console.error(e.reason));
 
         document.addEventListener("DOMContentLoaded", async () => {
+            renderExampleRedlines();
             setupUpload();
             setupControls();
+            trackStickyHeights();
             await loadConfig();
             resumeSession();
         });
 
-        // Payments (only when the server has AGLC_PAYMENTS set)
+        // ---- Config and resuming -------------------------------------------
+
         async function loadConfig() {
             try {
                 const response = await fetch("/api/config");
                 if (response.ok) config = await response.json();
             } catch {}
-            if (!config.payments) return;
-            const price = escapeHtml(config.price.display);
-            document.getElementById("howDownload").innerHTML =
-                `<span><strong>Preview free, then unlock.</strong> The first ${config.preview_footnotes} corrections are shown free; ${price} unlocks every change and your .docx with each edit as a Word tracked change.</span>`;
-            document.getElementById("footer").textContent =
-                "Only your footnotes are sent to the AI model. Card payments are taken on the payment provider's own checkout page; card details never reach this site.";
+            if (!config.payments) {
+                document.querySelectorAll("[data-paid]").forEach(el => { el.hidden = true; });
+                document.querySelectorAll('.site-nav a[href="/#pricing"]').forEach(el => { el.hidden = true; });
+            }
         }
 
         // After checkout (?paid=1&session=…) or a reload (?session=…), bring the results back
@@ -472,21 +684,22 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             const params = new URLSearchParams(location.search);
             const sessionId = params.get("session");
             if (!config.payments || !sessionId) return;
-            currentSessionId = sessionId;
+            showView("results");
+            document.getElementById("summary").textContent = "Loading your results…";
             if (params.get("paid") === "1") {
-                showNotice("Confirming payment…");
+                setBanner("payment", banner("", "Confirming your payment…", "It usually takes a few seconds."));
                 const status = await pollEntitlement(sessionId);
                 history.replaceState(null, "", `/?session=${encodeURIComponent(sessionId)}`);
-                if (status === "unlocked") {
-                    await loadResults(sessionId);
-                    showNotice("Payment received. Every footnote is unlocked and your .docx is ready to download.");
-                    return;
-                }
                 if (status === "refunded") {
-                    showError("This document's files were no longer available, so your payment has been refunded. Please process the document again.");
-                    return;
+                    setBanner("payment", banner("error", "Your payment has been refunded",
+                        "This document's files were no longer available, so the payment was refunded automatically. Please check the document again."));
+                } else if (status !== "unlocked") {
+                    setBanner("payment", banner("error", "Payment not confirmed yet",
+                        "Confirmation can take a minute. Refresh this page shortly. If you paid and it still hasn't unlocked, keep this page's address and contact us."));
                 }
-                showNotice("We haven't had confirmation of your payment yet. It can take a minute: refresh this page shortly. If you paid and it still hasn't unlocked, keep this page's address.");
+                if (!(await loadResults(sessionId))) return;
+                if (status === "unlocked") showPaid();
+                return;
             }
             await loadResults(sessionId);
         }
@@ -508,281 +721,360 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
         }
 
         async function loadResults(sessionId) {
-            const response = await fetch(`/api/results/${encodeURIComponent(sessionId)}`);
+            let response;
+            try {
+                response = await fetch(`/api/results/${encodeURIComponent(sessionId)}`);
+            } catch {
+                showAppError("We couldn't reach the server. Check your connection, then refresh this page.");
+                return false;
+            }
             if (!response.ok) {
-                let detail = "These results have expired. Please process the document again.";
-                try { detail = (await response.json()).detail || detail; } catch {}
-                hideNotice();
-                showError(detail);
-                return;
+                showAppError(await detailOf(response, "These results have expired. Please check the document again."));
+                return false;
             }
-            const result = await response.json();
-            currentSessionId = result.id;
-            processedFilename = result.filename || null;
-            if (processedFilename) {
-                const title = document.getElementById("matterTitle");
-                title.textContent = processedFilename;
-                title.classList.remove("empty");
-            }
-            displayResults(result);
+            displayResults(await response.json());
+            return true;
         }
 
-        async function startCheckout() {
-            const button = document.getElementById("downloadButton");
-            const label = document.getElementById("downloadLabel");
-            button.disabled = true;
-            label.textContent = "Opening checkout…";
-            try {
-                const response = await fetch("/api/checkout", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ session_id: currentSessionId }),
-                });
-                const body = await response.json().catch(() => ({}));
-                if (!response.ok) throw new Error(body.detail || "Couldn't open the checkout");
-                if (body.unlocked) { await loadResults(currentSessionId); return; }
-                location.href = body.checkout_url;
-            } catch (error) {
-                showError(error.message);
-                button.disabled = false;
-                setDownloadButton();
-            }
+        function showAppError(message) {
+            showView("results");
+            document.getElementById("summary").textContent = "";
+            document.getElementById("toolbar").hidden = true;
+            setBanner("error", banner("error", "Couldn't load your results", message,
+                `<a class="btn btn-secondary" href="/">Check a document</a>`));
         }
 
-        function setDownloadButton() {
-            const price = config.price?.display || "";
-            const button = document.getElementById("downloadButton");
-            const label = document.getElementById("downloadLabel");
-            const n = `${unreadable} footnote${unreadable === 1 ? "" : "s"}`;
-            button.disabled = mustRerun && rerunsLeft === 0;
-            document.getElementById("downloadIcon").innerHTML = mustRerun ? ICON_RETRY : locked ? ICON_LOCK : ICON_DOWNLOAD;
-            label.textContent = mustRerun
-                ? (rerunsLeft ? `Something went wrong reading ${n}. Try again (free)` : `Couldn't read ${n}`)
-                : locked ? `Unlock and download (${price})` : `Download ${downloadName()}`;
-            label.classList.toggle("wrap", mustRerun);
-            button.title = label.textContent;
+        function showPaid() {
+            const link = reDownloadLink();
+            setBanner("payment", banner("ok", "Payment received",
+                `Every correction is unlocked and your .docx is ready.`,
+                `<button type="button" class="btn btn-primary" data-download>Download ${escapeHtml(downloadName())}</button>`,
+                `<div class="copy-row"><span>To download it again later, keep this link:</span><code>${escapeHtml(link)}</code><button type="button" class="btn btn-secondary" data-copy-link>Copy link</button></div>
+                 <p>It works for as long as we keep your document; see <a href="/privacy">Privacy</a>.</p>`));
+            document.getElementById("relink").hidden = true;  // the banner carries the link
+            announce("Payment received. Your document is unlocked.");
         }
 
-        async function rerunDocument() {
-            const button = document.getElementById("downloadButton");
-            button.disabled = true;
-            document.getElementById("downloadLabel").textContent = `Reading ${unreadable} footnote${unreadable === 1 ? "" : "s"} again…`;
-            clearMessages();
-            try {
-                const response = await fetch(`/api/rerun/${encodeURIComponent(currentSessionId)}`, { method: "POST" });
-                const body = await response.json().catch(() => ({}));
-                if (!response.ok) throw new Error(body.detail || "Couldn't re-run the document");
-                displayResults(body);
-                showNotice(body.failed_footnotes?.length
-                    ? `${body.failed_footnotes.length} footnote${body.failed_footnotes.length === 1 ? " still couldn't" : "s still couldn't"} be read.`
-                    : "Every footnote has now been read.");
-            } catch (error) {
-                showError(error.message);
-                setDownloadButton();
-            }
+        function reDownloadLink() {
+            return `${location.origin}/?session=${encodeURIComponent(result?.id || "")}`;
         }
+
+        // ---- Upload ----------------------------------------------------------
 
         function setupUpload() {
-            const section = document.getElementById("uploadSection");
+            const card = document.getElementById("uploadCard");
             const input = document.getElementById("fileInput");
-
-            section.addEventListener("dragover", (e) => {
+            document.getElementById("dropzone").addEventListener("click", () => input.click());
+            card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("dragover"); });
+            card.addEventListener("dragleave", (e) => { if (!card.contains(e.relatedTarget)) card.classList.remove("dragover"); });
+            card.addEventListener("drop", (e) => {
                 e.preventDefault();
-                section.classList.add("dragover");
+                card.classList.remove("dragover");
+                if (e.dataTransfer.files[0]) chooseFile(e.dataTransfer.files[0]);
             });
-            section.addEventListener("dragleave", (e) => {
-                if (!section.contains(e.relatedTarget)) section.classList.remove("dragover");
+            input.addEventListener("change", () => { if (input.files[0]) chooseFile(input.files[0]); });
+            document.getElementById("processButton").addEventListener("click", () => {
+                if (!selectedFile) { input.click(); return; }
+                processDocument(selectedFile);
             });
-            section.addEventListener("drop", (e) => {
+            document.getElementById("sampleButton").addEventListener("click", processSample);
+            document.querySelectorAll("[data-start]").forEach(a => a.addEventListener("click", (e) => {
                 e.preventDefault();
-                section.classList.remove("dragover");
-                if (e.dataTransfer.files[0]) {
-                    input.files = e.dataTransfer.files;
-                    handleFileSelected();
-                }
-            });
-            input.addEventListener("change", handleFileSelected);
+                scrollTo({ top: 0, behavior: smooth() });
+                document.getElementById("dropzone").focus({ preventScroll: true });
+            }));
         }
 
-        function handleFileSelected() {
-            const file = document.getElementById("fileInput").files[0];
-            if (!file) return;
-            if (!file.name.toLowerCase().endsWith(".docx")) {
-                showError("Please select a .docx file");
+        function fileProblem(file) {
+            const name = file.name || "";
+            const dot = name.lastIndexOf(".");
+            const ext = dot >= 0 ? name.slice(dot).toLowerCase() : "";
+            if (ext !== ".docx") return WRONG_TYPE[ext] || "This tool reads Word documents (.docx) only. Save your essay as .docx, then upload that.";
+            if (file.size > MAX_BYTES) return `That file is ${formatSize(file.size)}; the limit is 10 MB. Try saving a copy without images, then upload that.`;
+            if (file.size === 0) return "That file is empty. Check you chose the right document.";
+            return null;
+        }
+
+        function chooseFile(file) {
+            clearUploadError();
+            const problem = fileProblem(file);
+            if (problem) {
+                selectedFile = null;
+                resetDropzone();
+                showUploadError(problem);
                 return;
             }
-            clearMessages();
             selectedFile = file;
-            currentFilename = file.name;
-            const title = document.getElementById("matterTitle");
-            title.textContent = file.name;
-            title.classList.remove("empty");
-            document.getElementById("matterHint").innerHTML = `${formatSize(file.size)} · Click or drop to choose a different file`;
-            document.getElementById("uploadSection").querySelector(".stamp.received")?.remove();
+            document.getElementById("uploadCard").classList.add("has-file");
+            document.getElementById("dzTitle").textContent = file.name;
+            document.getElementById("dzSub").textContent = `${formatSize(file.size)} · choose a different file`;
+            document.getElementById("processButton").focus();
         }
 
-        function setupControls() {
-            document.getElementById("processButton").addEventListener("click", processDocument);
-            document.getElementById("downloadButton").addEventListener("click", () =>
-                mustRerun ? rerunDocument() : locked ? startCheckout() : downloadDocument());
-            document.getElementById("warnings").addEventListener("click", (e) => {
-                if (e.target.closest("[data-rerun]")) rerunDocument();
-            });
-            document.getElementById("markupToggle").addEventListener("change", (e) => {
-                document.getElementById("footnotes").classList.toggle("markup", e.target.checked);
-                renderCitationBodies();
-            });
-            document.querySelectorAll(".filter").forEach(btn => {
-                btn.addEventListener("click", () => setFilter(btn.dataset.filter));
-            });
+        function resetDropzone() {
+            document.getElementById("uploadCard").classList.remove("has-file");
+            document.getElementById("dzTitle").textContent = "Choose your essay";
+            document.getElementById("dzSub").textContent = "or drop a .docx file here";
+            document.getElementById("fileInput").value = "";
         }
 
-        async function processDocument() {
-            const file = selectedFile;
-            if (!file) {
-                showError("Please select a .docx file");
-                return;
+        async function processSample() {
+            if (busy) return;
+            clearUploadError();
+            try {
+                const response = await fetch("/api/sample");
+                if (!response.ok) throw new Error();
+                const blob = await response.blob();
+                const file = new File([blob], "sample-essay.docx", { type: blob.type });
+                processDocument(file);
+            } catch {
+                showUploadError("The sample essay isn't available right now. Please try again later.");
             }
+        }
 
-            clearMessages();
-            hideNotice();
-            showLoading(true);
-            let succeeded = false;
-
+        async function processDocument(file) {
+            if (busy) return;
+            busy = true;
+            clearUploadError();
+            const progress = startProgress(file.name);
             try {
                 const formData = new FormData();
                 formData.append("file", file);
                 formData.append("track_changes", document.getElementById("trackChanges").checked);
                 formData.append("bibliography", document.getElementById("bibliography").checked);
-
-                const response = await fetch("/api/process", { method: "POST", body: formData });
-
-                if (!response.ok) {
-                    let detail = "Processing failed";
-                    try { detail = (await response.json()).detail || detail; } catch {}
-                    throw new Error(detail);
+                let response;
+                try {
+                    response = await fetch("/api/process", { method: "POST", body: formData });
+                } catch {
+                    throw new Error("We couldn't reach the server. Check your connection and try again.");
                 }
-
-                const result = await response.json();
-                currentSessionId = result.id;
-                processedFilename = file.name;
-                if (config.payments) history.replaceState(null, "", `/?session=${encodeURIComponent(result.id)}`);
-                displayResults(result);
-                stampReceived();
-                succeeded = true;
+                if (!response.ok) throw new Error(await detailOf(response, "Something went wrong processing your document. Please try again."));
+                const data = await response.json();
+                await progress.finish();
+                data.filename = data.filename || file.name;
+                if (config.payments) history.replaceState(null, "", `/?session=${encodeURIComponent(data.id)}`);
+                displayResults(data);
+                announce("Your footnotes have been checked.");
             } catch (error) {
-                console.error("Error:", error);
-                showError(error.message || "Error processing document");
+                progress.stop();
+                showUploadError(error.message);
             } finally {
-                showLoading(false);
-                if (succeeded) {
-                    document.getElementById("loading").textContent = "Document processed successfully";
-                    document.getElementById("announce").textContent = "Document processed successfully";
-                }
+                busy = false;
             }
         }
 
-        // Results
-        let entries = [];
+        // Named stages. The server works in one request, so the AI stage stays current until it answers;
+        // the stages after it ran on the server before the answer arrived, so they're ticked off then.
+        function startProgress(name) {
+            document.getElementById("uploadForm").hidden = true;
+            const panel = document.getElementById("progress");
+            panel.hidden = false;
+            document.getElementById("progressTitle").textContent = `Checking ${name}`;
+            const list = document.getElementById("stages");
+            list.innerHTML = STAGES.map(s => `<li class="stage"><span class="mark">${ICON_CHECK}</span><span>${s}</span><span class="time"></span></li>`).join("");
+            const items = [...list.children];
+            const set = (i, state) => {
+                items.forEach((li, j) => li.className = `stage ${j < i ? "done" : j === i ? state : ""}`);
+                items.forEach((li, j) => li.setAttribute("aria-current", j === i && state === "current" ? "step" : "false"));
+            };
+            set(0, "current");
+            const started = Date.now();
+            let current = 0;
+            const toAi = setTimeout(() => { current = 1; set(1, "current"); }, 900);
+            const tick = setInterval(() => {
+                const secs = Math.round((Date.now() - started) / 1000);
+                items.forEach(li => li.querySelector(".time").textContent = "");
+                if (current === 1 && secs >= 3) items[1].querySelector(".time").textContent = `${secs}s`;
+            }, 1000);
+            const stop = () => {
+                clearTimeout(toAi); clearInterval(tick);
+                panel.hidden = true;
+                document.getElementById("uploadForm").hidden = false;
+            };
+            return {
+                stop,
+                async finish() {
+                    clearTimeout(toAi); clearInterval(tick);
+                    const step = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 140;
+                    for (let i = Math.max(current, 1); i <= STAGES.length; i++) {
+                        set(i, "current");
+                        if (step) await new Promise(r => setTimeout(r, step));
+                    }
+                    stop();
+                },
+            };
+        }
 
-        function displayResults(result) {
-            locked = Boolean(result.locked);
-            unreadable = (result.failed_footnotes || []).length;
-            mustRerun = result.payable === false;
-            rerunsLeft = result.reruns_left ?? 0;
-            document.getElementById("downloadButton").disabled = false;
-            const refers = new Map();
+        function showUploadError(message) {
+            const el = document.getElementById("uploadError");
+            el.innerHTML = banner("error", "Couldn't check that file", message);
+            el.hidden = false;
+            el.setAttribute("role", "alert");
+        }
+
+        function clearUploadError() {
+            const el = document.getElementById("uploadError");
+            el.hidden = true;
+            el.innerHTML = "";
+        }
+
+        // ---- Results -----------------------------------------------------------
+
+        function showView(view) {
+            if (document.body.dataset.view === view) return;
+            document.body.dataset.view = view;
+            scrollTo({ top: 0 });
+        }
+
+        function displayResults(data) {
+            result = data;
+            const failed = new Set(data.failed_footnotes || []);
+            const notesFor = new Map();
             const general = [];
-            for (const w of result.warnings || []) {
+            for (const w of data.warnings || []) {
+                if (isFailureWarning(w.message)) continue;  // shown once, in the grouped banner
                 const numbers = w.footnote ? [w.footnote] : footnotesNamedIn(w.message);
                 if (!numbers.length) { general.push(w.message); continue; }
                 for (const n of numbers) {
-                    if (!refers.has(n)) refers.set(n, []);
-                    refers.get(n).push(w.message);
+                    if (!notesFor.has(n)) notesFor.set(n, []);
+                    notesFor.get(n).push(w.message);
                 }
             }
+            entries = data.footnotes.map(fn => {
+                const notes = notesFor.get(fn.number) || [];
+                const unread = failed.has(fn.number);
+                return { ...fn, notes, unread, state: unread || notes.length ? "check" : fn.changed ? "amended" : "unchanged" };
+            });
 
-            entries = result.footnotes.map(fn => ({
-                ...fn,
-                notes: refers.get(fn.number) || [],
-                state: refers.has(fn.number) ? "refer" : fn.changed ? "amended" : "unchanged",
-            }));
-
-            const counts = { all: entries.length, amended: 0, refer: 0, unchanged: 0 };
+            showView("results");
+            document.getElementById("toolbar").hidden = false;
+            document.getElementById("docTitle").textContent = data.filename || "Your footnotes";
+            const counts = { all: entries.length, amended: 0, check: 0, unchanged: 0 };
             entries.forEach(e => counts[e.state]++);
-            document.getElementById("countAll").textContent = counts.all;
-            document.getElementById("countAmended").textContent = counts.amended;
-            document.getElementById("countRefer").textContent = counts.refer;
-            document.getElementById("countUnchanged").textContent = counts.unchanged;
+            for (const [key, id] of [["all", "countAll"], ["amended", "countAmended"], ["check", "countCheck"], ["unchanged", "countUnchanged"]]) {
+                document.getElementById(id).textContent = counts[key];
+            }
             document.querySelectorAll(".filter").forEach(btn => {
                 btn.disabled = btn.dataset.filter !== "all" && counts[btn.dataset.filter] === 0;
             });
-
-            const changedTotal = entries.filter(e => e.changed).length;
             document.getElementById("summary").textContent =
-                `${changedTotal} of ${entries.length} footnote${entries.length === 1 ? "" : "s"} changed`;
-            setDownloadButton();
+                `${plural(entries.length, "footnote")} · ${counts.amended} amended · ${counts.check} to check · ${counts.unchanged} unchanged`;
+            const next = document.getElementById("nextCheck");
+            next.hidden = counts.check === 0;
+            next.textContent = `Next Check (${counts.check})`;
 
-            const bodyFixes = (result.body_fixes || []).map(b => ({
-                text: b.footnote ? `Footnote ${b.footnote}: ${b.message}` : b.message,
-                check: b.applied === false,
-            }));
-            const n = `${unreadable} footnote${unreadable === 1 ? "" : "s"}`;
-            const paywall = mustRerun ? `
-                <div class="general-notes paywall">
-                    <p><span class="stamp refer" style="--tilt:-2deg">Not read</span><span>The AI model couldn't read <strong>${n}</strong>, so ${unreadable === 1 ? "it is" : "they are"} left as written. ${rerunsLeft
-                        ? "Try again free; you won't be asked to pay until they've been read."
-                        : "The free re-runs are used up. Please process the document again later."}</span></p>
-                </div>` : locked ? `
-                <div class="general-notes paywall">
-                    <p><span class="stamp" style="--tilt:-2deg">Preview</span><span>${result.locked_count
-                        ? `The first ${config.preview_footnotes ?? 3} corrected footnotes are shown in full. <strong>${result.locked_count} more</strong> ${result.locked_count === 1 ? "is" : "are"} stamped but hidden`
-                        : "Every correction is shown in full below"}${result.bibliography_entries ? `, and the bibliography (${result.bibliography_entries} ${result.bibliography_entries === 1 ? "entry" : "entries"}) is ready` : ""}. Unlock for ${escapeHtml(result.price?.display || config.price?.display || "")} to see everything and download the .docx.${unreadable
-                        ? ` ${n} couldn't be read and ${unreadable === 1 ? "is" : "are"} left as written; you can re-run ${unreadable === 1 ? "it" : "them"} free after unlocking.` : ""}</span></p>
-                </div>` : unreadable && config.payments ? `
-                <div class="general-notes paywall">
-                    <p><span class="stamp refer" style="--tilt:-2deg">Not read</span><span>${n} couldn't be read and ${unreadable === 1 ? "is" : "are"} left as written. ${rerunsLeft
-                        ? `<button class="filter" type="button" data-rerun>Re-run ${unreadable === 1 ? "it" : "them"} free</button>` : ""}</span></p>
-                </div>` : "";
-            document.getElementById("warnings").innerHTML = paywall + (general.length ? `
-                <div class="general-notes">
-                    ${general.map(m => `<p><span class="stamp refer" style="--tilt:-2deg">Warning</span><span>${escapeHtml(m)}</span></p>`).join("")}
-                </div>` : "") + (bodyFixes.length ? `
-                <div class="general-notes" aria-label="Body text fixes">
-                    ${bodyFixes.map(b => `<p><span class="stamp${b.check ? " refer" : ""}" style="--tilt:-2deg">${b.check ? "Check" : "Body text"}</span><span>${escapeHtml(b.text)}</span></p>`).join("")}
-                </div>` : "");
-
-            const tilts = [-3, -1.5, -4, -2.5, -1, -3.5];
-            const labels = { amended: "Amended", refer: "Refer", unchanged: "Unchanged" };
-            document.getElementById("footnotes").innerHTML = entries.map((e, i) => `
-                <li class="entry ${e.state}" data-state="${e.state}" id="fn-${e.number}">
-                    <span class="margin-no" aria-label="Footnote ${e.number}">${e.number}</span>
-                    <div>
-                        ${e.changed && !e.locked ? `<p class="cite was"><span class="was-label">Original: </span>${e.original_html}</p>` : ""}
-                        <p class="cite now" data-index="${i}"></p>
-                        ${e.notes.length ? `<div class="notes">${e.notes.map(m => `<p>${escapeHtml(m)}</p>`).join("")}</div>` : ""}
-                    </div>
-                    <span class="stamp land ${e.state}" style="--tilt:${tilts[i % tilts.length]}deg; --delay:${Math.min(i, 12) * 35}ms">${labels[e.state]}</span>
-                </li>`).join("");
-            renderCitationBodies();
-
-            // Bibliography
-            const bib = result.bibliography || [];
-            const lockedBib = locked && result.bibliography_entries > 0;
-            document.getElementById("bibliographyWrap").hidden = bib.length === 0 && !lockedBib;
-            document.getElementById("bibliographyOut").innerHTML = lockedBib ? `
-                <div class="bibliography"><span class="locked-note">${result.bibliography_entries} ${result.bibliography_entries === 1 ? "entry" : "entries"}, unlocked with the full results</span></div>` : bib.length ? `
-                <div class="bibliography">
-                    ${bib.map(section => `
-                        <h3>${escapeHtml(section.heading)}</h3>
-                        ${section.entries.map(entry => `<p class="bibliography-entry">${markMissing(entry)}</p>`).join("")}
-                    `).join("")}
-                </div>` : "";
-
-            const section = document.getElementById("resultsSection");
-            section.style.display = "block";
+            renderBanners(data, general, failed);
+            renderRegister();
+            renderBibliography(data);
+            renderActions(data);
             setFilter("all");
-            section.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+        }
+
+        function renderBanners(data, general, failed) {
+            const n = failed.size;
+            const unreadList = [...failed].sort((a, b) => a - b).join(", ");
+            const rerunsLeft = data.reruns_left ?? 0;
+            const canRerun = config.payments && rerunsLeft > 0;
+            setBanner("failed", n ? banner("check", `Couldn't read ${plural(n, "footnote")} (${unreadList})`,
+                `The AI model couldn't read ${n === 1 ? "this footnote" : "these footnotes"}, so ${n === 1 ? "it is" : "each is"} left as written, unchanged in your document. `
+                + (canRerun ? (data.payable === false ? "Try again for free; you won't be asked to pay until they've been read." : "Re-reading them is free, before or after you unlock; it only re-reads these footnotes.")
+                    : config.payments ? "The free re-reads for this document are used up. Please check the document again later, or contact us if it keeps happening." : "Check the document again to retry them."),
+                canRerun ? `<button type="button" class="btn btn-secondary" data-rerun>Try again (free)</button>` : "") : "");
+
+            const locked = Boolean(data.locked);
+            const bib = data.bibliography_entries;
+            setBanner("preview", locked && data.payable !== false ? banner("", "Free preview",
+                `Every footnote's status and every Check item is shown. `
+                + (data.locked_count ? `The first ${config.preview_footnotes ?? 3} corrections are in full; the other ${data.locked_count} show your original with the result hidden. ` : "Every correction is shown in full. ")
+                + (bib ? `The bibliography (${plural(bib, "entry", "entries")}) unlocks with them. ` : "")
+                + `Unlock to see everything and download the .docx.`) : "");
+
+            setBanner("general", general.length ? banner("check", "Check", "",
+                "", `<ul>${general.map(m => `<li>${escapeHtml(humanNote(m))}</li>`).join("")}</ul>`) : "");
+
+            const body = data.body_fixes || [];
+            const checks = body.filter(b => b.applied === false);
+            const fixed = body.filter(b => b.applied !== false);
+            setBanner("body", body.length ? banner(checks.length ? "check" : "", "Body text",
+                `${fixed.length ? `${plural(fixed.length, "fix", "fixes")} made in the body text` : ""}${fixed.length && checks.length ? "; " : ""}${checks.length ? `${checks.length} to check` : ""}.`,
+                "", `<ul>${body.map(b => `<li>${b.applied === false ? "<strong>Check:</strong> " : ""}${escapeHtml((b.footnote ? `Footnote ${b.footnote}: ` : "") + b.message)}</li>`).join("")}</ul>`) : "");
+
+            const relink = document.getElementById("relink");
+            relink.hidden = !(config.payments && !locked);
+            if (!relink.hidden) relink.innerHTML = `To download again later, keep this page's link. <button type="button" class="link-button" data-copy-link>Copy link</button>`;
+        }
+
+        function renderRegister() {
+            document.getElementById("register").innerHTML =
+                `<div class="register-head" aria-hidden="true"><span>No.</span><span>As written</span><span>AGLC4</span><span></span></div>` +
+                entries.map((e, i) => `
+                <article class="entry" role="listitem" data-state="${e.state}" id="fn-${e.number}" tabindex="-1" aria-label="Footnote ${e.number}, ${label(e)}">
+                    <div class="e-no">${e.number}</div>
+                    <div class="e-orig"><span class="e-label">As written</span><p class="cite">${markMissing(e.original_html)}</p></div>
+                    <div class="e-result"><span class="e-label">AGLC4</span>${resultCell(e, i)}</div>
+                    <div class="e-status"><span class="badge ${e.state}">${label(e)}</span></div>
+                </article>`).join("");
+            renderCitationBodies();
+        }
+
+        function label(e) {
+            return { amended: "Amended", check: "Check", unchanged: "Unchanged" }[e.state];
+        }
+
+        function resultCell(e, i) {
+            const notes = e.notes.map(humanNote);
+            const chips = rulesFor(e);
+            const notesHtml = notes.length ? `<div class="notes">${notes.map(m => `<p><span>${escapeHtml(m)}</span></p>`).join("")}</div>` : "";
+            const chipsHtml = chips.length ? `<div class="chips">${chips.map(([r, name]) => `<span class="chip" title="AGLC4 rule ${r}: ${RULE_TITLES[r]}">r ${r} ${escapeHtml(name)}</span>`).join("")}</div>` : "";
+            if (e.unread) return `<p class="placeholder">Left as written. The AI model couldn't read this footnote.</p>`;
+            if (e.locked) return `<p class="placeholder">${ICON_LOCK}<span>Result hidden until you unlock</span></p>${notesHtml}`;
+            if (!e.changed) return `<p class="placeholder">${notes.length ? "Left as written" : "No change needed"}</p>${notesHtml}`;
+            return `<p class="cite now" data-index="${i}"></p>${notesHtml}${chipsHtml}`;
+        }
+
+        function renderCitationBodies() {
+            const markup = document.getElementById("markupToggle").checked;
+            document.querySelectorAll("#register .cite.now").forEach(el => {
+                const e = entries[Number(el.dataset.index)];
+                el.innerHTML = markup ? diffHtml(e.original_html, e.formatted_html) : markMissing(e.formatted_html);
+            });
+        }
+
+        // Rule chips, only where the result or a warning says which rule applied
+        function rulesFor(e) {
+            if (!e.changed || e.locked || !e.formatted_html) return [];
+            const before = textOf(e.original_html), after = textOf(e.formatted_html);
+            const rules = new Map();
+            if (/\bIbid\b/.test(after)) rules.set("1.4.3", RULES["1.4.3"]);
+            if (/\(n \d+\)/.test(after) && !/\(n \d+\)/.test(before)) rules.set("1.4.1", RULES["1.4.1"]);
+            if (/\(‘[^’]+’\)\.?\s*$/.test(after) && !/\(['‘][^'’]+['’]\)\.?\s*$/.test(before)) rules.set("1.4.4", RULES["1.4.4"]);
+            for (const note of e.notes) {
+                const m = note.match(/\(AGLC4 rr? ([\d.]+)\)/);
+                if (m && RULES[m[1]]) rules.set(m[1], RULES[m[1]]);
+            }
+            return [...rules];
+        }
+
+        // Turn the formatter's notes into plain sentences for a student
+        function humanNote(message) {
+            let m = message.replace(/^footnote \d+:\s*/i, "");
+            if (/^footnote \d+ has missing data$/i.test(m)) return "Something this citation needs isn't in your footnote. It's marked [MISSING] in the result: add it in Word.";
+            m = m.replace(/\s*\(AGLC4 rr? [\d.]+\)/, "");
+            m = m.replace(/^left unchanged for manual review; the extraction kept dropping (.+)$/i, "The AI model's reading kept leaving out $1, so it wasn't safe to change.");
+            m = m.replace(/^may have dropped (.+); check it$/i, "The AI model's reading may have left out $1. Check the result still has it.");
+            m = m.replace(/^left out of the AGLC citation: (.+)$/i, "Left out of the citation: $1. Check it isn't needed.");
+            m = m.replace(/^trailing text not covered by extraction; appended verbatim$/i, "Text at the end of the footnote was kept exactly as you wrote it.");
+            m = m.replace(/^could not resolve reference to footnote (\d+) \((.*)\); recorded as an unclassified source$/i, "Couldn't match $2 to footnote $1, so it is kept as written.");
+            m = m.replace(/^kept text the extraction skipped: (.+)$/i, "Kept as you wrote it: $1.");
+            m = m.replace(/^Unknown report series: '(.+)'$/, "‘$1’ isn't a report series we recognise. Check its abbreviation.");
+            m = m.replace(/^Unknown court identifier: '(.+)'$/, "‘$1’ isn't a court we recognise. Check the medium neutral citation.");
+            m = m.replace(/^Unknown jurisdiction: '(.+)'$/, "‘$1’ isn't a jurisdiction we recognise.");
+            return m.charAt(0).toUpperCase() + m.slice(1);
+        }
+
+        function isFailureWarning(message) {
+            return /^extraction failed for footnotes \[/i.test(message)
+                || /^footnote \d+: (missing from LLM response|LLM returned no segments)/i.test(message);
         }
 
         // Extractor warnings carry no footnote field but name them: "footnote 3: ..." or "footnotes [1, 2]"
@@ -793,29 +1085,239 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             return many ? many[1].split(",").map(n => Number(n.trim())).filter(Boolean) : [];
         }
 
-        function renderCitationBodies() {
-            const markup = document.getElementById("markupToggle").checked;
-            document.querySelectorAll(".cite.now").forEach(el => {
-                const e = entries[Number(el.dataset.index)];
-                if (e.locked) { el.innerHTML = `<span class="locked-note">Corrected citation unlocks with the full results</span>`; return; }
-                el.innerHTML = markup && e.changed ? diffHtml(e.original_html, e.formatted_html) : markMissing(e.formatted_html);
-            });
+        function renderBibliography(data) {
+            const bib = data.bibliography || [];
+            const lockedCount = data.locked ? data.bibliography_entries || 0 : 0;
+            const wrap = document.getElementById("bibWrap");
+            wrap.hidden = bib.length === 0 && !lockedCount;
+            document.getElementById("bibOut").innerHTML = lockedCount
+                ? `<p class="placeholder">${plural(lockedCount, "entry", "entries")}, unlocked with the full results.</p>`
+                : bib.map(section => `<h3>${escapeHtml(section.heading)}</h3>${section.entries.map(entry => `<p class="bib-entry">${markMissing(entry)}</p>`).join("")}`).join("");
+            document.getElementById("copyBib").hidden = !bib.length;
+        }
+
+        function renderActions(data) {
+            const locked = Boolean(data.locked);
+            const download = document.getElementById("downloadButton");
+            download.hidden = locked;
+            document.getElementById("downloadLabel").textContent = `Download ${downloadName()}`;
+            download.title = `Download ${downloadName()}`;
+
+            const bar = document.getElementById("paybar");
+            const show = config.payments && locked;
+            bar.hidden = !show;
+            document.body.classList.toggle("has-paybar", show);
+            if (!show) return;
+            const text = document.getElementById("paybarText");
+            const button = document.getElementById("paybarButton");
+            const failed = (data.failed_footnotes || []).length;
+            button.disabled = false;
+            if (data.payable === false) {
+                const left = data.reruns_left ?? 0;
+                text.innerHTML = `<strong>We couldn't read ${plural(failed, "footnote")}</strong>, so there's nothing to pay for yet.`
+                    + (left ? "" : " The free re-reads are used up; please check it again later.");
+                button.textContent = left ? "Try again (free)" : "Check another document";
+                button.dataset.action = left ? "rerun" : "home";
+            } else {
+                const total = entries.filter(e => e.changed).length;
+                const shown = total - (data.locked_count || 0);
+                text.innerHTML = `Free preview: <strong>${shown} of ${plural(total, "correction")}</strong> shown.`;
+                const price = data.price?.display || config.price?.display;
+                button.textContent = `Unlock all ${plural(total, "correction")} and the .docx${price ? ` — ${price}` : ""}`;
+                button.dataset.action = "checkout";
+            }
+            requestAnimationFrame(updateStickyHeights);
         }
 
         function setFilter(filter) {
             currentFilter = filter;
-            document.querySelectorAll(".filter").forEach(btn => {
-                btn.setAttribute("aria-pressed", String(btn.dataset.filter === filter));
-            });
+            document.querySelectorAll(".filter").forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.filter === filter)));
             let shown = 0;
-            document.querySelectorAll(".entry").forEach(li => {
-                const show = filter === "all" || li.dataset.state === filter;
-                li.hidden = !show;
+            document.querySelectorAll("#register .entry").forEach(el => {
+                const show = filter === "all" || el.dataset.state === filter;
+                el.hidden = !show;
                 if (show) shown++;
             });
-            const list = document.getElementById("footnotes");
-            list.querySelector(".empty-filter")?.remove();
-            if (!shown) list.insertAdjacentHTML("beforeend", `<li class="empty-filter">No footnotes in this group.</li>`);
+            const register = document.getElementById("register");
+            register.querySelector(".empty-filter")?.remove();
+            if (!shown) register.insertAdjacentHTML("beforeend", `<p class="empty-filter">No footnotes in this group.</p>`);
+        }
+
+        function jumpToNextCheck() {
+            if (currentFilter !== "all" && currentFilter !== "check") setFilter("all");
+            const checks = [...document.querySelectorAll('#register .entry[data-state="check"]:not([hidden])')];
+            if (!checks.length) return;
+            const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sticky-top")) || 0;
+            const next = checks.find(el => el.getBoundingClientRect().top > top + 24) || checks[0];
+            next.focus({ preventScroll: true });
+            next.scrollIntoView({ behavior: smooth(), block: "start" });
+        }
+
+        // ---- Actions ------------------------------------------------------------
+
+        function setupControls() {
+            document.getElementById("markupToggle").addEventListener("change", renderCitationBodies);
+            document.querySelectorAll(".filter").forEach(btn => btn.addEventListener("click", () => setFilter(btn.dataset.filter)));
+            document.getElementById("nextCheck").addEventListener("click", jumpToNextCheck);
+            document.getElementById("copyBib").addEventListener("click", copyBibliography);
+            document.getElementById("downloadButton").addEventListener("click", downloadDocument);
+            document.getElementById("paybarButton").addEventListener("click", (e) =>
+                ({ rerun: rerunDocument, home: () => { location.href = "/"; } }[e.currentTarget.dataset.action] || startCheckout)());
+            document.addEventListener("click", (e) => {
+                if (e.target.closest("[data-rerun]")) rerunDocument();
+                if (e.target.closest("[data-download]")) downloadDocument();
+                const copy = e.target.closest("[data-copy-link]");
+                if (copy) copyText(reDownloadLink(), copy, "Link copied");
+            });
+        }
+
+        async function startCheckout() {
+            const button = document.getElementById("paybarButton");
+            const label = button.textContent;
+            button.disabled = true;
+            button.textContent = "Opening checkout…";
+            try {
+                const response = await fetch("/api/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ session_id: result.id }),
+                });
+                if (!response.ok) throw new Error(await detailOf(response, "The checkout couldn't be opened. Please try again."));
+                const body = await response.json();
+                if (body.unlocked) { await loadResults(result.id); return; }
+                location.href = body.checkout_url;
+            } catch (error) {
+                setBanner("error", banner("error", "Couldn't open the checkout", error.message));
+                button.disabled = false;
+                button.textContent = label;
+            }
+        }
+
+        async function rerunDocument() {
+            const buttons = [document.getElementById("paybarButton"), ...document.querySelectorAll("[data-rerun]")];
+            const n = (result.failed_footnotes || []).length;
+            buttons.forEach(b => { b.disabled = true; b.textContent = `Reading ${plural(n, "footnote")} again…`; });
+            setBanner("error", "");
+            try {
+                const response = await fetch(`/api/rerun/${encodeURIComponent(result.id)}`, { method: "POST" });
+                if (!response.ok) throw new Error(await detailOf(response, "The footnotes couldn't be read again. Please try later."));
+                const body = await response.json();
+                body.filename = body.filename || result.filename;
+                displayResults(body);
+                const still = (body.failed_footnotes || []).length;
+                announce(still ? `${plural(still, "footnote")} still couldn't be read.` : "Every footnote has now been read.");
+            } catch (error) {
+                setBanner("error", banner("error", "Couldn't try again", error.message));
+                displayResults(result);
+            }
+        }
+
+        async function downloadDocument() {
+            if (!result) return;
+            try {
+                const response = await fetch(`/api/download/${encodeURIComponent(result.id)}`);
+                if (!response.ok) throw new Error(await detailOf(response, "The download failed. Please try again."));
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = downloadName();
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                setBanner("error", banner("error", "Couldn't download", error.message));
+            }
+        }
+
+        async function copyBibliography(e) {
+            const sections = result?.bibliography || [];
+            const html = sections.map(s => `<p><strong>${escapeHtml(s.heading)}</strong></p>${s.entries.map(x => `<p>${x}</p>`).join("")}`).join("");
+            const text = sections.map(s => `${s.heading}\n${s.entries.map(textOf).join("\n")}`).join("\n\n");
+            const button = e.currentTarget;
+            try {
+                if (window.ClipboardItem) {
+                    await navigator.clipboard.write([new ClipboardItem({
+                        "text/html": new Blob([html], { type: "text/html" }),
+                        "text/plain": new Blob([text], { type: "text/plain" }),
+                    })]);
+                } else {
+                    await navigator.clipboard.writeText(text);
+                }
+                flash(button, "Copied, with italics");
+            } catch {
+                flash(button, "Couldn't copy");
+            }
+        }
+
+        async function copyText(text, button, done) {
+            try { await navigator.clipboard.writeText(text); flash(button, done); }
+            catch { flash(button, "Couldn't copy"); }
+        }
+
+        function flash(button, text) {
+            const before = button.dataset.label || button.textContent;
+            button.dataset.label = before;
+            button.textContent = text;
+            announce(text);
+            clearTimeout(button._flash);
+            button._flash = setTimeout(() => { button.textContent = before; }, 2000);
+        }
+
+        // ---- Sticky toolbar and pay bar: keep focused things clear of them -------
+
+        function trackStickyHeights() {
+            const ro = new ResizeObserver(updateStickyHeights);
+            ro.observe(document.getElementById("toolbar"));
+            ro.observe(document.getElementById("paybar"));
+            addEventListener("resize", updateStickyHeights);
+        }
+
+        function updateStickyHeights() {
+            const root = document.documentElement.style;
+            const toolbar = document.getElementById("toolbar");
+            const sticky = getComputedStyle(toolbar).position === "sticky" && document.body.dataset.view === "results";
+            root.setProperty("--sticky-top", `${sticky ? toolbar.offsetHeight : 0}px`);
+            const bar = document.getElementById("paybar");
+            root.setProperty("--sticky-bottom", `${bar.hidden ? 0 : bar.offsetHeight}px`);
+        }
+
+        document.addEventListener("focusin", (e) => {
+            // scroll-padding covers scrolling; this catches focus that lands under a bar without a scroll
+            if (document.getElementById("paybar").contains(e.target) || document.getElementById("toolbar").contains(e.target)) return;
+            const rect = e.target.getBoundingClientRect();
+            const bottom = innerHeight - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sticky-bottom")) || 0);
+            const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sticky-top")) || 0;
+            if (rect.bottom > bottom) scrollBy({ top: rect.bottom - bottom + 16 });
+            else if (rect.top < top && document.body.dataset.view === "results") scrollBy({ top: rect.top - top - 16 });
+        });
+
+        // ---- Banners ---------------------------------------------------------------
+
+        function banner(kind, title, text, actions = "", extra = "") {
+            return `<div class="banner ${kind}">
+                ${title ? `<p class="label">${escapeHtml(title)}</p>` : ""}
+                ${text ? `<p>${text.includes("<") ? text : escapeHtml(text)}</p>` : ""}
+                ${extra}
+                ${actions ? `<div class="actions">${actions}</div>` : ""}
+            </div>`;
+        }
+
+        const BANNER_ORDER = ["payment", "error", "failed", "preview", "general", "body"];
+        const banners = {};
+        function setBanner(key, html) {
+            banners[key] = html;
+            document.getElementById("banners").innerHTML = BANNER_ORDER.map(k => banners[k] || "").join("");
+        }
+
+        // ---- Redline -----------------------------------------------------------------
+
+        function renderExampleRedlines() {
+            document.querySelectorAll("#example [data-redline]").forEach(el => {
+                const before = el.closest(".entry").querySelector(".e-orig .cite").innerHTML;
+                el.innerHTML = diffHtml(before, el.innerHTML);
+            });
         }
 
         // Word-level redline between the original and formatted footnote, italics included
@@ -825,9 +1327,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             const walk = (node, italic) => {
                 for (const child of node.childNodes) {
                     if (child.nodeType === Node.TEXT_NODE) {
-                        for (const t of child.textContent.match(/\s+|[\p{L}\p{N}]+|[^\s\p{L}\p{N}]/gu) || []) {
-                            tokens.push({ text: t, italic });
-                        }
+                        for (const t of child.textContent.match(/\s+|[\p{L}\p{N}]+|[^\s\p{L}\p{N}]/gu) || []) tokens.push({ text: t, italic });
                     } else if (child.nodeType === Node.ELEMENT_NODE) {
                         walk(child, italic || child.tagName === "EM" || child.tagName === "I");
                     }
@@ -855,119 +1355,73 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                 else if (i < n && (j === m || dp[i + 1][j] >= dp[i][j + 1])) { ops.push(["del", a[i]]); i++; }
                 else { ops.push(["ins", b[j]]); j++; }
             }
-            // Group runs and render; whitespace between two changes of the same kind joins the run
-            let out = "", run = null;
-            const flush = () => {
-                if (!run) return;
-                const inner = run.tokens.map(t => t.italic ? `<em>${escapeHtml(t.text)}</em>` : escapeHtml(t.text)).join("").replace(/<\/em><em>/g, "");
-                out += run.op === "eq" ? inner : `<${run.op}>${inner}</${run.op}>`;
-                run = null;
-            };
-            ops.forEach(([op, t], idx) => {
-                const isSpace = /^\s+$/.test(t.text);
-                if (run && (run.op === op || (isSpace && op === "eq" && run.op !== "eq" && ops[idx + 1]?.[0] === run.op))) {
-                    run.tokens.push(t);
-                } else {
-                    flush();
-                    run = { op, tokens: [t] };
-                }
-            });
-            flush();
-            return markMissing(out);
+            // Group into runs of the same op
+            let runs = [];
+            for (const [op, t] of ops) {
+                const last = runs[runs.length - 1];
+                if (last && last.op === op) last.tokens.push(t);
+                else runs.push({ op, tokens: [t] });
+            }
+            // Semantic cleanup: a short unchanged scrap between two edits ("No 2" between a
+            // struck "(" and an inserted "[") reads better as one deletion and one insertion
+            const short = r => r.tokens.map(t => t.text).join("").replace(/\s+/g, "").length <= 3;
+            runs = runs.flatMap((r, i) =>
+                r.op === "eq" && i > 0 && i < runs.length - 1 && runs[i - 1].op !== "eq" && runs[i + 1].op !== "eq" && short(r)
+                    ? [{ op: "del", tokens: r.tokens }, { op: "ins", tokens: r.tokens }] : [r]);
+            // Each cluster of edits becomes one deletion followed by one insertion, as Word shows them
+            const merged = [];
+            for (let k = 0; k < runs.length;) {
+                if (runs[k].op === "eq") { merged.push(runs[k++]); continue; }
+                const del = [], ins = [];
+                for (; k < runs.length && runs[k].op !== "eq"; k++) (runs[k].op === "del" ? del : ins).push(...runs[k].tokens);
+                // What both sides start or end with (often a space) isn't a change
+                const head = [], tail = [];
+                while (del.length && ins.length && key(del[0]) === key(ins[0])) { head.push(ins.shift()); del.shift(); }
+                while (del.length && ins.length && key(del[del.length - 1]) === key(ins[ins.length - 1])) { tail.unshift(ins.pop()); del.pop(); }
+                if (head.length) merged.push({ op: "eq", tokens: head });
+                if (del.length) merged.push({ op: "del", tokens: del });
+                if (ins.length) merged.push({ op: "ins", tokens: ins });
+                if (tail.length) merged.push({ op: "eq", tokens: tail });
+            }
+            const html = tokens => tokens.map(t => t.italic ? `<em>${escapeHtml(t.text)}</em>` : escapeHtml(t.text)).join("").replace(/<\/em><em>/g, "");
+            return markMissing(merged.map(r => r.op === "eq" ? html(r.tokens) : `<${r.op}>${html(r.tokens)}</${r.op}>`).join(""));
         }
 
         function markMissing(html) {
-            return html.replace(/\[MISSING:[^\]]*\]/g, m => `<span class="missing">${m}</span>`);
+            return (html || "").replace(/\[MISSING:[^\]]*\]/g, m => `<span class="missing">${m}</span>`);
         }
 
-        function stampReceived() {
-            const sheet = document.getElementById("uploadSection");
-            sheet.querySelector(".stamp.received")?.remove();
-            const date = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
-            sheet.insertAdjacentHTML("beforeend", `<span class="stamp received land" style="--tilt:6deg">Formatted<small>${escapeHtml(date)}</small></span>`);
+        // ---- Utilities ------------------------------------------------------------------
+
+        async function detailOf(response, fallback) {
+            try {
+                const body = await response.json();
+                return typeof body.detail === "string" ? body.detail : fallback;
+            } catch {
+                return fallback;
+            }
         }
 
         function downloadName() {
-            return processedFilename ? processedFilename.replace(/\.docx$/i, ".aglc.docx") : "document.aglc.docx";
+            const name = result?.filename || "document.docx";
+            return name.replace(/\.docx$/i, "") + ".aglc.docx";
         }
 
-        async function downloadDocument() {
-            if (!currentSessionId) return;
-
-            try {
-                const response = await fetch(`/api/download/${currentSessionId}`);
-                if (!response.ok) {
-                    let detail = "Failed to download document";
-                    try { detail = (await response.json()).detail || detail; } catch {}
-                    throw new Error(detail);
-                }
-
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = downloadName();
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            } catch (error) {
-                console.error("Error:", error);
-                showError(error.message || "Failed to download document");
-            }
-        }
-
-        // Utilities
-        let loadingTimer = null;
-
-        function showLoading(show) {
-            const status = document.getElementById("loading");
-            const button = document.getElementById("processButton");
-            document.getElementById("uploadSection").classList.toggle("busy", show);
-            button.disabled = show;
-            button.textContent = show ? "Processing…" : "Process";
-            clearInterval(loadingTimer);
-            status.textContent = "";
-            document.getElementById("announce").textContent = show ? "Processing document…" : "";
-            if (show) {
-                const started = Date.now();
-                const tick = () => {
-                    const secs = Math.round((Date.now() - started) / 1000);
-                    status.textContent = `Processing document… ${secs}s (the AI model is reading your footnotes; this can take a minute)`;
-                };
-                tick();
-                loadingTimer = setInterval(tick, 1000);
-            }
-        }
-
-        function showError(message, title = "Error.") {
-            const el = document.getElementById("errorMessage");
-            el.innerHTML = `<strong>${escapeHtml(title)}</strong>${escapeHtml(message)}`;
-            el.style.display = "block";
-            el.scrollIntoView({ block: "nearest" });
-        }
-
-        function showNotice(message) {
-            const el = document.getElementById("noticeMessage");
-            el.textContent = message;
-            el.style.display = "block";
-        }
-
-        function hideNotice() {
-            document.getElementById("noticeMessage").style.display = "none";
-        }
-
-        function clearMessages() {
-            document.getElementById("errorMessage").style.display = "none";
-        }
+        function plural(n, one, many = `${one}s`) { return `${n} ${n === 1 ? one : many}`; }
+        function smooth() { return matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"; }
+        function announce(text) { document.getElementById("announce").textContent = text; }
 
         function formatSize(bytes) {
             return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
         }
 
+        function textOf(html) {
+            return new DOMParser().parseFromString(`<div>${html || ""}</div>`, "text/html").body.textContent;
+        }
+
         function escapeHtml(text) {
             const div = document.createElement("div");
-            div.textContent = text;
+            div.textContent = text ?? "";
             return div.innerHTML;
         }
     </script>

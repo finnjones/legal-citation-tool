@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+    {{> head}}
+    <title>{{title}} · {{brand}}</title>
+    <meta name="description" content="{{description}}">
+    <link rel="canonical" href="{{base_url}}/{{page}}">
+</head>
+<body>
+    {{> header}}
+    <main id="main" class="page-main">
+        <div class="container">
+            <article class="prose">
+{{content}}
+            </article>
+        </div>
+    </main>
+    {{> footer}}
+</body>
+</html>
