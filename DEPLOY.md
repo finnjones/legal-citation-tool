@@ -1,6 +1,6 @@
 # Deploying the paid site (homelab)
 
-What the homelab needs before `AGLC_PAYMENTS=square` is switched on. Local use needs none
+What the homelab needs before `AGLC_PAYMENTS=square` (or `stripe`, see 3a) is switched on. Local use needs none
 of this. GitHub Actions deploys every push to `main` over SSH (`.github/workflows/deploy.yml`
 runs `deploy <sha>` on `deployer@legal-citation.home`); the server-side `deploy` script is
 not in this repository, so the checklist below says what it must do.
@@ -69,6 +69,37 @@ longer than the privacy page says. Check a restore once (`sqlite3 <backup> 'PRAG
 - Cloudflare limits request bodies to 100 MB on the free plan; the app itself refuses
   bodies over `AGLC_MAX_UPLOAD_MB` (10) with 413.
 
+## 3a. Stripe instead of Square
+
+`AGLC_PAYMENTS=stripe` switches the whole site to Stripe Checkout; nothing else changes.
+Install the extra (`uv sync --frozen --extra stripe ...`, or `--all-extras`) and set, in
+`/etc/aglc/env` in place of the `SQUARE_*` lines:
+
+```ini
+AGLC_PAYMENTS=stripe
+STRIPE_SECRET_KEY=sk_live_...        # sk_test_... while testing
+STRIPE_WEBHOOK_SECRET=whsec_...      # the endpoint's signing secret
+```
+
+- **Webhook endpoint:** in the Stripe Dashboard (Developers > Webhooks) add
+  `https://<domain>/api/webhooks/stripe` and subscribe it to `checkout.session.completed`,
+  `checkout.session.async_payment_succeeded`, `checkout.session.expired` and
+  `charge.refunded`. The same Cloudflare rule applies as in section 3: no Access or
+  challenge on `/api/webhooks/*`. Unlike Square, the signature doesn't cover the URL, so
+  there is no `*_WEBHOOK_URL` setting.
+- **Testing locally:** `stripe listen --forward-to localhost:8766/api/webhooks/stripe`
+  prints a `whsec_...` secret for that session; use it as `STRIPE_WEBHOOK_SECRET` with a
+  `sk_test_...` key, then pay with test card `4242 4242 4242 4242` (any future expiry, any CVC).
+- **Statement descriptor:** Dashboard > Settings > Public details > set the statement
+  descriptor to `AFORECITE`, so the charge is recognisable on a card statement.
+- **Wallets and methods:** Apple Pay and Google Pay come with Checkout; manage other
+  methods in Dashboard > Settings > Payment methods.
+- **Fees:** 1.65% + 30c per domestic card payment (check the current rate in the
+  Dashboard). A refund doesn't return the fee.
+- **Checkouts last an hour.** A document's pending checkout is reused for 55 minutes, then
+  a new one is made when the customer clicks Unlock again. A refund made in the Dashboard
+  locks the document again only when it is a full refund.
+
 ## 4. OpenRouter spend limit
 
 Free previews cost real model calls. Create a key just for the site and set a credit limit
@@ -105,8 +136,9 @@ Update `POLICY_DATE` in `aglc/site.py` whenever you change those pages.
 The workflow tests with `uv sync --all-extras` and then runs the server-side `deploy` script.
 For payments, that script must:
 
-- install the Square extra: `uv sync --frozen --extra square --extra openai` (or
-  `--all-extras`); without it checkout fails with "The Square SDK is not installed";
+- install the provider's extra: `uv sync --frozen --extra square --extra openai` (or
+  `--extra stripe`, or `--all-extras`); without it checkout fails with "The Square SDK is not
+  installed" (or the Stripe equivalent);
 - load `/etc/aglc/env` into the service (eg systemd `EnvironmentFile=/etc/aglc/env`), not a
   `.env` in the release folder;
 - restart the service, then check `GET /api/config` returns `"payments": true`;
@@ -132,3 +164,6 @@ nightly backup (or a manual `.backup`) before deploying a release that adds one.
 - Do one Square **sandbox** run end to end (pay, late webhook, refund from the dashboard)
   with the real tunnel before switching `SQUARE_ENVIRONMENT=production`.
 - Turn on Apple Pay and Google Pay in Square Dashboard > Payment links > Settings.
+- For Stripe: do one **test-mode** run end to end (`stripe listen`, pay with the 4242 card,
+  refund from the Dashboard) before switching to the live keys, and register the live webhook
+  endpoint separately: test and live have different signing secrets.

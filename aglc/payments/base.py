@@ -1,10 +1,10 @@
 """Provider-agnostic payments interface.
 
-The billing code only ever sees `PaymentProvider`. Switching from Square to another
-hosted checkout (Stripe Checkout is the fallback) means writing one small subclass and
-registering it; billing, the store and the web page don't change.
+The billing code only ever sees `PaymentProvider`. Switching between hosted checkouts
+(Square, Stripe Checkout) means writing one small subclass and registering it; billing,
+the store and the web page don't change.
 
-The provider is chosen with $AGLC_PAYMENTS (eg `square`, or `fake` for tests). When it is
+The provider is chosen with $AGLC_PAYMENTS (`square`, `stripe`, or `fake` for tests). When it is
 unset, payments are off and the tool behaves exactly as it does locally: no paywall,
 no quotas, no database.
 """
@@ -83,6 +83,10 @@ class PaymentProvider(ABC):
 
     #: registry name, eg "square"
     name: str = ""
+
+    #: Seconds a checkout stays payable, or None if it never lapses. Billing reuses a pending
+    #: checkout for a document, but makes a new one once the old one is about to lapse.
+    checkout_lifetime: int | None = None
 
     @abstractmethod
     def create_checkout(self, *, order_id: str, product: Product, redirect_url: str) -> CheckoutSession:

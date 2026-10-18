@@ -1,4 +1,4 @@
-"""Pay per document. Off unless $AGLC_PAYMENTS names a provider (`square`, or `fake`).
+"""Pay per document. Off unless $AGLC_PAYMENTS names a provider (`square`, `stripe`, or `fake`).
 
 When it is on, processing is free but returns a redacted preview: every footnote's
 stamp, all warnings, and only the first PREVIEW_FULL changed footnotes in full. The full
@@ -38,6 +38,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 
@@ -535,6 +536,22 @@ def _public_base(request: Request) -> str:
     return (os.environ.get("AGLC_PUBLIC_URL") or str(request.base_url)).rstrip("/")
 
 
+CHECKOUT_LAPSE_MARGIN = 300  # seconds: a checkout this close to lapsing isn't offered again
+
+
+def _checkout_lapsed(order: sqlite3.Row) -> bool:
+    """Has this pending order's checkout (nearly) lapsed, so that it shouldn't be offered again?
+    The order stays pending, so a payment made at the last minute is still applied."""
+    try:
+        lifetime = get_payment_provider(order["provider"]).checkout_lifetime
+    except (PaymentError, ValueError):
+        return False
+    if not lifetime:
+        return False
+    age = (datetime.now(timezone.utc) - datetime.fromisoformat(order["created_at"])).total_seconds()
+    return age > lifetime - CHECKOUT_LAPSE_MARGIN
+
+
 @router.post("/api/checkout")
 def create_checkout(body: CheckoutRequest, request: Request) -> dict:
     _require_enabled()
@@ -552,7 +569,7 @@ def create_checkout(body: CheckoutRequest, request: Request) -> dict:
         raise HTTPException(409, "Some footnotes couldn't be read. Re-run them (free) before unlocking.")
 
     for order in store.orders_for(session_id):  # don't make a second link for the same document
-        if order["status"] == "pending" and order["checkout_url"]:
+        if order["status"] == "pending" and order["checkout_url"] and not _checkout_lapsed(order):
             store.update_order(order["id"])  # touched: the retention window runs from the latest checkout
             return {"checkout_url": order["checkout_url"], "order_id": order["id"]}
 

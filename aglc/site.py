@@ -16,6 +16,7 @@ and analytics are set in one place:
                       $AGLC_LOG_RETENTION_DAYS; an unset one shows as a visible TODO
     {{gst_note}}      from $AGLC_GST_REGISTERED (default: not registered)
     {{analytics_note}} whether analytics is on ($AGLC_PLAUSIBLE_DOMAIN)
+    {{payment_provider}} "Stripe" when $AGLC_PAYMENTS=stripe, otherwise "Square"
     {{> name}}        web/partials/<name>.html
 """
 
@@ -99,6 +100,11 @@ def analytics_note() -> str:
     return "We don't use analytics or tracking scripts."
 
 
+def payment_provider() -> str:
+    """The name of the payment provider the legal pages mention (Square unless $AGLC_PAYMENTS=stripe)."""
+    return "Stripe" if (os.environ.get("AGLC_PAYMENTS") or "").strip().lower() == "stripe" else "Square"
+
+
 def log_retention() -> str:
     days = (os.environ.get("AGLC_LOG_RETENTION_DAYS") or "").strip()
     if not days:
@@ -120,6 +126,7 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "contact": contact_link(),
         "gst_note": gst_note(),
         "analytics_note": analytics_note(),
+        "payment_provider": payment_provider(),
         "log_retention": log_retention(),
         **(extra or {}),
     }

@@ -11,7 +11,7 @@
                     <li><strong>The footnotes</strong> are sent to an AI model, which reads them and returns their parts (names, years, report series, pinpoints). The body text of your essay is not sent to the AI model.</li>
                     <li><strong>The body text</strong> is checked by our own code on our server (for example, footnote numbers after punctuation). It isn't sent anywhere else.</li>
                     <li><strong>What we keep:</strong> your uploaded document, the corrected document, the results shown on the page, the file name, and the date. These are kept so you can come back to your results, pay, and download again.</li>
-                    <li><strong>How long:</strong> {{retention_hours}} hours. Your uploaded document, the corrected document, the results and the file name are deleted automatically {{retention_hours}} hours after you last upload, check out or pay for that document. After that the results link no longer works and the document can't be downloaded again. A record of any order (amount, status and Square's references) is kept for our accounts.</li>
+                    <li><strong>How long:</strong> {{retention_hours}} hours. Your uploaded document, the corrected document, the results and the file name are deleted automatically {{retention_hours}} hours after you last upload, check out or pay for that document. After that the results link no longer works and the document can't be downloaded again. A record of any order (amount, status and {{payment_provider}}'s references) is kept for our accounts.</li>
                 </ul>
                 <p>Anyone with your results link (the page address after you check a document) can see the results for that document, so share it only if you mean to.</p>
 
@@ -19,7 +19,7 @@
                 <p>Footnotes are read by a DeepSeek model, reached through <a href="https://openrouter.ai/privacy">OpenRouter</a>, which passes each request to a company that runs the model. We only allow companies that, under OpenRouter's rules, don't store or train on the requests they receive. These companies, and OpenRouter, may be outside Australia. Only the footnotes are sent, never the body of your essay.</p>
 
                 <h2>Payments</h2>
-                <p>Payments are taken on Square's own checkout page. Your card details go to Square and never reach our server. We keep a record of each order: the amount, its status, and Square's payment and order references, so we can confirm payment and give refunds.</p>
+                <p>Payments are taken on {{payment_provider}}'s own checkout page. Your card details go to {{payment_provider}} and never reach our server. We keep a record of each order: the amount, its status, and {{payment_provider}}'s payment and order references, so we can confirm payment and give refunds.</p>
 
                 <h2>Free preview limits</h2>
                 <p>To limit free previews to a few a day, we set one cookie (<code>aglc_anon</code>) holding a random identifier, kept for a year. We also record a one-way hash of your IP address, salted and changed every day, so we can count previews per day without keeping your address in our database.</p>
