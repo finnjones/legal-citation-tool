@@ -436,11 +436,51 @@ def test_policy_pages_keep_consumer_law_rights(path):
     assert "Nothing here limits your rights under the Australian Consumer Law." in client.get(path).text
 
 
-def test_privacy_page_marks_unknown_facts_as_todo():
+def test_privacy_page_describes_the_ai_model_honestly():
     text = client.get("/privacy").text
-    assert "[TODO: confirm the OpenRouter account's data settings" in text
-    assert "OpenRouter" in text and "DeepSeek" in text
-    assert "never used for training" not in text
+    assert "OpenRouter" in text and "DeepSeek" in text and "don't store or train on" in text
+    assert "outside Australia" in text and "never used for training" not in text
+
+
+@pytest.mark.parametrize("path", ["/privacy", "/terms", "/about", "/refunds"])
+def test_unset_owner_details_show_as_todo(path):
+    text = client.get(path).text
+    assert "[TODO: set AGLC_CONTACT_EMAIL" in text  # the footer, at least
+    assert site.POLICY_DATE in text or path == "/about"
+
+
+def test_owner_details_fill_the_legal_pages(monkeypatch):
+    for var, value in {"AGLC_OWNER_NAME": "Sam Example", "AGLC_CONTACT_EMAIL": "hi@example.com",
+                       "AGLC_ABN": "12 345 678 901", "AGLC_STATE": "Victoria",
+                       "AGLC_OWNER_ABOUT": "A law student.", "AGLC_LOG_RETENTION_DAYS": "14"}.items():
+        monkeypatch.setenv(var, value)
+    pages = {p: client.get(p).text for p in ("/privacy", "/terms", "/about", "/refunds")}
+    assert all("[TODO" not in text for text in pages.values()), [p for p, t in pages.items() if "[TODO" in t]
+    assert "Sam Example" in pages["/terms"] and "law of Victoria, Australia" in pages["/terms"]
+    assert '<a href="mailto:hi@example.com">hi@example.com</a>' in pages["/refunds"]
+    assert "kept for 14 days" in pages["/privacy"] and "A law student." in pages["/about"]
+
+
+def test_owner_details_are_escaped(monkeypatch):
+    monkeypatch.setenv("AGLC_OWNER_NAME", "<script>x</script>")
+    assert "<script>x</script>" not in client.get("/terms").text
+
+
+def test_gst_and_analytics_notes_follow_the_settings(monkeypatch):
+    assert "aren't registered for GST" in client.get("/terms").text
+    assert "don't use analytics" in client.get("/privacy").text
+    monkeypatch.setenv("AGLC_GST_REGISTERED", "true")
+    monkeypatch.setenv("AGLC_PLAUSIBLE_DOMAIN", "cite.example.com")
+    assert "The price includes GST." in client.get("/terms").text
+    assert "Analytics is on" in client.get("/privacy").text
+
+
+def test_terms_limit_liability_but_keep_consumer_law():
+    text = client.get("/terms").text
+    assert "No guarantee of accuracy" in text and "To the extent the law allows" in text
+    assert "marks or grades" in text
+    refunds = client.get("/refunds").text
+    assert "within 14 days of paying" in refunds and "change of mind" in refunds
 
 
 def test_privacy_page_states_the_real_retention_period(monkeypatch):

@@ -183,6 +183,10 @@ class OpenRouterProvider(OpenAIProvider):
         # Only route to upstream hosts that honour response_format, so JSON mode is enforced,
         # and let OpenRouter fall through to another host when one is down.
         routing: dict[str, Any] = {"require_parameters": True, "allow_fallbacks": True}
+        # Only hosts that don't store or train on requests, unless $AGLC_OPENROUTER_DATA_COLLECTION
+        # is "allow". The privacy page says so; it is never relaxed to find a host.
+        if _data_collection() == "deny":
+            routing["data_collection"] = "deny"
         # hosts known to misbehave, plus any that just sent an empty reply (send the retry elsewhere)
         excluded = list(dict.fromkeys([*self._ignored_hosts, *self._failed_hosts]))
         if excluded:
@@ -197,6 +201,11 @@ class OpenRouterProvider(OpenAIProvider):
         elif reasoning in ("low", "medium", "high"):
             body["reasoning"] = {"effort": reasoning}
         return body
+
+
+def _data_collection() -> str:
+    value = (os.environ.get("AGLC_OPENROUTER_DATA_COLLECTION") or "deny").strip().lower()
+    return "allow" if value == "allow" else "deny"
 
 
 def _ignored_hosts(option: str | list[str] | None, default: tuple[str, ...]) -> list[str]:

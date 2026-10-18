@@ -487,6 +487,17 @@ def _reconcile(session_id: str) -> None:
             _refund(order["id"])
 
 
+def cancel_checkouts_quietly(session_id: str) -> None:
+    """For the retention sweep, after deleting a document: stop its unpaid checkouts taking
+    payment. Orders are left as they are, so a payment that still arrives is refunded."""
+    for order in get_store().orders_for(session_id):
+        if order["status"] == "pending" and order["checkout_id"]:
+            try:
+                get_payment_provider(order["provider"]).cancel_checkout(order["checkout_id"])
+            except Exception:
+                log.warning("could not cancel the checkout of a deleted document's order %s", order["id"][:8])
+
+
 def reconcile_quietly(session_id: str) -> None:
     """_reconcile for the retention sweep, which must carry on whatever the provider says."""
     try:

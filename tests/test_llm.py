@@ -551,7 +551,7 @@ def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
     assert req["model"] == "deepseek/deepseek-v4-flash"
     assert req["response_format"]["type"] == "json_schema"
     assert req["extra_body"] == {
-        "provider": {"require_parameters": True, "allow_fallbacks": True, "ignore": ["DigitalOcean"]},
+        "provider": {"require_parameters": True, "allow_fallbacks": True, "data_collection": "deny", "ignore": ["DigitalOcean"]},
         "reasoning": {"enabled": False},
     }
 
@@ -714,6 +714,17 @@ def test_openrouter_ignored_hosts_come_from_the_environment(monkeypatch):
     )
     provider.generate_json(system="s", user="u", output_model=SimpleModel)
     assert completions.requests[0]["extra_body"]["provider"]["ignore"] == ["HostA", "HostB"]
+
+
+def test_openrouter_data_collection_is_denied_unless_allowed(monkeypatch):
+    provider, completions = _scripted_provider(
+        monkeypatch, "openrouter:deepseek/deepseek-v4-flash", [_completion('{"name": "A", "age": 1}')] * 2
+    )
+    provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert completions.requests[0]["extra_body"]["provider"]["data_collection"] == "deny"
+    monkeypatch.setenv("AGLC_OPENROUTER_DATA_COLLECTION", "allow")
+    provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert "data_collection" not in completions.requests[1]["extra_body"]["provider"]
 
 
 def test_openrouter_ignore_list_can_be_turned_off(monkeypatch):

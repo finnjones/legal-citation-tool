@@ -76,6 +76,30 @@ on it at openrouter.ai/keys (eg a little above `AGLC_FREE_GLOBAL_PER_DAY` × the
 long essay × a few days). With payments on, the client can't choose the model (the server
 uses `AGLC_LLM` only), so the limit maps directly to the configured model's price.
 
+The privacy page says footnotes only go to hosts that don't store or train on requests.
+The app enforces that with OpenRouter's `data_collection: "deny"` routing
+(`AGLC_OPENROUTER_DATA_COLLECTION`, default `deny`; never set it to `allow` in production
+without changing the page). Also keep **prompt logging off** in the OpenRouter account's
+privacy settings. If OpenRouter ever has no such host for the model, requests fail with a
+"No endpoints" error instead of falling back: switch `AGLC_LLM` to a model that has one.
+
+## 4a. Who runs the site (the legal pages)
+
+The Privacy, Terms, Refunds and About pages and the footer read these from the environment;
+any that's unset shows on the page as a visible TODO:
+
+```bash
+AGLC_OWNER_NAME="Your Name"            # or your business name
+AGLC_CONTACT_EMAIL=hello@example.com    # shown as a mailto link
+AGLC_ABN="12 345 678 901"
+AGLC_STATE="New South Wales"            # whose law governs the terms
+AGLC_OWNER_ABOUT="A sentence or two about who you are and why you built it."
+AGLC_LOG_RETENTION_DAYS=14              # and configure journald/your proxy to match
+AGLC_GST_REGISTERED=false               # true once registered: the price then "includes GST"
+```
+
+Update `POLICY_DATE` in `aglc/site.py` whenever you change those pages.
+
 ## 5. The deploy script and workflow
 
 The workflow tests with `uv sync --all-extras` and then runs the server-side `deploy` script.

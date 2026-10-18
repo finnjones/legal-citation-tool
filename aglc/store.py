@@ -198,6 +198,19 @@ class Store:
         with self.read() as conn:
             return conn.execute("SELECT * FROM documents WHERE session_id = ?", (session_id,)).fetchone()
 
+    def purged_states(self, session_ids: list[str]) -> dict[str, bool]:
+        """{session id: whether it was purged} for those of `session_ids` with a row."""
+        states: dict[str, bool] = {}
+        with self.read() as conn:
+            for i in range(0, len(session_ids), 500):  # SQLite's limit on query parameters
+                chunk = session_ids[i : i + 500]
+                rows = conn.execute(
+                    f"SELECT session_id, purged_at FROM documents WHERE session_id IN ({','.join('?' * len(chunk))})",
+                    chunk,
+                ).fetchall()
+                states.update({r["session_id"]: bool(r["purged_at"]) for r in rows})
+        return states
+
     def expired_documents(self, cutoff: str) -> list[tuple[str, bool]]:
         """(session id, has an old pending order) for each document past its window."""
         with self.read() as conn:
@@ -213,8 +226,12 @@ class Store:
         checked in the same transaction a webhook would unlock it in. True if marked."""
         with self.transaction() as conn:
             return conn.execute(
-                f"UPDATE documents AS d SET purged_at = :now, filename = '' WHERE d.session_id = :sid AND {_EXPIRED}",
-                {"now": now(), "sid": session_id, "cutoff": cutoff},
+                "UPDATE documents AS d SET purged_at = :now, filename = '',"
+                # who processed it isn't needed once it's gone; today's rows still count for quotas
+                " anon_id = CASE WHEN d.day < :today THEN NULL ELSE d.anon_id END,"
+                " ip_hash = CASE WHEN d.day < :today THEN NULL ELSE d.ip_hash END"
+                f" WHERE d.session_id = :sid AND {_EXPIRED}",
+                {"now": now(), "sid": session_id, "cutoff": cutoff, "today": today()},
             ).rowcount == 1
 
     def free_uses_today(self, *, ip_hash: str | None, anon_id: str | None) -> tuple[int, int, int]:

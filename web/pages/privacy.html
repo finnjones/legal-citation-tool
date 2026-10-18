@@ -1,9 +1,9 @@
                 <h1>Privacy</h1>
                 <p class="lede">What happens to your essay when you check it, what is kept, and who else sees it.</p>
-                <p class="updated">Last updated <span class="todo">[TODO: date]</span></p>
+                <p class="updated">Last updated {{policy_date}}</p>
 
                 <h2>Who we are</h2>
-                <p>{{brand}} is run by <span class="todo">[TODO: owner name]</span>, ABN <span class="todo">[TODO: ABN]</span>. Questions about privacy go to <span class="todo">[TODO: contact email]</span>.</p>
+                <p>{{brand}} is run by {{owner}}, ABN {{abn}}. Questions about privacy go to {{contact}}.</p>
 
                 <h2>Your document</h2>
                 <p>When you check an essay, the .docx is uploaded to our server so a corrected copy can be made. There is no account, so the document isn't linked to your name.</p>
@@ -16,18 +16,18 @@
                 <p>Anyone with your results link (the page address after you check a document) can see the results for that document, so share it only if you mean to.</p>
 
                 <h2>The AI model</h2>
-                <p>Footnotes are read by a DeepSeek model, reached through OpenRouter, which passes the request to a model provider. Their own terms and privacy policies apply to what they receive. <span class="todo">[TODO: confirm the OpenRouter account's data settings (prompt logging, which upstream providers may be used and where they are), and say here whether those providers may keep or train on what they receive. Don't promise they won't train on it unless that is confirmed.]</span></p>
+                <p>Footnotes are read by a DeepSeek model, reached through <a href="https://openrouter.ai/privacy">OpenRouter</a>, which passes each request to a company that runs the model. We only allow companies that, under OpenRouter's rules, don't store or train on the requests they receive. These companies, and OpenRouter, may be outside Australia. Only the footnotes are sent, never the body of your essay.</p>
 
                 <h2>Payments</h2>
                 <p>Payments are taken on Square's own checkout page. Your card details go to Square and never reach our server. We keep a record of each order: the amount, its status, and Square's payment and order references, so we can confirm payment and give refunds.</p>
 
                 <h2>Free preview limits</h2>
                 <p>To limit free previews to a few a day, we set one cookie (<code>aglc_anon</code>) holding a random identifier, kept for a year. We also record a one-way hash of your IP address, salted and changed every day, so we can count previews per day without keeping your address in our database.</p>
-                <p>Our web server's own logs record IP addresses for security and troubleshooting. <span class="todo">[TODO: how long server logs are kept]</span></p>
+                <p>Our web server's own logs record IP addresses for security and troubleshooting. {{log_retention}}</p>
 
                 <h2>Fonts and analytics</h2>
                 <p>The page's fonts are served from our own server, so loading the page doesn't contact any other site.</p>
-                <p>If we turn on analytics, we use Plausible, which counts page views without cookies and without personal data. <span class="todo">[TODO: say whether analytics is on]</span></p>
+                <p>{{analytics_note}}</p>
 
                 <h2>Your choices</h2>
-                <p>You can ask us to delete a document you checked: send the results link to <span class="todo">[TODO: contact email]</span>. You can also ask what we hold about you, or complain about how we've handled your information. If you're not satisfied with our answer, you can contact the Office of the Australian Information Commissioner.</p>
+                <p>You can ask us to delete a document you checked: send the results link to {{contact}}. You can also ask what we hold about you, or complain about how we've handled your information. If you're not satisfied with our answer, you can contact the Office of the Australian Information Commissioner.</p>

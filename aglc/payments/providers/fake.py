@@ -46,6 +46,8 @@ class FakePaymentProvider(PaymentProvider):
         self.secret = options.get("secret") or os.environ.get("AGLC_FAKE_WEBHOOK_SECRET") or "fake-webhook-secret"
         self.checkouts: dict[str, FakeCheckout] = {}
         self.fail_refunds = False
+        #: checkout ids passed to cancel_checkout
+        self.cancelled: list[str] = []
 
     # ---- PaymentProvider ---------------------------------------------------- #
 
@@ -96,6 +98,9 @@ class FakePaymentProvider(PaymentProvider):
 
     def sign(self, body: bytes) -> str:
         return hmac.new(self.secret.encode(), body, hashlib.sha256).hexdigest()
+
+    def cancel_checkout(self, checkout_id: str) -> None:
+        self.cancelled.append(checkout_id)
 
     def pay(self, provider_order_id: str) -> str:
         """The customer pays; returns the payment id."""

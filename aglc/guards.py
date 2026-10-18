@@ -90,9 +90,20 @@ class GuardMiddleware:
             await self.app(scope, limited_receive, guarded_send)
         except Exception:
             if not exceeded:
+                if not started:
+                    # Answer here, with the headers, before Starlette's own bare 500 would.
+                    # Re-raised so the server still logs it (Starlette sees the reply was sent).
+                    await _server_error(send_with_headers)
                 raise
         if exceeded and not started:
             await _too_large(send_with_headers)
+
+
+async def _server_error(send) -> None:
+    body = json.dumps({"detail": "Something went wrong on our side. Please try again."}).encode()
+    await send({"type": "http.response.start", "status": 500,
+                "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
+    await send({"type": "http.response.body", "body": body})
 
 
 async def _too_large(send) -> None:

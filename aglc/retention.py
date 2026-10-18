@@ -103,14 +103,15 @@ def _sweep_paid(sessions: Path, cutoff: datetime) -> int:
         if store.purge_document(session_id, stamp):
             shutil.rmtree(sessions / session_id, ignore_errors=True)
             deleted += 1
+            if has_pending and billing.enabled():
+                billing.cancel_checkouts_quietly(session_id)
     # Folders with no live row: a crash mid-upload, or a purge whose delete failed.
-    for d in sessions.iterdir():
-        if not _is_session_dir(d):
-            continue
-        doc = store.document(d.name)
-        if (doc is None and _older_than(d, cutoff.timestamp())) or (doc is not None and doc["purged_at"]):
+    folders = [d for d in sessions.iterdir() if _is_session_dir(d)]
+    purged = store.purged_states([d.name for d in folders])  # one query, not one per folder
+    for d in folders:
+        if (d.name not in purged and _older_than(d, cutoff.timestamp())) or purged.get(d.name):
             shutil.rmtree(d, ignore_errors=True)
-            deleted += doc is None
+            deleted += d.name not in purged
     return deleted
 
 

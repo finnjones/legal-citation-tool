@@ -102,6 +102,10 @@ class PaymentProvider(ABC):
     def refund(self, *, payment_id: str, amount: int, currency: str, reason: str, idempotency_key: str) -> Refund:
         """Refund a payment in full."""
 
+    def cancel_checkout(self, checkout_id: str) -> None:
+        """Stop a hosted checkout from taking payment (its document has been deleted).
+        Best effort: a payment that still arrives is refunded. Default: nothing to do."""
+
     def __repr__(self) -> str:
         return f"<{type(self).__name__} {self.name}>"
 

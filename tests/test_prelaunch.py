@@ -263,6 +263,35 @@ def test_abandoned_checkout_no_longer_holds_the_document(paid, client):
     assert _sweep() == 1
 
 
+def test_deleting_a_document_cancels_its_unpaid_checkout(paid, client, fake):
+    sid = _process(client).json()["id"]
+    order_id = _checkout(client, sid)["order_id"]
+    _age(sid, 30, orders=25)
+    assert _sweep() == 1
+    order = get_store().order(order_id)
+    assert fake.cancelled == [order["checkout_id"]]
+    assert order["status"] == "pending"  # left alone, so a payment that still arrives is refunded
+
+
+def test_a_failed_cancel_doesnt_stop_the_sweep(paid, client, fake, monkeypatch):
+    sid = _process(client).json()["id"]
+    _checkout(client, sid)
+    _age(sid, 30, orders=25)
+    monkeypatch.setattr(fake, "cancel_checkout", mock.Mock(side_effect=RuntimeError("Square is down")))
+    assert _sweep() == 1
+
+
+def test_purged_rows_forget_who_processed_them(paid, client):
+    sid = _process(client).json()["id"]
+    assert get_store().document(sid)["anon_id"]
+    _age(sid, 25)
+    with get_store().transaction() as conn:  # processed on an earlier day
+        conn.execute("UPDATE documents SET day = date('now', '-2 day') WHERE session_id = ?", (sid,))
+    _sweep()
+    doc = get_store().document(sid)
+    assert doc["anon_id"] is None and doc["ip_hash"] is None and doc["filename"] == ""
+
+
 def test_lost_webhook_is_reconciled_before_deleting(paid, client, fake):
     sid = _process(client).json()["id"]
     poid = _provider_order_id(_checkout(client, sid)["order_id"])
@@ -348,6 +377,14 @@ def test_security_headers(client):
     assert r.headers["cache-control"] == "no-store"
     assert r.headers["x-content-type-options"] == "nosniff"
     assert client.get("/").headers["referrer-policy"] == "no-referrer"
+
+
+def test_unhandled_errors_get_the_security_headers_and_a_generic_message():
+    with mock.patch("aglc.site.index", side_effect=RuntimeError("/secret/path")):
+        r = TestClient(api.app, raise_server_exceptions=False).get("/")
+    assert r.status_code == 500 and "secret" not in r.text
+    assert r.json()["detail"].startswith("Something went wrong")
+    assert r.headers["x-content-type-options"] == "nosniff" and r.headers["referrer-policy"] == "no-referrer"
 
 
 def test_access_log_redacts_session_ids():

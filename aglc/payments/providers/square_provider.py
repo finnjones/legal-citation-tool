@@ -111,6 +111,11 @@ class SquareProvider(PaymentProvider):
             raise PaymentError(f"Square returned no payment link: {getattr(resp, 'errors', None)}")
         return CheckoutSession(checkout_id=link.id or "", url=link.url, provider_order_id=link.order_id)
 
+    def cancel_checkout(self, checkout_id: str) -> None:
+        # A deleted payment link can't be paid, so a late payment (refunded, but Square keeps
+        # its fee) can't happen.
+        self._call(self.client.checkout.payment_links.delete, id=checkout_id)
+
     def parse_webhook(self, *, body: bytes, headers: Mapping[str, str], url: str) -> WebhookEvent:
         if not self.signature_key:
             raise WebhookSignatureError("SQUARE_WEBHOOK_SIGNATURE_KEY is not set")
