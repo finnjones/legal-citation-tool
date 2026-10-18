@@ -11,12 +11,12 @@ import zipfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import pipeline
+from . import billing, pipeline
 from .llm.base import LLMError, available_providers, default_spec, get_provider
 from .models import ProcessResult
 
@@ -43,10 +43,16 @@ def _describe(e: Exception) -> str:
 load_env()
 
 app = FastAPI(title="AGLC4 Citation Tool API")
+app.include_router(billing.router)  # every route 404s unless AGLC_PAYMENTS is set
 
 # Temporary directory for uploads and outputs
 _TEMP_DIR = Path(tempfile.gettempdir()) / "aglc_sessions"
 _TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _sessions_dir() -> Path:
+    """Paid documents are kept in $AGLC_DATA_DIR, which outlives the temp directory."""
+    return billing.sessions_dir() if billing.enabled() else _TEMP_DIR
 
 
 # ---- Shared dependencies -------------------------------------------------- #
@@ -91,6 +97,8 @@ async def get_providers() -> dict:
 
 @app.post("/api/process")
 async def process_document(
+    request: Request,
+    response: Response,
     file: Annotated[UploadFile, File(description="Word document (.docx)")],
     model: Annotated[str | None, Form()] = None,
     track_changes: Annotated[bool, Form()] = True,
@@ -107,16 +115,21 @@ async def process_document(
         fix_body: Whether to fix footnote numbers and headings in the body text
 
     Returns:
-        JSON with id, footnotes, bibliography, warnings, body_fixes
+        JSON with id, footnotes, bibliography, warnings, body_fixes. With payments on
+        (see aglc/billing.py) this is a redacted preview with `locked: true`.
     """
     # Validate file type
     if not file.filename or not file.filename.lower().endswith(".docx"):
         raise HTTPException(status_code=400, detail="File must be a .docx document")
 
+    paid = billing.enabled()
+    visitor = billing.admit(request, response) if paid else None  # free-use quotas: 429
+
     # Create session directory
     session_id = str(uuid.uuid4())
-    session_dir = _TEMP_DIR / session_id
+    session_dir = _sessions_dir() / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
+    started = False
 
     try:
         # Save original filename for later download
@@ -133,7 +146,7 @@ async def process_document(
 
         # Process in thread pool
         output_file = session_dir / "output.docx"
-        result: ProcessResult = await run_in_threadpool(
+        process = lambda: run_in_threadpool(  # noqa: E731
             pipeline.process_docx,
             input_file,
             output_file,
@@ -142,6 +155,14 @@ async def process_document(
             track_changes=track_changes,
             fix_body=fix_body,
         )
+        if paid:
+            await run_in_threadpool(billing.check_footnote_cap, input_file)  # 413, before any LLM call
+            with billing.processing_slot():  # 503 when too many documents are in flight
+                billing.start_document(session_id, file.filename, visitor)
+                started = True
+                result: ProcessResult = await process()
+        else:
+            result = await process()
 
         # Format response
         footnotes = []
@@ -164,7 +185,7 @@ async def process_document(
 
         warnings = [{"footnote": w.footnote, "message": w.message} for w in result.warnings]
 
-        return {
+        full = {
             "id": session_id,
             "footnotes": footnotes,
             "bibliography": bibliography,
@@ -172,10 +193,13 @@ async def process_document(
             "body_fixes": [{"footnote": b.footnote, "message": b.message, "applied": b.applied}
                            for b in result.body_fixes],
         }
+        return billing.save_result(session_id, file.filename, full) if paid else full
 
     except Exception as e:
         # Clean up on error
         shutil.rmtree(session_dir, ignore_errors=True)
+        if started:
+            billing.fail_document(session_id)
         if isinstance(e, HTTPException):
             raise
         log.exception("processing %s failed", file.filename)
@@ -190,15 +214,18 @@ async def download_document(session_id: str) -> FileResponse:
         session_id: Session UUID from /api/process response
 
     Returns:
-        The processed .docx file
+        The processed .docx file (402 until paid for, when payments are on)
     """
     # Validate session_id is a valid UUID
     try:
-        uuid.UUID(session_id)
+        session_id = str(uuid.UUID(session_id))
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid session ID")
 
-    session_dir = _TEMP_DIR / session_id
+    if billing.enabled():
+        billing.require_unlocked(session_id)
+
+    session_dir = _sessions_dir() / session_id
     output_file = session_dir / "output.docx"
     filename_file = session_dir / "original_filename.txt"
 

@@ -18,6 +18,7 @@ anthropic = ["anthropic>=0.60"]
 openai = ["openai>=1.40"]
 gemini = ["google-genai>=1.0"]
 all = ["anthropic>=0.60", "openai>=1.40", "google-genai>=1.0"]
+square = ["squareup>=42"]  # payments (AGLC_PAYMENTS=square)
 
 [project.scripts]
 aglc = "aglc.cli:app"

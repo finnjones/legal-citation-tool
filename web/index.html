@@ -196,6 +196,12 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             border: 1px solid color-mix(in oklch, var(--refer) 40%, transparent); border-radius: 4px;
         }
         .error strong { color: var(--refer); margin-right: 6px; }
+        .notice {
+            display: none; margin-top: 24px; padding: 14px 18px;
+            background: var(--stamp-wash); color: var(--ink);
+            border: 1px solid color-mix(in oklch, var(--stamp) 35%, transparent); border-radius: 4px;
+            font-family: var(--font-typed);
+        }
 
         /* Stamps */
         .stamp {
@@ -299,6 +305,12 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
         .notes { margin-top: 10px; display: grid; gap: 4px; font-size: 0.875rem; color: var(--ink); max-width: 72ch; }
         .notes p::before { content: "Warning: "; font-weight: 700; color: var(--refer); }
         .entry .stamp { margin-top: 2px; }
+        .locked-note {
+            display: inline-block; font-family: var(--font-ui); font-size: 0.875rem; color: var(--ink-2);
+            padding: 2px 10px; border: 1px dashed var(--rule); border-radius: 3px;
+        }
+        .paywall strong { font-weight: 600; }
+        .bibliography .locked-note { margin-top: 2px; }
 
         .empty-filter { padding: 28px 20px; color: var(--ink-2); text-align: center; }
 
@@ -367,18 +379,19 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                     <div class="busy-rule" aria-hidden="true"></div>
                 </div>
 
-                <aside class="how">
+                <aside class="how" id="how">
                     <h2>How it works</h2>
                     <ol>
                         <li><span><strong>An AI model reads each footnote</strong> and pulls out its parts: names, years, reports, pinpoints.</span></li>
                         <li><span><strong>Tested AGLC4 rules</strong> rebuild every citation, adding <em>Ibid</em>, (n x) references and short titles.</span></li>
                         <li><span><strong>Nothing is dropped or invented.</strong> A footnote that can't be fully accounted for is left exactly as you wrote it and marked Refer.</span></li>
-                        <li><span><strong>Review, then download</strong> your .docx with every edit as a Word tracked change.</span></li>
+                        <li id="howDownload"><span><strong>Review, then download</strong> your .docx with every edit as a Word tracked change.</span></li>
                     </ol>
                 </aside>
             </section>
 
             <div class="error" id="errorMessage" role="alert"></div>
+            <div class="notice" id="noticeMessage" role="status" aria-live="polite"></div>
 
             <section class="results-section" id="resultsSection" aria-labelledby="registerTitle">
                 <div class="register-head">
@@ -395,7 +408,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                     </div>
                     <label class="switch"><input type="checkbox" id="markupToggle" role="switch" /> Show markup</label>
                     <button class="btn-primary" id="downloadButton">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg>
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="downloadIcon"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg>
                         <span id="downloadLabel">Download .docx</span>
                     </button>
                 </div>
@@ -410,7 +423,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             </section>
         </main>
 
-        <footer>Runs on your machine. Only your footnotes are sent, and only to the AI model set in your .env.</footer>
+        <footer id="footer">Runs on your machine. Only your footnotes are sent, and only to the AI model set in your .env.</footer>
     </div>
 
     <script>
@@ -420,14 +433,122 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
         let processedFilename = null;
         let selectedFile = null;
         let currentFilter = "all";
+        let config = { payments: false };
+        let locked = false;
+        const ICON_DOWNLOAD = `<path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/>`;
+        const ICON_LOCK = `<rect x="3" y="7" width="10" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>`;
 
         window.addEventListener("error", (e) => showError(`Unexpected error: ${e.message}`));
         window.addEventListener("unhandledrejection", (e) => showError(`Unexpected error: ${e.reason?.message || e.reason}`));
 
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", async () => {
             setupUpload();
             setupControls();
+            await loadConfig();
+            resumeSession();
         });
+
+        // Payments (only when the server has AGLC_PAYMENTS set)
+        async function loadConfig() {
+            try {
+                const response = await fetch("/api/config");
+                if (response.ok) config = await response.json();
+            } catch {}
+            if (!config.payments) return;
+            const price = escapeHtml(config.price.display);
+            document.getElementById("howDownload").innerHTML =
+                `<span><strong>Preview free, then unlock.</strong> The first ${config.preview_footnotes} corrections are shown free; ${price} unlocks every change and your .docx with each edit as a Word tracked change.</span>`;
+            document.getElementById("footer").textContent =
+                "Only your footnotes are sent to the AI model. Card payments are taken on the payment provider's own checkout page; card details never reach this site.";
+        }
+
+        // After checkout (?paid=1&session=…) or a reload (?session=…), bring the results back
+        async function resumeSession() {
+            const params = new URLSearchParams(location.search);
+            const sessionId = params.get("session");
+            if (!config.payments || !sessionId) return;
+            currentSessionId = sessionId;
+            if (params.get("paid") === "1") {
+                showNotice("Confirming payment…");
+                const status = await pollEntitlement(sessionId);
+                history.replaceState(null, "", `/?session=${encodeURIComponent(sessionId)}`);
+                if (status === "unlocked") {
+                    await loadResults(sessionId);
+                    showNotice("Payment received. Every footnote is unlocked and your .docx is ready to download.");
+                    return;
+                }
+                if (status === "refunded") {
+                    showError("This document's files were no longer available, so your payment has been refunded. Please process the document again.");
+                    return;
+                }
+                showNotice("We haven't had confirmation of your payment yet. It can take a minute: refresh this page shortly. If you paid and it still hasn't unlocked, keep this page's address.");
+            }
+            await loadResults(sessionId);
+        }
+
+        async function pollEntitlement(sessionId) {
+            const deadline = Date.now() + 90000;
+            while (Date.now() < deadline) {
+                try {
+                    const response = await fetch(`/api/entitlement/${encodeURIComponent(sessionId)}`);
+                    if (response.status === 404) return "missing";
+                    if (response.ok) {
+                        const { status } = await response.json();
+                        if (status === "unlocked" || status === "refunded") return status;
+                    }
+                } catch {}
+                await new Promise(r => setTimeout(r, 1500));
+            }
+            return "pending";
+        }
+
+        async function loadResults(sessionId) {
+            const response = await fetch(`/api/results/${encodeURIComponent(sessionId)}`);
+            if (!response.ok) {
+                let detail = "These results have expired. Please process the document again.";
+                try { detail = (await response.json()).detail || detail; } catch {}
+                hideNotice();
+                showError(detail);
+                return;
+            }
+            const result = await response.json();
+            currentSessionId = result.id;
+            processedFilename = result.filename || null;
+            if (processedFilename) {
+                const title = document.getElementById("matterTitle");
+                title.textContent = processedFilename;
+                title.classList.remove("empty");
+            }
+            displayResults(result);
+        }
+
+        async function startCheckout() {
+            const button = document.getElementById("downloadButton");
+            const label = document.getElementById("downloadLabel");
+            button.disabled = true;
+            label.textContent = "Opening checkout…";
+            try {
+                const response = await fetch("/api/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ session_id: currentSessionId }),
+                });
+                const body = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(body.detail || "Couldn't open the checkout");
+                if (body.unlocked) { await loadResults(currentSessionId); return; }
+                location.href = body.checkout_url;
+            } catch (error) {
+                showError(error.message);
+                button.disabled = false;
+                setDownloadButton();
+            }
+        }
+
+        function setDownloadButton() {
+            const price = config.price?.display || "";
+            document.getElementById("downloadIcon").innerHTML = locked ? ICON_LOCK : ICON_DOWNLOAD;
+            document.getElementById("downloadLabel").textContent = locked ? `Unlock and download (${price})` : `Download ${downloadName()}`;
+        }
 
         function setupUpload() {
             const section = document.getElementById("uploadSection");
@@ -470,7 +591,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
 
         function setupControls() {
             document.getElementById("processButton").addEventListener("click", processDocument);
-            document.getElementById("downloadButton").addEventListener("click", downloadDocument);
+            document.getElementById("downloadButton").addEventListener("click", () => locked ? startCheckout() : downloadDocument());
             document.getElementById("markupToggle").addEventListener("change", (e) => {
                 document.getElementById("footnotes").classList.toggle("markup", e.target.checked);
                 renderCitationBodies();
@@ -488,6 +609,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             }
 
             clearMessages();
+            hideNotice();
             showLoading(true);
             let succeeded = false;
 
@@ -508,6 +630,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                 const result = await response.json();
                 currentSessionId = result.id;
                 processedFilename = file.name;
+                if (config.payments) history.replaceState(null, "", `/?session=${encodeURIComponent(result.id)}`);
                 displayResults(result);
                 stampReceived();
                 succeeded = true;
@@ -527,6 +650,8 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
         let entries = [];
 
         function displayResults(result) {
+            locked = Boolean(result.locked);
+            document.getElementById("downloadButton").disabled = false;
             const refers = new Map();
             const general = [];
             for (const w of result.warnings || []) {
@@ -557,13 +682,19 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             const changedTotal = entries.filter(e => e.changed).length;
             document.getElementById("summary").textContent =
                 `${changedTotal} of ${entries.length} footnote${entries.length === 1 ? "" : "s"} changed`;
-            document.getElementById("downloadLabel").textContent = `Download ${downloadName()}`;
+            setDownloadButton();
 
             const bodyFixes = (result.body_fixes || []).map(b => ({
                 text: b.footnote ? `Footnote ${b.footnote}: ${b.message}` : b.message,
                 check: b.applied === false,
             }));
-            document.getElementById("warnings").innerHTML = (general.length ? `
+            const paywall = locked ? `
+                <div class="general-notes paywall">
+                    <p><span class="stamp" style="--tilt:-2deg">Preview</span><span>${result.locked_count
+                        ? `The first ${config.preview_footnotes ?? 3} corrected footnotes are shown in full. <strong>${result.locked_count} more</strong> ${result.locked_count === 1 ? "is" : "are"} stamped but hidden`
+                        : "Every correction is shown above"}${result.bibliography_entries ? `, and the bibliography (${result.bibliography_entries} ${result.bibliography_entries === 1 ? "entry" : "entries"}) is ready` : ""}. Unlock for ${escapeHtml(result.price?.display || config.price?.display || "")} to see everything and download the .docx.</span></p>
+                </div>` : "";
+            document.getElementById("warnings").innerHTML = paywall + (general.length ? `
                 <div class="general-notes">
                     ${general.map(m => `<p><span class="stamp refer" style="--tilt:-2deg">Warning</span><span>${escapeHtml(m)}</span></p>`).join("")}
                 </div>` : "") + (bodyFixes.length ? `
@@ -577,7 +708,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                 <li class="entry ${e.state}" data-state="${e.state}" id="fn-${e.number}">
                     <span class="margin-no" aria-label="Footnote ${e.number}">${e.number}</span>
                     <div>
-                        ${e.changed ? `<p class="cite was"><span class="was-label">Original: </span>${e.original_html}</p>` : ""}
+                        ${e.changed && !e.locked ? `<p class="cite was"><span class="was-label">Original: </span>${e.original_html}</p>` : ""}
                         <p class="cite now" data-index="${i}"></p>
                         ${e.notes.length ? `<div class="notes">${e.notes.map(m => `<p>${escapeHtml(m)}</p>`).join("")}</div>` : ""}
                     </div>
@@ -587,8 +718,10 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
 
             // Bibliography
             const bib = result.bibliography || [];
-            document.getElementById("bibliographyWrap").hidden = bib.length === 0;
-            document.getElementById("bibliographyOut").innerHTML = bib.length ? `
+            const lockedBib = locked && result.bibliography_entries > 0;
+            document.getElementById("bibliographyWrap").hidden = bib.length === 0 && !lockedBib;
+            document.getElementById("bibliographyOut").innerHTML = lockedBib ? `
+                <div class="bibliography"><span class="locked-note">${result.bibliography_entries} ${result.bibliography_entries === 1 ? "entry" : "entries"}, unlocked with the full results</span></div>` : bib.length ? `
                 <div class="bibliography">
                     ${bib.map(section => `
                         <h3>${escapeHtml(section.heading)}</h3>
@@ -614,6 +747,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             const markup = document.getElementById("markupToggle").checked;
             document.querySelectorAll(".cite.now").forEach(el => {
                 const e = entries[Number(el.dataset.index)];
+                if (e.locked) { el.innerHTML = `<span class="locked-note">Corrected citation unlocks with the full results</span>`; return; }
                 el.innerHTML = markup && e.changed ? diffHtml(e.original_html, e.formatted_html) : markMissing(e.formatted_html);
             });
         }
@@ -712,7 +846,11 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
 
             try {
                 const response = await fetch(`/api/download/${currentSessionId}`);
-                if (!response.ok) throw new Error("Download failed");
+                if (!response.ok) {
+                    let detail = "Failed to download document";
+                    try { detail = (await response.json()).detail || detail; } catch {}
+                    throw new Error(detail);
+                }
 
                 const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
@@ -725,7 +863,7 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
                 URL.revokeObjectURL(url);
             } catch (error) {
                 console.error("Error:", error);
-                showError("Failed to download document");
+                showError(error.message || "Failed to download document");
             }
         }
 
@@ -757,6 +895,16 @@ FORM: Registry filing ephemera, candidate 7 of 7; staging: preview before commit
             el.innerHTML = `<strong>${escapeHtml(title)}</strong>${escapeHtml(message)}`;
             el.style.display = "block";
             el.scrollIntoView({ block: "nearest" });
+        }
+
+        function showNotice(message) {
+            const el = document.getElementById("noticeMessage");
+            el.textContent = message;
+            el.style.display = "block";
+        }
+
+        function hideNotice() {
+            document.getElementById("noticeMessage").style.display = "none";
         }
 
         function clearMessages() {

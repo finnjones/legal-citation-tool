@@ -43,6 +43,31 @@ aglc/llm/providers/
   then the default `anthropic:claude-opus-5`.
 - Vendor SDKs are optional extras (`pip install aglc[openai]`) and are imported lazily.
 
+## Paid hosting (optional)
+
+Off unless `AGLC_PAYMENTS` is set, so local use is unchanged. With it on, `/api/process`
+returns a redacted preview (`locked: true`: every stamp, all warnings, the first 3 changed
+footnotes in full) and keeps the full result server-side; paying A$4 per document unlocks it.
+
+```
+aglc/payments/base.py     PaymentProvider: create_checkout, parse_webhook (verifies the signature),
+                          retrieve, refund; registry + get_payment_provider() / $AGLC_PAYMENTS
+aglc/payments/providers/
+    square_provider.py    square   (Checkout API payment links; HMAC-SHA256 over URL + raw body)
+    fake.py               fake     (offline, HMAC-signed events; a stand-in checkout page)
+aglc/store.py             SQLite in $AGLC_DATA_DIR (WAL, user_version migrations):
+                          documents, orders, webhook_events
+aglc/billing.py           /api/config, /api/checkout, /api/webhooks/{provider},
+                          /api/entitlement/{id}, /api/results/{id}; free-use limits
+```
+
+- Prices live only in `billing.PRODUCTS`. In v1 the processing session id is the entitlement.
+- Webhooks are verified, deduplicated by event id and applied in one transaction; a late
+  webhook is reconciled by `retrieve()` when the page polls `/api/entitlement`.
+- If a paid document's files are missing, or a document is paid for twice, it is refunded.
+- Free processing is limited before any LLM call: per browser and per salted, daily-rotated
+  IP hash, a global daily cap, a footnote cap and a concurrency cap.
+
 ## AGLC4 coverage
 
 | Phase | Content |

@@ -37,6 +37,9 @@ gemini = [
 openai = [
     { name = "openai" },
 ]
+square = [
+    { name = "squareup" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -57,10 +60,11 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.7" },
     { name = "python-docx", specifier = ">=1.1" },
     { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "squareup", marker = "extra == 'square'", specifier = ">=42" },
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", specifier = ">=0.29" },
 ]
-provides-extras = ["anthropic", "openai", "gemini", "all"]
+provides-extras = ["anthropic", "openai", "gemini", "all", "square"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1151,6 +1155,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc", size = 20372, upload-time = "2024-02-25T23:20:04.057Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
+]
+
+[[package]]
+name = "squareup"
+version = "46.0.0.20260916"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/78/82/52567f9d7e1903014848a40a8197e1fc3fdbcbac3b45b094ef7f3585bbb2/squareup-46.0.0.20260916.tar.gz", hash = "sha256:7e0e6ca7ebb0eed86fb4a315ab12c8ef639480da174f8d70b9b659cfa27d44b0", size = 830781, upload-time = "2026-09-15T21:02:16.358Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/77/ccbe2697420486cd2d3df391ddad5bf7fa6828ef0f96026d08da34d4ee18/squareup-46.0.0.20260916-py3-none-any.whl", hash = "sha256:735fcd0efad66a25cf9c6c8557cdc342bd89dd1f629cbbbbced87e4b8cdcb742", size = 2319462, upload-time = "2026-09-15T21:02:14.284Z" },
 ]
 
 [[package]]
