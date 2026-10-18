@@ -180,7 +180,7 @@ def check_footnote_cap(docx_path: Path) -> int:
     count = len(read_footnotes(docx_path))
     cap = _int_env("AGLC_MAX_FOOTNOTES", 400)
     if count > cap:
-        raise HTTPException(413, f"This document has {count} footnotes; the limit is {cap}.")
+        raise HTTPException(413, f"This document has {count} footnotes; the limit is {cap}. Try splitting it into parts.")
     return count
 
 
@@ -268,12 +268,13 @@ def rerun_inputs(session_id: str) -> tuple[dict, Extraction | None, dict]:
 
 def claim_rerun(session_id: str) -> None:
     if not get_store().claim_rerun(session_id, MAX_RERUNS):
-        raise HTTPException(429, f"This document has already been re-run {MAX_RERUNS} times.")
+        raise HTTPException(429, f"This document has had its {MAX_RERUNS} free re-reads. Please check it again later.")
 
 
 def preview(full: dict) -> dict:
-    """Every footnote's stamp and all warnings; only the first PREVIEW_FULL changed
-    footnotes in full. Unchanged footnotes are the student's own text, so they are shown."""
+    """Every footnote's status and all warnings; only the first PREVIEW_FULL changed
+    footnotes in full. Unchanged footnotes, and the original of a locked one, are the
+    student's own text, so they are shown; a locked footnote's result is not."""
     footnotes, shown, locked = [], 0, 0
     for fn in full["footnotes"]:
         if not fn["changed"] or shown < PREVIEW_FULL:
@@ -281,7 +282,8 @@ def preview(full: dict) -> dict:
             footnotes.append(fn)
         else:
             locked += 1
-            footnotes.append({"number": fn["number"], "changed": True, "locked": True})
+            footnotes.append({"number": fn["number"], "changed": True, "locked": True,
+                              "original": fn["original"], "original_html": fn["original_html"]})
     return {
         **full,
         "footnotes": footnotes,

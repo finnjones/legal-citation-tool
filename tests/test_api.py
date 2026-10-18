@@ -12,7 +12,8 @@ from unittest import mock
 import pytest
 from fastapi.testclient import TestClient
 
-from aglc import api
+from aglc import api, pipeline, site
+from aglc.llm.base import LLMError
 from aglc.models import (
     BibliographySection,
     BodyFix,
@@ -24,6 +25,7 @@ from aglc.models import (
 )
 
 client = TestClient(api.app)
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 # ---- Fixtures -------------------------------------------------------------- #
@@ -86,7 +88,9 @@ def test_root_serves_html():
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "AGLC4 Citation Tool" in response.text
+    assert "<title>AGLC4 Citation Checker and Fixer for Word (.docx)</title>" in response.text
+    assert "{{" not in response.text  # every placeholder filled
+    assert site.BRAND in response.text
 
 
 def test_root_file_not_found_handled():
@@ -225,7 +229,48 @@ def test_process_error_handling(minimal_docx):
         )
 
         assert response.status_code == 500
-        assert "Error processing document" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "went wrong" in detail
+        assert "Test error" not in detail  # the exception is logged, never shown
+
+
+def test_process_ai_error_hides_provider_text(minimal_docx):
+    with mock.patch("aglc.pipeline.process_docx", side_effect=LLMError("401 invalid key sk-secret")):
+        response = client.post("/api/process", files={"file": ("test.docx", minimal_docx, DOCX)})
+    assert response.status_code == 502
+    assert "sk-secret" not in response.json()["detail"]
+    assert "AI model" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(("name", "expected"), [
+    ("essay.doc", "older Word .doc"),
+    ("essay.pdf", "PDF"),
+    ("essay.pages", "Pages"),
+    ("essay.txt", ".docx"),
+])
+def test_wrong_file_type_gets_a_specific_message(name, expected):
+    response = client.post("/api/process", files={"file": (name, b"x", "application/octet-stream")})
+    assert response.status_code == 400
+    assert expected in response.json()["detail"]
+
+
+def test_process_rejects_files_over_10_mb():
+    big = b"PK\x03\x04" + b"\0" * api.MAX_UPLOAD_BYTES
+    with mock.patch("aglc.pipeline.process_docx") as mock_process:
+        response = client.post("/api/process", files={"file": ("big.docx", big, DOCX)})
+    assert response.status_code == 413
+    assert "10 MB" in response.json()["detail"]
+    mock_process.assert_not_called()
+
+
+def test_failed_extraction_warning_hides_provider_error(minimal_docx, fake_process_result):
+    fake_process_result.warnings = [
+        Warning_(message="extraction failed for footnotes [1, 2]: Error code: 402 - {'error': 'no credit'}; left unchanged"),
+    ]
+    with mock.patch("aglc.pipeline.process_docx", return_value=fake_process_result):
+        data = client.post("/api/process", files={"file": ("test.docx", minimal_docx, DOCX)}).json()
+    assert data["warnings"][0]["message"] == "extraction failed for footnotes [1, 2]; left unchanged"
+    assert pipeline.failed_footnotes(data["warnings"]) == {1, 2}  # still recognised as failed
 
 
 # ---- Tests: GET /api/download/{id} ----------------------------------------- #
@@ -368,3 +413,73 @@ def test_richtext_italic_conversion(minimal_docx):
         assert "<em>Case</em>" in html
         assert "<em>State</em>" in html
         assert " v " in html
+
+
+# ---- Tests: the public site --------------------------------------------- #
+
+
+@pytest.mark.parametrize("path", ["/privacy", "/terms", "/refunds", "/about"])
+def test_static_pages(path):
+    response = client.get(path)
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "{{" not in response.text
+    assert site.BRAND in response.text
+    for link in ("/about", "/privacy", "/terms", "/refunds"):  # the shared footer
+        assert f'href="{link}"' in response.text
+
+
+@pytest.mark.parametrize("path", ["/terms", "/refunds"])
+def test_policy_pages_keep_consumer_law_rights(path):
+    assert "Nothing here limits your rights under the Australian Consumer Law." in client.get(path).text
+
+
+def test_privacy_page_marks_unknown_facts_as_todo():
+    text = client.get("/privacy").text
+    assert "[TODO: retention period" in text
+    assert "OpenRouter" in text and "DeepSeek" in text
+    assert "never used for training" not in text
+
+
+def test_status():
+    response = client.get("/status")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": api.__version__, "payments": False}
+
+
+def test_sample_essay_is_served():
+    response = client.get("/api/sample")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == DOCX
+    assert response.content == site.SAMPLE_ESSAY.read_bytes()
+    assert "sample-essay.docx" in response.headers["content-disposition"]
+
+
+def test_shared_stylesheet_is_served():
+    response = client.get("/assets/chambers.css")
+    assert response.status_code == 200
+    assert "--accent: #1F3A5F" in response.text
+
+
+def test_open_graph_tags_use_the_public_url(monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://cite.example.com/")
+    text = client.get("/").text
+    assert '<meta property="og:image" content="https://cite.example.com/assets/og.png">' in text
+    assert '<meta property="og:url" content="https://cite.example.com/">' in text
+    assert '<meta name="description"' in text
+    assert client.get("/assets/og.png").headers["content-type"] == "image/png"
+
+
+def test_plausible_is_off_unless_configured(monkeypatch):
+    assert "plausible.io" not in client.get("/").text
+    monkeypatch.setenv("AGLC_PLAUSIBLE_DOMAIN", "cite.example.com")
+    for path in ("/", "/privacy"):
+        assert '<script defer data-domain="cite.example.com" src="https://plausible.io/js/script.js"></script>' in client.get(path).text
+
+
+def test_price_on_the_page_comes_from_the_server():
+    from aglc import billing
+
+    text = client.get("/").text
+    assert f"{billing.PRODUCTS['document'].display} per document" in text
+    assert f"first {billing.PREVIEW_FULL} fixes free" in text
