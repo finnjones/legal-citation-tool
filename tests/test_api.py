@@ -180,6 +180,7 @@ def test_process_response_format(minimal_docx, fake_process_result):
         assert "formatted" in fn
         assert "formatted_html" in fn
         assert "changed" in fn
+        assert fn["extraction_failed"] is None
         assert "<em>" in fn["formatted_html"]
 
         # Check bibliography format

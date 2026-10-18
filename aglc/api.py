@@ -232,7 +232,7 @@ async def rerun_document(session_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Not found")
     session_id = billing.check_session_id(session_id)
     full, extraction, options = billing.rerun_inputs(session_id)
-    failed = pipeline.failed_footnotes(full["warnings"])
+    failed = pipeline.failed_footnotes(full)
     if not failed:
         return billing.view(session_id, full)
     if extraction is None:
@@ -269,6 +269,8 @@ def _result_json(session_id: str, result: ProcessResult) -> dict:
                 "formatted": fn.formatted.to_markup(),
                 "formatted_html": _richtext_to_html(fn.formatted),
                 "changed": fn.changed,
+                # "provider_error" / "not_returned" when left unchanged because extraction failed
+                "extraction_failed": fn.extraction_failed,
             }
         )
 

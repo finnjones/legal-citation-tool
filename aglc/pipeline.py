@@ -131,8 +131,8 @@ def process_docx(
 # --------------------------------------------------------------------------- #
 # Footnotes the LLM failed to read
 # --------------------------------------------------------------------------- #
-# Detected from the Extractor's warnings for now. Swap these for a structured per-footnote
-# reason once extraction reports one; callers only use these two functions.
+# Read from each footnote's `extraction_failed` reason. The Extractor's warnings are still
+# checked too, for results saved before that field existed; callers only use these functions.
 
 _FAILED = re.compile(r"^extraction failed for footnotes \[([\d,\s]+)\]", re.I)
 _MISSING = re.compile(r"^footnote (\d+): (missing from LLM response|LLM returned no segments)", re.I)
@@ -159,8 +159,14 @@ def _messages(result) -> Iterable[str]:
 
 def failed_footnotes(result) -> set[int]:
     """Footnotes the model failed to read (left as written because extraction failed, not
-    because the tool chose to). `result` is a ProcessResult or a list of warnings."""
+    because the tool chose to). `result` is a ProcessResult, the API's result dict, or a
+    list of warnings."""
     failed: set[int] = set()
+    if isinstance(result, dict):
+        failed |= {fn["number"] for fn in result.get("footnotes", []) if fn.get("extraction_failed")}
+        result = result.get("warnings", [])
+    elif hasattr(result, "footnotes"):
+        failed |= {fn.number for fn in result.footnotes if getattr(fn, "extraction_failed", None)}
     for message in _messages(result):
         if m := _FAILED.match(message):
             failed |= {int(n) for n in m[1].split(",") if n.strip()}

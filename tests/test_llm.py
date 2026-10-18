@@ -550,7 +550,10 @@ def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
     req = client.requests[0]
     assert req["model"] == "deepseek/deepseek-v4-flash"
     assert req["response_format"]["type"] == "json_schema"
-    assert req["extra_body"] == {"provider": {"require_parameters": True}, "reasoning": {"enabled": False}}
+    assert req["extra_body"] == {
+        "provider": {"require_parameters": True, "allow_fallbacks": True},
+        "reasoning": {"enabled": False},
+    }
 
 
 def test_openrouter_without_key_gives_helpful_error(monkeypatch):
@@ -575,3 +578,170 @@ def test_openrouter_rejects_non_openrouter_key(monkeypatch):
     provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
     with pytest.raises(LLMError, match="Groq key"):
         provider.generate_json(system="s", user="u", output_model=Out)
+
+
+# ============================================================================
+# Empty / failed replies: retried as-is, then the fallback model
+# ============================================================================
+
+
+def test_empty_reply_is_retried_unchanged_then_succeeds():
+    provider = FakeProvider("test", responses=["", '{"title": "T", "items": []}'])
+    result = provider.generate_json(system="s", user="the prompt", output_model=NestedModel)
+    assert result.title == "T"
+    assert len(provider.calls) == 2
+    # an empty reply is not fed back to the model as a schema correction
+    assert provider.calls[1]["user"] == "the prompt"
+
+
+def test_retries_after_empty_replies_back_off(monkeypatch):
+    pauses = []
+    monkeypatch.setattr("aglc.llm.base._sleep", pauses.append)
+    provider = FakeProvider("test", responses=["", "  ", '{"title": "T", "items": []}'])
+    provider.generate_json(system="s", user="u", output_model=NestedModel)
+    assert pauses == [1.0, 3.0]
+
+
+def test_only_empty_replies_raise_transient_error():
+    from aglc.llm.base import TransientLLMError
+
+    provider = FakeProvider("test", responses=[""])
+    with pytest.raises(TransientLLMError, match="empty reply"):
+        provider.generate_json(system="s", user="u", output_model=NestedModel)
+    assert len(provider.calls) == 3
+
+
+def test_fallback_model_used_when_first_fails_every_attempt():
+    primary = FakeProvider("primary", responses=[""])
+    backup = FakeProvider("backup", responses=['{"title": "from backup", "items": []}'])
+    primary.fallback = backup
+    result = primary.generate_json(system="s", user="u", output_model=NestedModel)
+    assert result.title == "from backup"
+    assert len(primary.calls) == 3
+    assert len(backup.calls) == 1
+
+
+def test_fallback_model_not_used_when_first_succeeds():
+    primary = FakeProvider("primary", responses=['{"title": "T", "items": []}'])
+    primary.fallback = backup = FakeProvider("backup")
+    primary.generate_json(system="s", user="u", output_model=NestedModel)
+    assert backup.calls == []
+
+
+def test_fallback_model_from_env(monkeypatch):
+    monkeypatch.setenv("AGLC_LLM_FALLBACK", "fake:backup")
+    provider = get_provider("fake:primary")
+    assert provider.fallback is not None and provider.fallback.model == "backup"
+    assert provider.fallback.fallback is None
+    # the same model as its own fallback, or "" to turn it off
+    assert get_provider("fake:backup").fallback is None
+    assert get_provider("fake:primary", fallback="").fallback is None
+
+
+def test_no_fallback_model_by_default():
+    assert get_provider("fake:primary").fallback is None
+
+
+# ============================================================================
+# OpenAI / OpenRouter: empty content, transient errors, rerouting
+# ============================================================================
+
+
+def _completion(content, *, finish_reason="stop", host=None):
+    msg = type("M", (), {"content": content, "refusal": None})()
+    choice = type("C", (), {"message": msg, "finish_reason": finish_reason})()
+    return type("R", (), {"choices": [choice], "provider": host, "id": "gen-123"})()
+
+
+class _ScriptedCompletions:
+    """chat.completions stand-in: each request gets the next item; exceptions are raised."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.requests = []
+
+    def create(self, **req):
+        self.requests.append(req)
+        item = self.script[min(len(self.requests) - 1, len(self.script) - 1)]
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+
+def _scripted_provider(monkeypatch, spec, script):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+    provider = get_provider(spec)
+    completions = _ScriptedCompletions(script)
+    provider._client = type("Client", (), {"chat": type("Chat", (), {"completions": completions})()})()
+    return provider, completions
+
+
+def _http_request():
+    import httpx
+
+    return httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+
+
+def test_openai_empty_content_is_transient_with_diagnostics(monkeypatch, caplog):
+    from aglc.llm.base import TransientLLMError
+
+    provider, completions = _scripted_provider(monkeypatch, "openai:gpt-test", [_completion("", host="SomeHost")])
+    with pytest.raises(TransientLLMError) as err:
+        provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert "empty reply" in str(err.value)
+    assert "finish_reason=stop" in str(err.value) and "upstream=SomeHost" in str(err.value)
+    assert len(completions.requests) == 3
+    # never sent back to the model as a correction
+    assert all(r["messages"][1]["content"] == "u" for r in completions.requests)
+
+
+def test_openrouter_retry_after_empty_reply_avoids_that_host(monkeypatch):
+    provider, completions = _scripted_provider(
+        monkeypatch,
+        "openrouter:deepseek/deepseek-v4-flash",
+        [_completion("", host="FlakyHost"), _completion('{"name": "A", "age": 1}', host="GoodHost")],
+    )
+    assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
+    first, second = (r["extra_body"]["provider"] for r in completions.requests)
+    assert "ignore" not in first and first["allow_fallbacks"] is True
+    assert second["ignore"] == ["FlakyHost"]
+
+
+def test_openrouter_allows_failed_hosts_again_when_none_left(monkeypatch):
+    import httpx
+    import openai
+
+    no_endpoints = openai.NotFoundError(
+        "No endpoints found", response=httpx.Response(404, request=_http_request()), body=None
+    )
+    provider, completions = _scripted_provider(
+        monkeypatch,
+        "openrouter:deepseek/deepseek-v4-flash",
+        [_completion("", host="OnlyHost"), no_endpoints, _completion('{"name": "A", "age": 1}', host="OnlyHost")],
+    )
+    assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
+    assert completions.requests[1]["extra_body"]["provider"]["ignore"] == ["OnlyHost"]
+    assert "ignore" not in completions.requests[2]["extra_body"]["provider"]
+
+
+def test_openai_timeout_is_retried(monkeypatch):
+    import openai
+
+    provider, completions = _scripted_provider(
+        monkeypatch,
+        "openai:gpt-test",
+        [openai.APITimeoutError(request=_http_request()), _completion('{"name": "A", "age": 1}')],
+    )
+    assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
+    assert len(completions.requests) == 2
+
+
+def test_openai_auth_error_is_not_retried(monkeypatch):
+    import httpx
+    import openai
+
+    bad_key = openai.AuthenticationError("bad key", response=httpx.Response(401, request=_http_request()), body=None)
+    provider, completions = _scripted_provider(monkeypatch, "openai:gpt-test", [bad_key])
+    with pytest.raises(openai.AuthenticationError):
+        provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert len(completions.requests) == 1

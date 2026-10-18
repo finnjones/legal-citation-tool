@@ -566,7 +566,9 @@ def test_failed_footnote_detection():
 def test_failed_batch_is_retried_before_the_preview(model, paid, client):
     model.mode = "fail_once"
     data = _process(client).json()
-    assert paid.call_count == 2  # the first run, then the retry of the failed footnotes
+    # The Extractor recovers a batch that fails once by splitting it, within the first run, so
+    # the retry of failed footnotes before the preview isn't needed (it runs when some remain).
+    assert paid.call_count == 1
     assert data["payable"] is True and data["failed_footnotes"] == []
     assert not any("extraction failed" in w["message"] for w in data["warnings"])
     assert sum(f["changed"] for f in data["footnotes"]) == 10

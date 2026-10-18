@@ -579,6 +579,104 @@ def test_batch_failure_leaves_footnotes_unchanged_and_records_warning():
     assert any("failed" in w and "1" in w for w in extractor.warnings)
 
 
+def _asked_for(user: str) -> list[int]:
+    return [int(n) for n in re.findall(r"Footnote (\d+):", user)]
+
+
+def test_empty_reply_then_success_extracts_batch():
+    footnotes = [fn(1, "Mabo v Queensland [No 2] (1992) 175 CLR 1.")]
+    provider = CannedProvider(lambda i, s, u: "" if i == 0 else echo_responses(i, s, u))
+    extractor = Extractor(provider, verify=False)
+    result = extractor.extract(footnotes)
+    assert result[0].segments and result[0].extraction_failed is None
+    assert len(provider.calls) == 2
+    assert not any("failed" in w for w in extractor.warnings)
+
+
+def test_failed_batch_is_split_into_fives_before_giving_up():
+    footnotes = [fn(n, f"Commentary number {n}.") for n in range(1, 16)]
+    # the provider sends empty replies for the big request, but answers smaller ones
+    provider = CannedProvider(lambda i, s, u: "" if len(_asked_for(u)) > 5 else echo_responses(i, s, u))
+    extractor = Extractor(provider, verify=False)
+    result = extractor.extract(footnotes)
+    assert all(f.segments and f.extraction_failed is None for f in result)
+    sizes = [len(_asked_for(c["user"])) for c in provider.calls]
+    assert sizes == [15, 15, 15, 5, 5, 5]
+    assert not any("failed" in w for w in extractor.warnings)
+
+
+def test_failed_batch_is_split_down_to_single_footnotes():
+    footnotes = [fn(n, f"Commentary number {n}.") for n in range(1, 8)]
+    provider = CannedProvider(lambda i, s, u: "" if len(_asked_for(u)) > 1 else echo_responses(i, s, u))
+    extractor = Extractor(provider, verify=False)
+    result = extractor.extract(footnotes)
+    assert all(f.segments and f.extraction_failed is None for f in result)
+    asked_alone = [_asked_for(c["user"]) for c in provider.calls if len(_asked_for(c["user"])) == 1]
+    assert asked_alone == [[n] for n in range(1, 8)]
+
+
+def test_split_batches_keep_resolving_references_in_order():
+    footnotes = [
+        fn(1, "Mabo v Queensland [No 2] (1992) 175 CLR 1."),
+        *[fn(n, f"Commentary number {n}.") for n in range(2, 7)],
+        fn(7, "Ibid 45."),
+    ]
+    mabo = cite_seg("Mabo v Queensland [No 2] (1992) 175 CLR 1", {"source": case("Mabo v Queensland [No 2]", year="1992")})
+    ibid = cite_seg("Ibid 45", {"source": {"type": "other", "text": "Ibid"}, "pinpoints": [{"value": "45"}]}, refers_to_footnote=1)
+
+    def respond(i: int, system: str, user: str) -> str:
+        numbers = _asked_for(user)
+        if len(numbers) > 5:
+            return ""
+        segs = {1: [mabo], 7: [ibid]}
+        return batch_json([{"number": n, "segments": segs.get(n, [text_seg(f"Commentary number {n}.")])} for n in numbers])
+
+    result = Extractor(CannedProvider(respond), verify=False).extract(footnotes)
+    assert isinstance(result[6].segments[0].citation.source, CaseSource)
+
+
+def test_provider_down_records_failure_reason_on_each_footnote():
+    footnotes = [fn(n, f"Commentary number {n}.") for n in range(1, 16)]
+    provider = CannedProvider([""])
+    extractor = Extractor(provider, verify=False)
+    result = extractor.extract(footnotes)
+    assert [f.extraction_failed for f in result] == ["provider_error"] * 15
+    assert all(f.segments == [] for f in result)
+    # stops splitting once the provider looks down, rather than asking for every footnote
+    assert len(provider.calls) == 3 * Extractor.max_failures_in_a_row
+    failed = [w for w in extractor.warnings if w.startswith("extraction failed")]
+    assert failed and sorted(int(n) for w in failed for n in re.findall(r"\d+", w.split("]")[0])) == list(range(1, 16))
+
+
+def test_footnote_missing_from_every_answer_is_marked_not_returned():
+    footnotes = [fn(1, "Commentary one."), fn(2, "Commentary two.")]
+    provider = CannedProvider(lambda i, s, u: batch_json([{"number": 1, "segments": [text_seg("Commentary one.")]}]))
+    result = Extractor(provider, verify=False).extract(footnotes)
+    assert result[0].extraction_failed is None
+    assert result[1].extraction_failed == "not_returned"
+
+
+def test_deliberately_unchanged_footnote_is_not_marked_as_failed():
+    # the extraction keeps dropping '175 CLR 1', so strict mode keeps the footnote as written
+    footnotes = [fn(1, "Mabo v Queensland [No 2] (1992) 175 CLR 1.")]
+    provider = CannedProvider([batch_json([{"number": 1, "segments": [
+        cite_seg("Mabo v Queensland [No 2] (1992) 175 CLR 1", {"source": case("Mabo v Queensland [No 2]", year="1992")})
+    ]}])])
+    extractor = Extractor(provider)
+    result = extractor.extract(footnotes)
+    assert any("left unchanged for manual review" in w for w in extractor.warnings)
+    assert result[0].extraction_failed is None
+
+
+def test_fallback_model_used_by_extractor():
+    footnotes = [fn(n, f"Commentary number {n}.") for n in range(1, 4)]
+    primary = CannedProvider([""])
+    primary.fallback = backup = CannedProvider(echo_responses)
+    result = Extractor(primary, verify=False).extract(footnotes)
+    assert all(f.segments and f.extraction_failed is None for f in result)
+    assert len(primary.calls) == 3 and len(backup.calls) == 1
+
+
 def test_missing_footnote_in_response_left_unchanged_and_warns():
     footnotes = [fn(1, "Mabo v Queensland [No 2] (1992) 175 CLR 1."), fn(2, "Ibid 45.")]
     provider = CannedProvider(

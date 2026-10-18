@@ -1,11 +1,14 @@
 """OpenAI and OpenAI-compatible providers."""
 
+import logging
 import os
 from typing import Any
 
-from aglc.llm.base import LLMError, LLMProvider, register_provider
+from aglc.llm.base import LLMError, LLMProvider, TransientLLMError, register_provider
 
 from ._common import schema_instructions
+
+log = logging.getLogger("aglc")
 
 
 @register_provider("openai")
@@ -22,6 +25,8 @@ class OpenAIProvider(LLMProvider):
         super().__init__(model, **options)
         self._client = None
         self._use_fallback = False
+        #: upstream hosts (as named in OpenRouter's `provider` field) that sent an empty reply
+        self._failed_hosts: list[str] = []
 
     def _client_kwargs(self) -> dict[str, Any]:
         api_key = self.options.get("api_key") or (os.environ.get(self.api_key_env) if self.api_key_env else None)
@@ -61,7 +66,13 @@ class OpenAIProvider(LLMProvider):
         extra = self._extra_body(structured)
         if extra:
             kwargs["extra_body"] = extra
-        return self.client.chat.completions.create(**kwargs)
+        import openai
+
+        try:
+            return self.client.chat.completions.create(**kwargs)
+        except (openai.APIConnectionError, openai.InternalServerError, openai.RateLimitError) as e:
+            # timeouts, dropped connections, 5xx and 429: worth another try, unlike a bad key
+            raise TransientLLMError(f"{self.name}:{self.model}: {type(e).__name__}: {e}") from e
 
     def _complete_json(self, *, system: str, user: str, schema: dict[str, Any], schema_name: str) -> str:
         import openai
@@ -83,14 +94,41 @@ class OpenAIProvider(LLMProvider):
                 response = self._create(prompted_system, user, json_object, structured=False)
 
         if not response.choices:
-            raise LLMError(f"{self.name}:{self.model} returned no choices")
-        message = response.choices[0].message
+            raise TransientLLMError(f"{self.name}:{self.model} returned no choices ({_diagnose(response, None)})")
+        choice = response.choices[0]
+        message = choice.message
         refusal = getattr(message, "refusal", None)
         if refusal:
             raise LLMError(f"Model refused: {refusal}")
-        if getattr(response.choices[0], "finish_reason", None) == "length":
+        if getattr(choice, "finish_reason", None) == "length":
             raise LLMError("output truncated (max tokens reached)")
-        return message.content or ""
+        content = message.content or ""
+        if not content.strip():
+            # Seen from OpenRouter: a quick 200 with nothing in it, from one upstream host.
+            # Not a schema problem, so it mustn't be fed back to the model as one.
+            host = getattr(response, "provider", None)
+            if isinstance(host, str) and host and host not in self._failed_hosts:
+                self._failed_hosts.append(host)
+            raise TransientLLMError(f"{self.name}:{self.model} returned an empty reply ({_diagnose(response, choice)})")
+        return content
+
+
+def _diagnose(response: Any, choice: Any) -> str:
+    """What the response says about itself, for the log: finish reason, upstream host..."""
+    parts = []
+    if choice is not None:
+        parts.append(f"finish_reason={getattr(choice, 'finish_reason', None)}")
+        reasoning = getattr(choice.message, "reasoning", None)
+        if isinstance(reasoning, str) and reasoning:
+            parts.append(f"reasoning={len(reasoning)} chars")
+        error = getattr(choice, "error", None)
+        if error:
+            parts.append(f"error={error}")
+    for label, attr in (("upstream", "provider"), ("id", "id")):
+        value = getattr(response, attr, None)
+        if isinstance(value, str) and value:
+            parts.append(f"{label}={value}")
+    return ", ".join(parts)
 
 
 @register_provider("openrouter")
@@ -116,9 +154,28 @@ class OpenRouterProvider(OpenAIProvider):
         kwargs["default_headers"] = {"X-Title": "AGLC4 Citation Tool"}
         return kwargs
 
+    def _create(self, system: str, user: str, response_format: dict[str, Any], structured: bool):
+        import openai
+
+        try:
+            return super()._create(system, user, response_format, structured)
+        except (openai.NotFoundError, openai.BadRequestError):
+            if not self._failed_hosts:
+                raise
+            # Ruling out the hosts that failed may leave none that serve this model; let
+            # OpenRouter use any of them again rather than fail outright.
+            log.info("%s: no other upstream host available; allowing %s again", self, ", ".join(self._failed_hosts))
+            self._failed_hosts.clear()
+            return super()._create(system, user, response_format, structured)
+
     def _extra_body(self, structured: bool) -> dict[str, Any] | None:
-        # Only route to upstream hosts that honour response_format, so JSON mode is enforced.
-        body: dict[str, Any] = {"provider": {"require_parameters": True}}
+        # Only route to upstream hosts that honour response_format, so JSON mode is enforced,
+        # and let OpenRouter fall through to another host when one is down.
+        routing: dict[str, Any] = {"require_parameters": True, "allow_fallbacks": True}
+        if self._failed_hosts:
+            # a host that just sent an empty reply: send the retry somewhere else
+            routing["ignore"] = list(self._failed_hosts)
+        body: dict[str, Any] = {"provider": routing}
         # Extraction doesn't benefit from "thinking": on reasoning models like DeepSeek V4
         # Flash it made a 3-footnote batch take ~90s instead of ~7s with equally valid output.
         # AGLC_REASONING=off (default) | low | medium | high | default (the model's own setting)

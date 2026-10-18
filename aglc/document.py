@@ -446,7 +446,9 @@ def render_document(footnotes: list[Footnote], *, bibliography: bool = True) -> 
         formatted = _render_footnote(
             fn, plans, first_footnote, short_title_text, append_definition, disambiguate
         )
-        results.append(FootnoteResult(number=fn.number, original=fn.original, formatted=formatted))
+        results.append(FootnoteResult(
+            number=fn.number, original=fn.original, formatted=formatted, extraction_failed=fn.extraction_failed
+        ))
         if "[MISSING:" in formatted.text:
             warnings.append(Warning_(footnote=fn.number, message=f"Footnote {fn.number} has missing data"))
         warnings += _pinpoint_warnings(fn, plans)
