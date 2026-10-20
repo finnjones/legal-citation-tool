@@ -389,8 +389,18 @@ def _closing_full_stop(ctx: _Context) -> None:
                 after=[(len(after) - 1, len(after))])
 
 
+_DOUBLE_SPACE = re.compile(r"\S[ \t]{2,}\S")
+
+
+def _extra_spaces(ctx: _Context) -> None:
+    """The diff treats any run of spaces as one, so a removed double space needs its own line."""
+    if _DOUBLE_SPACE.search(ctx.before) and not _DOUBLE_SPACE.search(ctx.after):
+        ctx.add("spaces", "Extra space between words removed")
+
+
 _DETECTORS = [_ibid, _n_reference, _short_title, _italics, _case_number, _judges, _type_label, _pinpoint_punctuation,
-              _pinpoint_markers, _sections, _spans, _abbreviations, _quotes, _closing_full_stop]
+              _pinpoint_markers, _sections, _spans, _abbreviations, _quotes, _closing_full_stop,
+              _extra_spaces]
 
 
 def _remainder(ctx: _Context) -> None:

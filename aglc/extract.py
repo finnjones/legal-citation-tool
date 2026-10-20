@@ -321,6 +321,9 @@ class _TextMapper:
         self.skipped: RichText = RichText()
 
     def _find(self, text: str, start: int) -> tuple[int, int] | None:
+        if "*" not in self.plain:
+            # the model sometimes copies the *italic* markup it was shown into its text
+            text = text.replace("*", "")
         norm = "".join(_norm_char(c) for c in text)
         needle = " ".join(norm.split())
         if not needle:

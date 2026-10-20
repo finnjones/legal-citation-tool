@@ -589,3 +589,18 @@ def test_badly_formatted_hansard_is_corrected():
         result = pipeline.process_footnotes([fn], get_provider("fake:x", responses=[one]), bibliography=False)
         assert result.footnotes[0].formatted.to_markup() == SPEAKMAN_FULL + "."
         assert result.warnings == []
+
+
+def test_italic_markup_copied_into_the_citation_text_is_ignored():
+    # The real model returned original="... ‘Protest Law in New South Wales’, *Parliament of NSW* (Report,
+    # 2024) <https://www...>" with the asterisks it was shown. Unmatched, the footnote's closing '.'
+    # was then found in 'www.' and the rest of the URL appended: '(Report, 2024)parliament.nsw.gov.au/...>.'
+    url = "https://www.parliament.nsw.gov.au/research-papers/protest-law-nsw"
+    markup = f"Parliament of NSW, ‘Protest Law in New South Wales’, *Parliament of NSW* (Report, 2024) <{url}>"
+    out = _extract([_rich(31, markup + ".")], [{"number": 31, "segments": [
+        {"kind": "citation", "original": markup,
+         "citation": {"source": {"type": "report", "author": "Parliament of NSW", "title": "Protest Law in New South Wales",
+                                 "document_type": "Report", "date": "2024"}}},
+        {"kind": "text", "text": "."}]}])
+    texts = [s.text.text for s in out[0].segments if isinstance(s, TextSegment)]
+    assert texts == ["."]  # no URL fragment left over

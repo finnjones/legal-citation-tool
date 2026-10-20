@@ -36,6 +36,11 @@ def test_year_moved_inside_the_italics():
         "The year is part of an Act’s title, so it’s italic too"]
 
 
+def test_double_space_removed():
+    before = "Michelle Sanson, *Statutory Interpretation* (Oxford University Press, 2nd ed, 2016)  215."
+    assert _lines(before, before.replace("  ", " "), "book") == ["Extra space between words removed"]
+
+
 def test_comma_before_a_paragraph_pinpoint():
     before = "*Momcilovic v The Queen* (2011) 245 CLR 1 [597]."
     after = "*Momcilovic v The Queen* (2011) 245 CLR 1, [597]."
@@ -132,7 +137,10 @@ def test_unexplained_changes_get_one_closing_line():
 
 def test_unchanged_and_whitespace_only():
     assert _explain("*Crimes Act 1900* (NSW) s 5.", "*Crimes Act 1900* (NSW) s 5.", "legislation") == []
-    assert _explain("*Crimes Act 1900*  (NSW) s 5.", "*Crimes Act 1900* (NSW) s 5.", "legislation") == []
+    # a removed double space is a visible change (FootnoteResult.changed), so it is explained
+    assert _explain("*Crimes Act 1900*  (NSW) s 5.", "*Crimes Act 1900* (NSW) s 5.", "legislation") == [("spaces", None)]
+    # a trailing space or an italic space isn't
+    assert _explain("*Crimes Act 1900 *(NSW) s 5. ", "*Crimes Act 1900* (NSW) s 5.", "legislation") == []
 
 
 # ---- wired through the document pass and the API ------------------------------------ #

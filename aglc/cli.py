@@ -190,9 +190,10 @@ def serve(
     try:
         import uvicorn
 
+        _setup_logging()  # before importing the app, so it doesn't add a second handler
+
         from . import api
 
-        _setup_logging()
         rprint(f"[blue]Starting server on http://{host}:{port}[/blue]")
         rprint(f"[blue]Model: {default_spec()}[/blue]")
         uvicorn.run(api.app, host=host, port=port, log_level="info")
