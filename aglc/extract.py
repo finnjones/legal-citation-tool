@@ -498,7 +498,7 @@ class Extractor:
         if not missing or not self.verify:
             return segments
 
-        log.info("  footnote %d: extraction left out %s; asking again", fn.number, ", ".join(missing))
+        log.info("  footnote %d: extraction left out %d pieces of text; asking again", fn.number, len(missing))
         repaired = self._repair(fn, missing, resolved, system_prompt)
         if repaired is not None:
             segments2, missing2 = self._convert_and_check(fn, repaired, resolved)

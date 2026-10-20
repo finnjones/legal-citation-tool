@@ -17,7 +17,7 @@ An AI model only extracts structured data from the footnotes. All AGLC formattin
 
 ## Operating Context
 - Runs locally with `aglc serve` (FastAPI) on a single page, `web/index.html`. The same pipeline is also available as a CLI and an HTTP API.
-- Flow: upload a .docx (10 MB max), choose the model spec (for example `openrouter:deepseek/deepseek-v4-flash`), toggle track changes and bibliography, then process. Processing can take a minute. The student reviews the footnotes before and after, reads the warnings and bibliography, then downloads `<name>.aglc.docx`.
+- Flow: upload a .docx (10 MB max), choose the model spec (for example `openrouter:deepseek/deepseek-v4.1-flash-1017`), toggle track changes and bibliography, then process. Processing can take a minute. The student reviews the footnotes before and after, reads the warnings and bibliography, then downloads `<name>.aglc.docx`.
 - The results include each footnote's number, its original and formatted HTML (italics as `<em>`) and a `changed` flag, plus the bibliography sections (heading and entries) and any warnings (footnote number and message).
 
 ## Capabilities and Constraints

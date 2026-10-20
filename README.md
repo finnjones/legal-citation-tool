@@ -42,7 +42,7 @@ cp .env.example .env    # then edit it
 
 ```bash
 # .env: recommended, cheap and fast via OpenRouter (https://openrouter.ai/keys)
-AGLC_LLM=openrouter:deepseek/deepseek-v4-flash
+AGLC_LLM=openrouter:deepseek/deepseek-v4.1-flash-1017
 OPENROUTER_API_KEY=sk-or-...
 ```
 
@@ -50,14 +50,14 @@ Any model on OpenRouter works: use `openrouter:<model id from openrouter.ai/mode
 Real environment variables override `.env`. Other providers:
 
 ```bash
-AGLC_LLM=anthropic:claude-opus-5       # ANTHROPIC_API_KEY (the built-in default)
+AGLC_LLM=anthropic:claude-opus-5       # ANTHROPIC_API_KEY
 AGLC_LLM=openai:<model>                # OPENAI_API_KEY
 AGLC_LLM=gemini:<model>                # GEMINI_API_KEY
 AGLC_LLM=openai-compatible:llama3.1    # local Ollama / LM Studio / vLLM;
                                        # AGLC_OPENAI_BASE_URL=http://localhost:11434/v1
 ```
 
-You can also pick a model per run: `aglc fix essay.docx --model openrouter:deepseek/deepseek-v4-flash`,
+You can also pick a model per run: `aglc fix essay.docx --model openrouter:deepseek/deepseek-v4.1-flash-1017`,
 or type it into the Model field in the web app. `aglc providers` lists what's available.
 
 If the model sends back an empty reply, times out or its host is overloaded, the request is
@@ -179,7 +179,7 @@ The demo essay (`examples/test_essay.docx`), used by "Try a sample essay".
 
 #### `GET /api/providers`
 ```json
-{"providers": ["anthropic", "fake", "gemini", "openai", "openai-compatible", "openrouter"], "default": "openrouter:deepseek/deepseek-v4-flash"}
+{"providers": ["anthropic", "fake", "gemini", "openai", "openai-compatible", "openrouter"], "default": "openrouter:deepseek/deepseek-v4.1-flash-1017"}
 ```
 
 #### `POST /api/process`

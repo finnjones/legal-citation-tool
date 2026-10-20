@@ -56,8 +56,8 @@ def test_get_provider_from_env(monkeypatch):
 def test_get_provider_default():
     """Test default provider when nothing specified."""
     provider = get_provider()
-    assert provider.name == "anthropic"
-    assert provider.model == "claude-opus-5"
+    assert provider.name == "openrouter"
+    assert provider.model == "deepseek/deepseek-v4.1-flash-1017"
 
 
 def test_available_providers():
@@ -541,14 +541,14 @@ def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
 
     monkeypatch.setattr(openai, "OpenAI", _RecordingOpenAI)
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
-    provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
+    provider = get_provider("openrouter:deepseek/deepseek-v4.1-flash-1017")
     assert provider.generate_json(system="s", user="u", output_model=Out).value == "ok"
 
     client = _RecordingOpenAI.instances[-1]
     assert client.kwargs["base_url"] == "https://openrouter.ai/api/v1"
     assert client.kwargs["api_key"] == "sk-or-v1-test"
     req = client.requests[0]
-    assert req["model"] == "deepseek/deepseek-v4-flash"
+    assert req["model"] == "deepseek/deepseek-v4.1-flash-1017"
     assert req["response_format"]["type"] == "json_schema"
     assert req["extra_body"] == {
         "provider": {"require_parameters": True, "allow_fallbacks": True, "data_collection": "deny", "ignore": ["DigitalOcean"]},
@@ -563,7 +563,7 @@ def test_openrouter_without_key_gives_helpful_error(monkeypatch):
         value: str
 
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
+    provider = get_provider("openrouter:deepseek/deepseek-v4.1-flash-1017")
     with pytest.raises(LLMError, match="OPENROUTER_API_KEY"):
         provider.generate_json(system="s", user="u", output_model=Out)
 
@@ -575,7 +575,7 @@ def test_openrouter_rejects_non_openrouter_key(monkeypatch):
         value: str
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "gsk_notopenrouter")
-    provider = get_provider("openrouter:deepseek/deepseek-v4-flash")
+    provider = get_provider("openrouter:deepseek/deepseek-v4.1-flash-1017")
     with pytest.raises(LLMError, match="Groq key"):
         provider.generate_json(system="s", user="u", output_model=Out)
 
@@ -698,7 +698,7 @@ def test_openai_empty_content_is_transient_with_diagnostics(monkeypatch, caplog)
 def test_openrouter_retry_after_empty_reply_avoids_that_host(monkeypatch):
     provider, completions = _scripted_provider(
         monkeypatch,
-        "openrouter:deepseek/deepseek-v4-flash",
+        "openrouter:deepseek/deepseek-v4.1-flash-1017",
         [_completion("", host="FlakyHost"), _completion('{"name": "A", "age": 1}', host="GoodHost")],
     )
     assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
@@ -710,7 +710,7 @@ def test_openrouter_retry_after_empty_reply_avoids_that_host(monkeypatch):
 def test_openrouter_ignored_hosts_come_from_the_environment(monkeypatch):
     monkeypatch.setenv("AGLC_OPENROUTER_IGNORE", " HostA, HostB ,")
     provider, completions = _scripted_provider(
-        monkeypatch, "openrouter:deepseek/deepseek-v4-flash", [_completion('{"name": "A", "age": 1}')]
+        monkeypatch, "openrouter:deepseek/deepseek-v4.1-flash-1017", [_completion('{"name": "A", "age": 1}')]
     )
     provider.generate_json(system="s", user="u", output_model=SimpleModel)
     assert completions.requests[0]["extra_body"]["provider"]["ignore"] == ["HostA", "HostB"]
@@ -718,7 +718,7 @@ def test_openrouter_ignored_hosts_come_from_the_environment(monkeypatch):
 
 def test_openrouter_data_collection_is_denied_unless_allowed(monkeypatch):
     provider, completions = _scripted_provider(
-        monkeypatch, "openrouter:deepseek/deepseek-v4-flash", [_completion('{"name": "A", "age": 1}')] * 2
+        monkeypatch, "openrouter:deepseek/deepseek-v4.1-flash-1017", [_completion('{"name": "A", "age": 1}')] * 2
     )
     provider.generate_json(system="s", user="u", output_model=SimpleModel)
     assert completions.requests[0]["extra_body"]["provider"]["data_collection"] == "deny"
@@ -730,7 +730,7 @@ def test_openrouter_data_collection_is_denied_unless_allowed(monkeypatch):
 def test_openrouter_ignore_list_can_be_turned_off(monkeypatch):
     monkeypatch.setenv("AGLC_OPENROUTER_IGNORE", "")
     provider, completions = _scripted_provider(
-        monkeypatch, "openrouter:deepseek/deepseek-v4-flash", [_completion('{"name": "A", "age": 1}')]
+        monkeypatch, "openrouter:deepseek/deepseek-v4.1-flash-1017", [_completion('{"name": "A", "age": 1}')]
     )
     provider.generate_json(system="s", user="u", output_model=SimpleModel)
     assert "ignore" not in completions.requests[0]["extra_body"]["provider"]
@@ -745,7 +745,7 @@ def test_openrouter_allows_failed_hosts_again_when_none_left(monkeypatch):
     )
     provider, completions = _scripted_provider(
         monkeypatch,
-        "openrouter:deepseek/deepseek-v4-flash",
+        "openrouter:deepseek/deepseek-v4.1-flash-1017",
         [_completion("", host="OnlyHost"), no_endpoints, _completion('{"name": "A", "age": 1}', host="OnlyHost")],
     )
     assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"

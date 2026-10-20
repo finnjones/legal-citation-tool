@@ -249,17 +249,25 @@ def fail_document(session_id: str) -> None:
     get_store().finish_document(session_id, status="failed")
 
 
+def write_result(session_dir: Path, filename: str, full: dict, *,
+                 extraction: Extraction | None = None, options: dict | None = None) -> dict:
+    """Write result.json, and extraction.json (the model's own answer) and options.json when
+    given, next to the documents; the retention sweep deletes them with the folder. Free mode
+    keeps them too, so a run can be looked into afterwards. Returns the result as saved."""
+    full = {**full, "filename": filename}
+    if extraction is not None:
+        (session_dir / "extraction.json").write_text(extraction.model_dump_json())
+    if options is not None:
+        (session_dir / "options.json").write_text(json.dumps(options))
+    (session_dir / "result.json").write_text(json.dumps(full))
+    return full
+
+
 def save_result(session_id: str, filename: str, full: dict, *,
                 extraction: Extraction | None = None, options: dict | None = None) -> dict:
     """Keep the full result server-side (with what a re-run needs) and return what the page
     may see now."""
-    d = _session_dir(session_id)
-    full = {**full, "filename": filename}
-    if extraction is not None:
-        (d / "extraction.json").write_text(extraction.model_dump_json())
-    if options is not None:
-        (d / "options.json").write_text(json.dumps(options))
-    (d / "result.json").write_text(json.dumps(full))
+    full = write_result(_session_dir(session_id), filename, full, extraction=extraction, options=options)
     get_store().finish_document(session_id, status="ready", footnote_count=len(full["footnotes"]))
     return view(session_id, full)
 
