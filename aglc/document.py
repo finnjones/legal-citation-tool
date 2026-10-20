@@ -222,9 +222,8 @@ def _disambiguation_title(citation: Citation) -> str:
     """r 1.4.1: the title to append after an author's surname when they have
     more than one cited work. Prefers an author-supplied short title (eg
     '"Meanings of Membership"'); otherwise falls back to whatever title-like
-    field the source has. NOTE: this duck-types across source models rather
-    than using a dedicated Formatter hook -- see the final report for a
-    proposed `Formatter.disambiguation_title()` contract addition."""
+    field the source has. A formatter whose title isn't in a `title` field, or
+    is styled differently, overrides `Formatter.disambiguation_title()`."""
     if citation.short_title:
         return citation.short_title
     src = citation.source
@@ -248,8 +247,12 @@ def _render_disambiguated_subsequent(
     surname is always roman while the title needs its own italic/quoted
     styling -- something a single `short_title: str` parameter can't carry."""
     out.append(surname)
-    title = _disambiguation_title(citation)
-    if title:
+    styled = formatter.disambiguation_title(citation)
+    title = _disambiguation_title(citation) if styled is None else ""
+    if styled is not None and styled.text:
+        out.append(", ")
+        out.extend(styled)
+    elif title:
         out.append(", ")
         if formatter.italic_short_title:
             out.append(title, italic=True)

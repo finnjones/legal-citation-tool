@@ -42,6 +42,217 @@
   "expected_full": "Victoria, *Parliamentary Debates*, Legislative Council, 14 December 2017, 6854"
  },
  {
+  "id": "7.5.2-49",
+  "rule": "7.5.2",
+  "page": 116,
+  "citation": {
+   "source": {
+    "type": "submission",
+    "author": "Australian Institute of Company Directors",
+    "submission_number": "119",
+    "body": "Senate Standing Committees on Economics",
+    "legislature": "Parliament of Australia",
+    "inquiry": "The Performance of the Australian Securities and Investments Commission",
+    "date": "21 October 2013"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "2"
+    }
+   ]
+  },
+  "expected_full": "Australian Institute of Company Directors, Submission No 119 to Senate Standing Committees on Economics, Parliament of Australia, *The Performance of the Australian Securities and Investments Commission* (21 October 2013) 2"
+ },
+ {
+  "id": "7.5.2-50",
+  "rule": "7.5.2",
+  "page": 116,
+  "citation": {
+   "source": {
+    "type": "submission",
+    "author": "Mobil Oil Australia",
+    "submission_number": "25",
+    "body": "Australian Competition and Consumer Commission",
+    "inquiry": "Inquiry into the Price of Unleaded Petrol",
+    "date": "27 July 2007"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "6–7"
+    }
+   ]
+  },
+  "expected_full": "Mobil Oil Australia, Submission No 25 to Australian Competition and Consumer Commission, *Inquiry into the Price of Unleaded Petrol* (27 July 2007) 6–7"
+ },
+ {
+  "id": "7.5.2-51",
+  "rule": "7.5.2",
+  "page": 116,
+  "citation": {
+   "source": {
+    "type": "submission",
+    "author": "Human Rights Law Resource Centre",
+    "submission_number": "21",
+    "body": "Senate Standing Committees on Legal and Constitutional Affairs",
+    "legislature": "Parliament of Australia",
+    "inquiry": "Inquiry into the Anti-Terrorism Laws Reform Bill 2009",
+    "date": "11 September 2009"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "3"
+    },
+    {
+     "kind": "paragraph",
+     "value": "6"
+    }
+   ]
+  },
+  "expected_full": "Human Rights Law Resource Centre, Submission No 21 to Senate Standing Committees on Legal and Constitutional Affairs, Parliament of Australia, *Inquiry into the Anti-Terrorism Laws Reform Bill 2009* (11 September 2009) 3 [6]"
+ },
+ {
+  "id": "7.5.2-52",
+  "rule": "7.5.2",
+  "page": 116,
+  "citation": {
+   "source": {
+    "type": "submission",
+    "author": "Ambulance Victoria",
+    "submission_number": "208",
+    "body": "Law Reform, Road and Community Safety Committee",
+    "legislature": "Parliament of Victoria",
+    "inquiry": "Inquiry into Drug Law Reform",
+    "date": "24 March 2017"
+   }
+  },
+  "expected_full": "Ambulance Victoria, Submission No 208 to Law Reform, Road and Community Safety Committee, Parliament of Victoria, *Inquiry into Drug Law Reform* (24 March 2017)"
+ },
+ {
+  "id": "7.5.2-53",
+  "rule": "7.5.2",
+  "page": 116,
+  "citation": {
+   "source": {
+    "type": "submission",
+    "author": "Criminal Bar Association",
+    "body": "Law Reform Committee",
+    "legislature": "Parliament of Victoria",
+    "inquiry": "Inquiry into Forensic Sampling and DNA Databases in Criminal Investigations"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "2–3"
+    }
+   ]
+  },
+  "expected_full": "Criminal Bar Association, Submission to Law Reform Committee, Parliament of Victoria, *Inquiry into Forensic Sampling and DNA Databases in Criminal Investigations* 2–3"
+ },
+ {
+  "id": "7.5.2-54",
+  "rule": "7.5.2",
+  "page": 116,
+  "citation": {
+   "source": {
+    "type": "submission",
+    "author": "Anonymous 489",
+    "body": "Royal Commission into Family Violence",
+    "date": "29 May 2015"
+   }
+  },
+  "expected_full": "Anonymous 489, Submission to Royal Commission into Family Violence (29 May 2015)"
+ },
+ {
+  "id": "7.5.3-55",
+  "rule": "7.5.3",
+  "page": 117,
+  "citation": {
+   "source": {
+    "type": "committee_evidence",
+    "committee": "House Standing Committee on Tax and Revenue",
+    "legislature": "Parliament of Australia",
+    "location": "Canberra",
+    "date": "30 November 2016",
+    "speaker": "Peter Strong"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "2"
+    }
+   ]
+  },
+  "expected_full": "Evidence to House Standing Committee on Tax and Revenue, Parliament of Australia, Canberra, 30 November 2016, 2 (Peter Strong)"
+ },
+ {
+  "id": "7.5.3-56",
+  "rule": "7.5.3",
+  "page": 117,
+  "citation": {
+   "source": {
+    "type": "committee_evidence",
+    "committee": "Senate Standing Committee on Foreign Affairs, Defence and Trade",
+    "legislature": "Parliament of Australia",
+    "location": "Canberra",
+    "date": "26 February 2007",
+    "speaker": "Angus Houston",
+    "speaker_position": "Air Chief Marshal"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "12"
+    }
+   ]
+  },
+  "expected_full": "Evidence to Senate Standing Committee on Foreign Affairs, Defence and Trade, Parliament of Australia, Canberra, 26 February 2007, 12 (Angus Houston, Air Chief Marshal)"
+ },
+ {
+  "id": "7.5.4-57",
+  "rule": "7.5.4",
+  "page": 118,
+  "citation": {
+   "source": {
+    "type": "convention_debates",
+    "title": "Official Record of the Debates of the Australasian Federal Convention",
+    "location": "Sydney",
+    "date": "2 September 1897",
+    "speaker": "Edmund Barton"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "19"
+    }
+   ]
+  },
+  "expected_full": "*Official Record of the Debates of the Australasian Federal Convention*, Sydney, 2 September 1897, 19 (Edmund Barton)"
+ },
+ {
+  "id": "7.5.4-58",
+  "rule": "7.5.4",
+  "page": 118,
+  "citation": {
+   "source": {
+    "type": "convention_debates",
+    "title": "Official Report of the National Australasian Convention Debates",
+    "location": "Adelaide",
+    "date": "29 March 1897",
+    "speaker": "Sir John Downer"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "206–7"
+    }
+   ]
+  },
+  "expected_full": "*Official Report of the National Australasian Convention Debates*, Adelaide, 29 March 1897, 206–7 (Sir John Downer)"
+ },
+ {
   "id": "1.4.6-92",
   "rule": "1.4.6",
   "page": 14,

@@ -55,7 +55,7 @@ should be a single `text` segment. Do not invent a citation that is not there.
 
 ## The `citation` object
 
-`citation.source` is one of the thirteen source types below, chosen by its `type` field. `citation` also
+`citation.source` is one of the sixteen source types below, chosen by its `type` field. `citation` also
 carries, alongside the source:
 
 - `pinpoints`: a list of `{"kind": ..., "value": ..., "plural": false}` objects (see "Pinpoints").
@@ -129,6 +129,36 @@ carries, alongside the source:
     (Mark Speakman, Attorney-General)` → `jurisdiction: "New South Wales"`,
     `chamber: "Legislative Assembly"`, `date: "30 March 2022"`, `speaker: "Mark Speakman"`,
     `speaker_position: "Attorney-General"`, pinpoint page `8938`.
+- **`submission`** (r 7.5.2) — a written submission to a parliamentary committee, inquiry,
+  government agency or royal commission. The word "Submission" is implied by the type and goes in
+  no field. `author` (the person or body that made it; leave it out for an anonymous submission,
+  but keep a code name like `"Anonymous 489"`), `submission_number` (the number only, if there is
+  one), `body` (the committee, agency or royal commission it was made to, without "to"),
+  `legislature` (for a parliamentary committee, eg `"Parliament of Victoria"`), `inquiry` (the
+  name of the inquiry, if given), `date`.
+  - Example: `Ambulance Victoria, Submission No 208 to Law Reform, Road and Community Safety
+    Committee, Parliament of Victoria, Inquiry into Drug Law Reform (24 March 2017) 3` →
+    `author: "Ambulance Victoria"`, `submission_number: "208"`,
+    `body: "Law Reform, Road and Community Safety Committee"`, `legislature: "Parliament of
+    Victoria"`, `inquiry: "Inquiry into Drug Law Reform"`, `date: "24 March 2017"`, pinpoint page `3`.
+- **`committee_evidence`** (r 7.5.3) — evidence given at a parliamentary committee hearing
+  (Committee Hansard). The words "Evidence to" are implied by the type and go in no field.
+  `committee`, `legislature` (eg `"Parliament of Australia"`), `location` (where the hearing was
+  held), `date`, `speaker` (the witness named in brackets after the page, copied as written),
+  `speaker_position` (anything after the name in those brackets). The page is a pinpoint.
+  - Example: `Evidence to Senate Standing Committee on Foreign Affairs, Defence and Trade,
+    Parliament of Australia, Canberra, 26 February 2007, 12 (Angus Houston, Air Chief Marshal)` →
+    `committee: "Senate Standing Committee on Foreign Affairs, Defence and Trade"`,
+    `legislature: "Parliament of Australia"`, `location: "Canberra"`, `date: "26 February 2007"`,
+    `speaker: "Angus Houston"`, `speaker_position: "Air Chief Marshal"`, pinpoint page `12`.
+- **`convention_debates`** (r 7.5.4) — debates of the Australasian federal conventions of the
+  1890s. `title` (eg `"Official Record of the Debates of the Australasian Federal Convention"`),
+  `location` (the city), `date`, `speaker` (the name in brackets after the page, copied as
+  written). The page is a pinpoint.
+  - Example: `Official Report of the National Australasian Convention Debates, Adelaide, 29 March
+    1897, 206-7 (Sir John Downer)` → `title: "Official Report of the National Australasian
+    Convention Debates"`, `location: "Adelaide"`, `date: "29 March 1897"`,
+    `speaker: "Sir John Downer"`, pinpoint page `206-7`.
 - **`explanatory_memorandum`** (r 3.7) — an explanatory memorandum, statement or notes to a Bill.
   `document_type` (eg `"Explanatory Memorandum"`, `"Revised Explanatory Memorandum"`,
   `"Explanatory Notes"`), `title` (the Bill's title without its year), `year`, `jurisdiction`.

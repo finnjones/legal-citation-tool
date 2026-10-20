@@ -38,11 +38,16 @@ NOISE = frozenset(
 )
 
 # Words a source type supplies or removes itself, so an extraction of that type accounts
-# for them: '*Parliamentary Debates*' is printed by the formatter whatever the author
-# called it ('Hansard'), and r 7.5.1 drops designations like 'MP' and 'the Hon' from the
-# speaker's name.
+# for them: '*Parliamentary Debates*', 'Submission' and 'Evidence to' are printed by the
+# formatter whatever the author called them ('Hansard', 'Sub'), r 7.5.1 and 7.5.4 drop
+# designations like 'MP' and 'the Hon' from a speaker's name, and r 7.5.2 drops
+# 'Anonymous' and 'Name withheld' authors.
+_SPEAKER_TITLES = "Hon Honourable Senator Mr Mrs Ms Miss Dr Prof Professor MP MLA MLC MHR MHA QC SC KC"
 _IMPLIED_BY_TYPE = {
-    "parliamentary_debates": "Parliamentary Debates Hansard Hon Honourable Senator Mr Mrs Ms Dr MP MLA MLC MHR MHA QC SC KC",
+    "parliamentary_debates": "Parliamentary Debates Hansard " + _SPEAKER_TITLES,
+    "submission": "Submission Submissions Sub Anonymous Name Withheld Confidential",
+    "committee_evidence": "Evidence Hansard Proof " + _SPEAKER_TITLES,
+    "convention_debates": _SPEAKER_TITLES,
 }
 
 _ABBREV_DOTS = re.compile(r"(?<=\b[A-Za-z])\.")          # N.S.W. -> NSW, U.N.T.S. -> UNTS
@@ -140,7 +145,7 @@ def missing_from_extraction(original: str, segments: list, extra: Iterable[str] 
 # Fields holding numbers that must be copied from the source, never supplied from memory.
 _NUMERIC_FIELDS = (
     "year", "volume", "issue", "starting_page", "judgment_number", "edition", "page",
-    "document_number", "treaty_series", "date", "opened_for_signature", "entry_into_force",
+    "document_number", "submission_number", "treaty_series", "date", "opened_for_signature", "entry_into_force",
 )
 
 

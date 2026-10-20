@@ -65,6 +65,12 @@ class Formatter(ABC):
             out.append(f" ({citation.pinpoint_judges})")
         return out
 
+    def disambiguation_title(self, citation: Citation) -> RichText | None:
+        """r 1.4.1: the styled title added after the author's surname to tell apart
+        several of their works. None leaves it to the document pass, which uses the short
+        title or `title` field styled per `italic_short_title`."""
+        return None
+
     def ibid_pinpoint(self, citation: Citation) -> str:
         """Text after 'Ibid' when only the pinpoint changes (r 1.4.3): 'Ibid 42'."""
         pin = self.pinpoints(citation.pinpoints)

@@ -6,7 +6,8 @@ Implements AGLC4 (4th ed) rules:
   - r 2.2.1, 2.2.3: report series abbreviations and round/square year brackets
   - r 2.3: medium-neutral court identifiers
   - r 3.1.3: jurisdiction abbreviations, r 15.3/17-20.2.3 style Constitution handling
-  - r 3.7, 7.5.1: explanatory memoranda and parliamentary debates (Hansard)
+  - r 3.7, 7.5.1-7.5.4: explanatory memoranda, parliamentary debates (Hansard), submissions
+    to inquiries, evidence to committees and the federal convention debates
 
 Data tables live in aglc/data/*.json and are cached with functools.lru_cache.
 """
@@ -23,6 +24,8 @@ from .models import (
     BookSource,
     CaseSource,
     Citation,
+    CommitteeEvidenceSource,
+    ConventionDebatesSource,
     ExplanatoryMemorandumSource,
     JournalArticleSource,
     LegislationSource,
@@ -34,6 +37,7 @@ from .models import (
     ReportSource,
     ResearchPaperSource,
     Source,
+    SubmissionSource,
     TreatySource,
     WebsiteSource,
 )
@@ -485,6 +489,18 @@ _SPEAKER_PREFIX = re.compile(
 _SPEAKER_SUFFIX = re.compile(r"(?:,?\s+(?:MP|MLA|MLC|MHR|MHA|QC|SC|KC))+$")
 
 
+def _clean_speaker(name: str | None) -> str | None:
+    """'Senator the Hon George Brandis QC' -> 'George Brandis' (r 7.5.1, 7.5.4)."""
+    if not name:
+        return name
+    return _SPEAKER_SUFFIX.sub("", _SPEAKER_PREFIX.sub("", name)).strip() or name
+
+
+def _clean_date(date: str | None) -> str | None:
+    """'30th March 2022' -> '30 March 2022'."""
+    return re.sub(r"\b(\d{1,2})(?:st|nd|rd|th)\b", r"\1", date) if date else date
+
+
 def _hansard_jurisdiction(name: str) -> str:
     abbrev, matched = _canon_jurisdiction(name)
     if not matched or (abbrev == "UK" and len(name.replace(".", "")) > 2):
@@ -505,11 +521,59 @@ def _normalise_parliamentary_debates(
         data["chamber"] = _CHAMBERS.get(_norm_key(data["chamber"]), data["chamber"])
     else:
         warnings.append("Parliamentary debates missing chamber")
-    if data["date"]:
-        data["date"] = re.sub(r"\b(\d{1,2})(?:st|nd|rd|th)\b", r"\1", data["date"])  # '30th March' -> '30 March'
-    if data["speaker"]:
-        data["speaker"] = _SPEAKER_SUFFIX.sub("", _SPEAKER_PREFIX.sub("", data["speaker"])).strip() or data["speaker"]
+    data["date"] = _clean_date(data["date"])
+    data["speaker"] = _clean_speaker(data["speaker"])
     return ParliamentaryDebatesSource(**data), warnings
+
+
+# r 7.5.2: an anonymous submission has no author, unless it's identified some other way
+# ('Anonymous 489').
+_ANONYMOUS = re.compile(r"(?:anonymous|name withheld|withheld|confidential)", re.I)
+_ROYAL_COMMISSION = re.compile(r"^(?:the\s+)?royal commission\b", re.I)
+
+
+def _normalise_submission(source: SubmissionSource) -> tuple[SubmissionSource, list[str]]:
+    warnings: list[str] = []
+    data = {k: _clean_field(v) for k, v in source.model_dump().items() if k != "type"}
+    if data["author"] and _ANONYMOUS.fullmatch(data["author"]):
+        data["author"] = None
+    if data["submission_number"]:
+        # 'Submission No. 119' / 'No 119' -> '119'
+        data["submission_number"] = re.sub(r"^(?:submission\s*)?(?:no\b\.?\s*)?", "", data["submission_number"], flags=re.I) or None
+    if data["body"]:
+        data["body"] = re.sub(r"^to\s+", "", data["body"], flags=re.I)
+    if data["inquiry"] and not data["body"] and _ROYAL_COMMISSION.match(data["inquiry"]):
+        data["body"], data["inquiry"] = data["inquiry"], None
+    if data["body"] and _ROYAL_COMMISSION.match(data["body"]):
+        data["inquiry"] = None  # r 7.5.2: the royal commission is named once, as the body
+    if not data["body"]:
+        warnings.append("Submission missing the body it was made to")
+    data["date"] = _clean_date(data["date"])
+    return SubmissionSource(**data), warnings
+
+
+def _normalise_committee_evidence(
+    source: CommitteeEvidenceSource,
+) -> tuple[CommitteeEvidenceSource, list[str]]:
+    warnings: list[str] = []
+    data = {k: _clean_field(v) for k, v in source.model_dump().items() if k != "type"}
+    if data["committee"]:
+        data["committee"] = re.sub(r"^evidence\s+to\s+", "", data["committee"], flags=re.I)
+    else:
+        warnings.append("Committee evidence missing the committee")
+    data["date"] = _clean_date(data["date"])
+    data["speaker"] = _clean_speaker(data["speaker"])
+    return CommitteeEvidenceSource(**data), warnings
+
+
+def _normalise_convention_debates(
+    source: ConventionDebatesSource,
+) -> tuple[ConventionDebatesSource, list[str]]:
+    data = {k: _clean_field(v) for k, v in source.model_dump().items() if k != "type"}
+    data["title"] = data["title"] or source.title
+    data["date"] = _clean_date(data["date"])
+    data["speaker"] = _clean_speaker(data["speaker"])
+    return ConventionDebatesSource(**data), []
 
 
 def _normalise_newspaper(source: NewspaperSource) -> tuple[NewspaperSource, list[str]]:
@@ -587,6 +651,9 @@ _DISPATCH = {
     "report": _normalise_report,
     "research_paper": _normalise_research_paper,
     "parliamentary_debates": _normalise_parliamentary_debates,
+    "submission": _normalise_submission,
+    "committee_evidence": _normalise_committee_evidence,
+    "convention_debates": _normalise_convention_debates,
     "explanatory_memorandum": _normalise_explanatory_memorandum,
     "newspaper": _normalise_newspaper,
     "website": _normalise_website,
@@ -598,6 +665,10 @@ _DISPATCH = {
 # --------------------------------------------------------------------------- #
 # Public API
 # --------------------------------------------------------------------------- #
+
+
+_SPOKEN = (ParliamentaryDebatesSource, CommitteeEvidenceSource, ConventionDebatesSource)
+_COMMITTEE_PAGE_PREFIX = re.compile(r"^(?:[A-Z][A-Z&]+\s*|[A-Z]\s+)(?=\d)")
 
 
 def normalise_citation(citation: Citation) -> tuple[Citation, list[str]]:
@@ -637,13 +708,23 @@ def normalise_citation(citation: Citation) -> tuple[Citation, list[str]]:
         ]
     if citation.pinpoint_judges:
         citation.pinpoint_judges = _strip_trailing_punct(citation.pinpoint_judges.strip()) or None
-    if isinstance(src, ParliamentaryDebatesSource) and citation.pinpoint_judges and not src.speaker:
-        # The speaker in brackets after a Hansard pinpoint read as if it were a judge.
-        speaker, _, position = citation.pinpoint_judges.partition(",")
-        citation.source = src = _normalise_parliamentary_debates(
-            src.model_copy(update={"speaker": speaker, "speaker_position": position or None})
-        )[0]
+    if isinstance(src, _SPOKEN) and citation.pinpoint_judges and not src.speaker:
+        # The speaker in brackets after a Hansard (or committee or convention) pinpoint read
+        # as if it were a judge.
+        if isinstance(src, ConventionDebatesSource):
+            update = {"speaker": citation.pinpoint_judges}
+        else:
+            speaker, _, position = citation.pinpoint_judges.partition(",")
+            update = {"speaker": speaker, "speaker_position": position or None}
+        citation.source = src = _DISPATCH[src.type](src.model_copy(update=update))[0]
         citation.pinpoint_judges = None
+    if isinstance(src, CommitteeEvidenceSource):
+        # r 7.5.3 note: Committee Hansard page numbers carry the committee's abbreviation
+        # ('SL&C 12'), which is left out of the pinpoint.
+        citation.pinpoints = [
+            p.model_copy(update={"value": _COMMITTEE_PAGE_PREFIX.sub("", p.value)}) if p.kind == PinpointKind.page else p
+            for p in citation.pinpoints
+        ]
     if citation.short_title:
         citation.short_title = citation.short_title.strip() or None
 
@@ -696,6 +777,22 @@ def source_key(source: Source) -> str:
         chamber = _CHAMBERS.get(_norm_key(source.chamber), source.chamber or "")
         speaker = _normalise_parliamentary_debates(source)[0].speaker
         return f"hansard:{_norm_key(juris)}:{_norm_key(chamber)}:{_norm_key(source.date)}:{_norm_key(speaker)}"
+
+    if isinstance(source, SubmissionSource):
+        sub = _normalise_submission(source)[0]
+        parts = (sub.author, sub.submission_number, sub.body, sub.legislature, sub.inquiry, sub.date)
+        return "submission:" + ":".join(_norm_key(p) for p in parts)
+
+    if isinstance(source, CommitteeEvidenceSource):
+        # One witness at one hearing, as for Hansard.
+        ev = _normalise_committee_evidence(source)[0]
+        parts = (ev.committee, ev.legislature, ev.date, ev.speaker)
+        return "evidence:" + ":".join(_norm_key(p) for p in parts)
+
+    if isinstance(source, ConventionDebatesSource):
+        cd = _normalise_convention_debates(source)[0]
+        parts = (cd.title, cd.location, cd.date, cd.speaker)
+        return "convention:" + ":".join(_norm_key(p) for p in parts)
 
     if isinstance(source, ExplanatoryMemorandumSource):
         title, year = _split_title_year((source.title or "").strip(), source.year)
