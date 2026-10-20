@@ -19,6 +19,7 @@ _LABELS: dict[PinpointKind, tuple[str, str]] = {
     PinpointKind.annex: ("annex", "annexes"),
     PinpointKind.volume: ("vol", "vols"),
     PinpointKind.book: ("bk", "bks"),
+    PinpointKind.column: ("col", "cols"),
 }
 
 

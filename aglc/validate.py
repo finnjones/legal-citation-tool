@@ -37,6 +37,14 @@ NOISE = frozenset(
     """.split()
 )
 
+# Words a source type supplies or removes itself, so an extraction of that type accounts
+# for them: '*Parliamentary Debates*' is printed by the formatter whatever the author
+# called it ('Hansard'), and r 7.5.1 drops designations like 'MP' and 'the Hon' from the
+# speaker's name.
+_IMPLIED_BY_TYPE = {
+    "parliamentary_debates": "Parliamentary Debates Hansard Hon Honourable Senator Mr Mrs Ms Dr MP MLA MLC MHR MHA QC SC KC",
+}
+
 _ABBREV_DOTS = re.compile(r"(?<=\b[A-Za-z])\.")          # N.S.W. -> NSW, U.N.T.S. -> UNTS
 _TOKEN = re.compile(r"\d+|[^\W\d_]+(?:['’][^\W\d_]+)?")   # numbers, words (incl. accents, O'Donovan)
 _SPAN = re.compile(r"(\d+)\s*[–—-]\s*(\d+)")
@@ -91,6 +99,7 @@ def extracted_text(segments: list, extra: Iterable[str] = ()) -> str:
             parts.append(seg.text.text)
         elif isinstance(seg, CitationSegment):
             parts.extend(_strings(seg.citation))
+            parts.append(_IMPLIED_BY_TYPE.get(seg.citation.source.type, ""))
             parts.append(seg.original if seg.citation.source.type == "other" else "")
     return " ".join(parts)
 

@@ -45,7 +45,8 @@ assertion message names the rule and guide page so you can go back to the *Guide
 ## Adding examples
 
 1. Find a worked example in `reference/aglc4.txt` (chapter 1-3 coverage lives in `cases.json`
-   and `legislation.json`; other source types can add their own `*.json` file following the
+   and `legislation.json`; parliamentary materials, research papers and committee reports
+   (r 3.7, 7.1.2, 7.2, 7.5.1, 24.4.1) in `parliamentary.json`; other source types can add their own `*.json` file following the
    same schema -- the test loader picks up every file in this directory automatically).
 2. Build the `citation` object by hand from `aglc/models.py`'s `CaseSource` / `LegislationSource`
    (or another `Source` subtype) plus `pinpoints` / `pinpoint_judges` / `short_title` / `signal`

@@ -6,7 +6,7 @@ __all__ = ["BIB_CASES", "BIB_ORDER", "BIB_SECONDARY", "Formatter", "formatter_fo
 
 
 def _load_all() -> None:
-    from . import cases, legislation, other, secondary, treaties  # noqa: F401
+    from . import cases, legislation, other, parliamentary, secondary, treaties  # noqa: F401
 
 
 _load_all()

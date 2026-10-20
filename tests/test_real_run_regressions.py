@@ -16,6 +16,7 @@ from aglc.models import (
     LegislationSource,
     Pinpoint,
     RichText,
+    Run,
     TextSegment,
     TreatySource,
     WebsiteSource,
@@ -517,3 +518,74 @@ def test_case_name_inside_a_chapter_title_stays_italic():
                             chapter_title_rich=_marked(1, title).original, editors=["John Roe"],
                             book_title="Native Title", publisher="Federation Press", year="2010", starting_page="1")
     assert _full(Citation(source=src)).startswith("Jane Doe, ‘Revisiting *Mabo v Queensland [No 2]* (1992)’ in ")
+
+
+# Hansard and parliamentary papers now have source types of their own.
+
+
+def _from_markup(n: int, markup: str) -> Footnote:
+    """A footnote whose *asterisked* runs are italic, as read from Word."""
+    runs = [Run(text=part, italic=bool(i % 2)) for i, part in enumerate(markup.split("*")) if part]
+    return Footnote(number=n, original=RichText(runs=runs))
+
+
+SPEAKMAN = {"type": "parliamentary_debates", "jurisdiction": "New South Wales", "chamber": "Legislative Assembly",
+            "date": "30 March 2022", "speaker": "Mark Speakman", "speaker_position": "Attorney-General"}
+SPEAKMAN_FULL = ("New South Wales, *Parliamentary Debates*, Legislative Assembly, 30 March 2022, 8938 "
+                 "(Mark Speakman, Attorney-General)")
+
+
+def test_hansard_already_in_aglc_form_is_left_unchanged():
+    """Hansard used to fall through to the 'other' type and be copied verbatim, so a wrong
+    one could never be fixed. As its own type it is formatted, and a correct one is kept."""
+    from aglc import pipeline
+
+    fns = [
+        _from_markup(5, SPEAKMAN_FULL + " (‘*Parliamentary Debates*’)."),
+        _from_markup(6, "Australian Law Reform Commission, *Elder Abuse* (Discussion Paper No 83, December 2016)."),
+        _from_markup(7, "*Parliamentary Debates* (n 5) 8939."),
+    ]
+    batch = json.dumps({"footnotes": [
+        {"number": 5, "segments": [{"kind": "citation", "original": fns[0].original.text[:-1],
+                                    "citation": {"source": SPEAKMAN, "pinpoints": [{"kind": "page", "value": "8938"}],
+                                                 "short_title": "Parliamentary Debates"}}]},
+        {"number": 6, "segments": [{"kind": "citation", "original": fns[1].original.text[:-1],
+                                    "citation": {"source": {"type": "report", "author": "Australian Law Reform Commission",
+                                                            "title": "Elder Abuse", "document_type": "Discussion Paper",
+                                                            "document_number": "83", "date": "December 2016"}}}]},
+        {"number": 7, "segments": [{"kind": "citation", "original": "Parliamentary Debates (n 5) 8939", "refers_to_footnote": 5,
+                                    "citation": {"source": {"type": "other", "text": "Parliamentary Debates (n 5) 8939"},
+                                                 "short_title": "Parliamentary Debates",
+                                                 "pinpoints": [{"kind": "page", "value": "8939"}]}}]},
+    ]})
+    result = pipeline.process_footnotes(fns, get_provider("fake:x", responses=[batch]), bibliography=False)
+    assert [f.formatted.to_markup() for f in result.footnotes] == [f.original.to_markup() for f in fns]
+    assert not any(f.changed for f in result.footnotes)
+    assert result.warnings == []
+
+
+def test_badly_formatted_hansard_is_corrected():
+    """'Parliamentary Debates' in roman with the chamber italicised and no comma after it;
+    then the same speech with the speaker's titles and abbreviations left in."""
+    from aglc import pipeline
+
+    messy = [
+        _from_markup(5, "New South Wales, Parliamentary Debates, *Legislative Assembly* 30 March 2022, 8938 "
+                        "(Mark Speakman, Attorney-General)."),
+        _from_markup(9, "NSW, *Parliamentary Debates*, LA, 30th March 2022, p 8938 (The Hon. Mark Speakman SC MP, Attorney-General)."),
+    ]
+    extracted = [
+        dict(SPEAKMAN),
+        dict(SPEAKMAN, jurisdiction="NSW", chamber="LA", date="30th March 2022", speaker="The Hon. Mark Speakman SC MP"),
+    ]
+    batch = json.dumps({"footnotes": [
+        {"number": fn.number, "segments": [{"kind": "citation", "original": fn.original.text[:-1],
+                                            "citation": {"source": src, "pinpoints": [{"kind": "page", "value": "8938"}]}}]}
+        for fn, src in zip(messy, extracted)
+    ]})
+    for fn in messy:
+        # each footnote on its own, so the second isn't an 'Ibid' to the first
+        one = json.dumps({"footnotes": [f for f in json.loads(batch)["footnotes"] if f["number"] == fn.number]})
+        result = pipeline.process_footnotes([fn], get_provider("fake:x", responses=[one]), bibliography=False)
+        assert result.footnotes[0].formatted.to_markup() == SPEAKMAN_FULL + "."
+        assert result.warnings == []

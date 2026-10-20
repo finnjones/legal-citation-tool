@@ -1,8 +1,8 @@
 """Legislation (AGLC4 ch 3): Acts, delegated legislation, Bills and constitutions.
 
-Gazettes, explanatory memoranda, legislative-history annotations and non-government
-delegated legislation (rr 3.7-3.9) are out of scope: `LegislationSource` has no
-fields for them.
+Gazettes, legislative-history annotations and non-government delegated legislation
+(rr 3.8-3.9) are out of scope: `LegislationSource` has no fields for them. Explanatory
+memoranda (r 3.7) are their own source type (see `parliamentary.py`).
 """
 
 from __future__ import annotations

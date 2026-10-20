@@ -6,6 +6,7 @@ Implements AGLC4 (4th ed) rules:
   - r 2.2.1, 2.2.3: report series abbreviations and round/square year brackets
   - r 2.3: medium-neutral court identifiers
   - r 3.1.3: jurisdiction abbreviations, r 15.3/17-20.2.3 style Constitution handling
+  - r 3.7, 7.5.1: explanatory memoranda and parliamentary debates (Hansard)
 
 Data tables live in aglc/data/*.json and are cached with functools.lru_cache.
 """
@@ -22,13 +23,16 @@ from .models import (
     BookSource,
     CaseSource,
     Citation,
+    ExplanatoryMemorandumSource,
     JournalArticleSource,
     LegislationSource,
     NewspaperSource,
     OtherSource,
+    ParliamentaryDebatesSource,
     Pinpoint,
     PinpointKind,
     ReportSource,
+    ResearchPaperSource,
     Source,
     TreatySource,
     WebsiteSource,
@@ -432,6 +436,98 @@ def _normalise_report(source: ReportSource) -> tuple[ReportSource, list[str]]:
     return ReportSource(**data), warnings
 
 
+def _normalise_research_paper(source: ResearchPaperSource) -> tuple[ResearchPaperSource, list[str]]:
+    data = source.model_dump()
+    data["authors"] = _clean_authors(source.authors)
+    data["title"] = (source.title or "").strip()
+    for field in ("document_type", "document_number", "institution", "date"):
+        if data.get(field):
+            data[field] = _clean_field(data[field])
+    if source.url:
+        data["url"] = source.url.strip()
+    # A research paper may be authored by the body that publishes it (r 7.2.1), so no
+    # warning for a missing author.
+    return ResearchPaperSource(**data), []
+
+
+def _split_title_year(title: str, year: str | None) -> tuple[str, str | None]:
+    """'Native Title Act 1993' with no separate year -> ('Native Title Act', '1993')."""
+    if not year and title:
+        m = re.match(r"^(.*\S)\s+(\d{4})$", title)
+        if m:
+            return m.group(1).strip(), m.group(2)
+    return title, year
+
+
+def _normalise_explanatory_memorandum(
+    source: ExplanatoryMemorandumSource,
+) -> tuple[ExplanatoryMemorandumSource, list[str]]:
+    warnings: list[str] = []
+    data = source.model_dump()
+    title, year = _split_title_year(_clean_field(source.title) or "", _clean_field(source.year))
+    data["title"], data["year"] = title, year
+    data["document_type"] = _clean_field(source.document_type) or "Explanatory Memorandum"
+    if data.get("jurisdiction"):
+        abbrev, matched = _canon_jurisdiction(data["jurisdiction"])
+        if matched:
+            data["jurisdiction"] = abbrev
+        else:
+            warnings.append(f"Unknown jurisdiction: '{data['jurisdiction']}'")
+    else:
+        warnings.append("Explanatory memorandum missing the Bill's jurisdiction")
+    return ExplanatoryMemorandumSource(**data), warnings
+
+
+# r 7.5.1: Hansard names the jurisdiction in full ('Commonwealth', 'New South Wales').
+_CHAMBERS = {
+    _norm_key(variant): name
+    for name, variants in {
+        "Senate": [],
+        "House of Representatives": ["HR", "HoR", "H of R", "Reps"],
+        "Legislative Assembly": ["LA"],
+        "Legislative Council": ["LC"],
+        "House of Assembly": ["HA"],
+        "House of Commons": ["HC"],
+        "House of Lords": ["HL"],
+    }.items()
+    for variant in [name, *variants]
+}
+# r 7.5.1: 'MP', 'MLC', 'MLA', 'Senator' and other designations of membership of
+# Parliament are left out of the speaker's name; r 7.5.4 (after r 4.1): so are titles
+# such as 'the Hon', 'Mr' and 'Dr', but not 'Sir', 'Dame' or peerage titles.
+_SPEAKER_PREFIX = re.compile(
+    r"^(?:(?:the\s+)?(?:Hon(?:ourable)?|Senator|Mr|Mrs|Ms|Miss|Dr|Prof(?:essor)?)\.?\s+)+", re.I
+)
+_SPEAKER_SUFFIX = re.compile(r"(?:,?\s+(?:MP|MLA|MLC|MHR|MHA|QC|SC|KC))+$")
+
+
+def _hansard_jurisdiction(name: str) -> str:
+    abbrev, matched = _canon_jurisdiction(name)
+    if not matched or (abbrev == "UK" and len(name.replace(".", "")) > 2):
+        return name  # 'England', 'Scotland' etc stay as written (r 24.4.1)
+    return _load_json("jurisdictions.json")[abbrev]["name"]
+
+
+def _normalise_parliamentary_debates(
+    source: ParliamentaryDebatesSource,
+) -> tuple[ParliamentaryDebatesSource, list[str]]:
+    warnings: list[str] = []
+    data = {k: _clean_field(v) for k, v in source.model_dump().items() if k != "type"}
+    if data["jurisdiction"]:
+        data["jurisdiction"] = _hansard_jurisdiction(data["jurisdiction"])
+    else:
+        warnings.append("Parliamentary debates missing jurisdiction")
+    if data["chamber"]:
+        data["chamber"] = _CHAMBERS.get(_norm_key(data["chamber"]), data["chamber"])
+    else:
+        warnings.append("Parliamentary debates missing chamber")
+    if data["date"]:
+        data["date"] = re.sub(r"\b(\d{1,2})(?:st|nd|rd|th)\b", r"\1", data["date"])  # '30th March' -> '30 March'
+    if data["speaker"]:
+        data["speaker"] = _SPEAKER_SUFFIX.sub("", _SPEAKER_PREFIX.sub("", data["speaker"])).strip() or data["speaker"]
+    return ParliamentaryDebatesSource(**data), warnings
+
+
 def _normalise_newspaper(source: NewspaperSource) -> tuple[NewspaperSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
@@ -510,6 +606,9 @@ _DISPATCH = {
     "book": _normalise_book,
     "book_chapter": _normalise_book_chapter,
     "report": _normalise_report,
+    "research_paper": _normalise_research_paper,
+    "parliamentary_debates": _normalise_parliamentary_debates,
+    "explanatory_memorandum": _normalise_explanatory_memorandum,
     "newspaper": _normalise_newspaper,
     "website": _normalise_website,
     "treaty": _normalise_treaty,
@@ -559,6 +658,13 @@ def normalise_citation(citation: Citation) -> tuple[Citation, list[str]]:
         ]
     if citation.pinpoint_judges:
         citation.pinpoint_judges = _strip_trailing_punct(citation.pinpoint_judges.strip()) or None
+    if isinstance(src, ParliamentaryDebatesSource) and citation.pinpoint_judges and not src.speaker:
+        # The speaker in brackets after a Hansard pinpoint read as if it were a judge.
+        speaker, _, position = citation.pinpoint_judges.partition(",")
+        citation.source = src = _normalise_parliamentary_debates(
+            src.model_copy(update={"speaker": speaker, "speaker_position": position or None})
+        )[0]
+        citation.pinpoint_judges = None
     if citation.short_title:
         citation.short_title = citation.short_title.strip() or None
 
@@ -603,6 +709,19 @@ def source_key(source: Source) -> str:
 
     if isinstance(source, TreatySource):
         return f"treaty:{_norm_key(source.title)}"
+
+    if isinstance(source, ParliamentaryDebatesSource):
+        # One day's debates in one chamber; a different speaker is cited afresh so that a
+        # short reference never drops who said it.
+        juris = _hansard_jurisdiction(_clean_field(source.jurisdiction) or "")
+        chamber = _CHAMBERS.get(_norm_key(source.chamber), source.chamber or "")
+        speaker = _normalise_parliamentary_debates(source)[0].speaker
+        return f"hansard:{_norm_key(juris)}:{_norm_key(chamber)}:{_norm_key(source.date)}:{_norm_key(speaker)}"
+
+    if isinstance(source, ExplanatoryMemorandumSource):
+        title, year = _split_title_year((source.title or "").strip(), source.year)
+        juris = _canon_jurisdiction(source.jurisdiction or "")[0] or source.jurisdiction
+        return f"em:{_norm_key(source.document_type)}:{_norm_key(title)}:{_norm_key(year)}:{_norm_key(juris)}"
 
     if isinstance(source, OtherSource):
         return f"other:{_norm_key(source.text)}"

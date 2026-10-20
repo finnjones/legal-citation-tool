@@ -55,7 +55,7 @@ should be a single `text` segment. Do not invent a citation that is not there.
 
 ## The `citation` object
 
-`citation.source` is one of the ten source types below, chosen by its `type` field. `citation` also
+`citation.source` is one of the thirteen source types below, chosen by its `type` field. `citation` also
 carries, alongside the source:
 
 - `pinpoints`: a list of `{"kind": ..., "value": ..., "plural": false}` objects (see "Pinpoints").
@@ -104,6 +104,40 @@ carries, alongside the source:
     December 2015)` → `author: "Australian Law Reform Commission"`,
     `title: "Traditional Rights and Freedoms"`, `document_type: "Report"`, `document_number: "129"`,
     `date: "December 2015"`.
+  - A parliamentary committee's report (r 7.1.2) is a `report` whose `author` is the committee
+    and the parliament, eg `Law Reform Committee, Parliament of Victoria, Inquiry into Alternative
+    Dispute Resolution and Restorative Justice (Final Report, May 2009) 26` →
+    `author: "Law Reform Committee, Parliament of Victoria"`, `title: "Inquiry into Alternative
+    Dispute Resolution and Restorative Justice"`, `document_type: "Final Report"`,
+    `date: "May 2009"`, pinpoint page `26`.
+- **`research_paper`** (r 7.2) — research papers, working papers, parliamentary library research
+  papers, notes and briefs, conference papers and theses, whose title is in quotation marks rather
+  than italics. `authors`, `title`, `document_type` (as it appears, eg `"Research Paper"`,
+  `"Research Note"`, `"e-brief"`, `"Working Paper"`, `"PhD Thesis"`), `document_number`,
+  `institution` (the body that published it, including the parliament for a parliamentary paper),
+  `date`, `url`.
+  - Example: `Scott Bennett, 'The Rise of the Australian Greens' (Research Paper No 8,
+    Parliamentary Library, Parliament of Australia, 22 September 2008) 15` →
+    `authors: ["Scott Bennett"]`, `title: "The Rise of the Australian Greens"`,
+    `document_type: "Research Paper"`, `document_number: "8"`,
+    `institution: "Parliamentary Library, Parliament of Australia"`, `date: "22 September 2008"`,
+    pinpoint page `15`.
+- **`parliamentary_debates`** (r 7.5.1) — Hansard, including second reading speeches. The words
+  "Parliamentary Debates" or "Hansard" are implied by the type and go in no field.
+  `jurisdiction` (as written, eg `"Commonwealth"`, `"New South Wales"`, `"NSW"`), `chamber`
+  (eg `"Senate"`, `"Legislative Assembly"`), `date` (date of the debate), `speaker` (the name in
+  brackets after the page, copied as written, titles included), `speaker_position` (anything after
+  the name in those brackets, eg `"Attorney-General"`). The page is a pinpoint, not a field.
+  - Example: `New South Wales, Parliamentary Debates, Legislative Assembly, 30 March 2022, 8938
+    (Mark Speakman, Attorney-General)` → `jurisdiction: "New South Wales"`,
+    `chamber: "Legislative Assembly"`, `date: "30 March 2022"`, `speaker: "Mark Speakman"`,
+    `speaker_position: "Attorney-General"`, pinpoint page `8938`.
+- **`explanatory_memorandum`** (r 3.7) — an explanatory memorandum, statement or notes to a Bill.
+  `document_type` (eg `"Explanatory Memorandum"`, `"Revised Explanatory Memorandum"`,
+  `"Explanatory Notes"`), `title` (the Bill's title without its year), `year`, `jurisdiction`.
+  - Example: `Explanatory Notes, Adoption Bill 2009 (Qld) 5-6` →
+    `document_type: "Explanatory Notes"`, `title: "Adoption Bill"`, `year: "2009"`,
+    `jurisdiction: "Qld"`, pinpoint page `5-6`.
 - **`newspaper`** (r 7.10) — `authors`, `title` (article headline), `newspaper` (publication name),
   `place`, `date`, `page`, `url`.
 - **`website`** (r 7.15) — `authors`, `title` (page title), `website_name`, `date`, `url`.
@@ -134,6 +168,7 @@ Map each pinpoint reference to a `Pinpoint`. `value` is the number/range only (n
 | `art 5` | `article` | `"5"` | `false` |
 | `ch 4` | `chapter` | `"4"` | `false` |
 | `vol 1` (volume of a report or multi-volume book) | `volume` | `"1"` | `false` |
+| `col 778` (column of UK Hansard) | `column` | `"778"` | `false` |
 | `bk 2` | `book` | `"2"` | `false` |
 | `annex II` | `annex` | `"II"` | `false` |
 | `n 7` (pinpoint to another footnote, eg `42 n 7`) | `footnote` | `"7"` | `false` |
