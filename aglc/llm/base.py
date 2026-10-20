@@ -62,6 +62,29 @@ class LLMProvider(ABC):
         self.options = options
         #: asked instead when this provider has failed every attempt (see $AGLC_LLM_FALLBACK)
         self.fallback: LLMProvider | None = None
+        #: called with each piece of the reply as it arrives, by providers that stream
+        self.on_text: Callable[[str], None] | None = None
+        #: called with ("retry", {...}) / ("fallback", {...}) so progress can say what's happening
+        self.on_event: Callable[[str, dict[str, Any]], None] | None = None
+
+    def avoid_last_host(self) -> bool:
+        """Route the next request away from whichever host served the last reply, where the
+        provider routes between hosts (OpenRouter). True if it will."""
+        return False
+
+    def _emit_text(self, text: str) -> None:
+        if self.on_text is not None:
+            try:
+                self.on_text(text)
+            except Exception:  # noqa: BLE001 - progress must never break a request
+                log.debug("on_text callback failed", exc_info=True)
+
+    def _emit(self, kind: str, **data: Any) -> None:
+        if self.on_event is not None:
+            try:
+                self.on_event(kind, data)
+            except Exception:  # noqa: BLE001 - progress must never break a request
+                log.debug("on_event callback failed", exc_info=True)
 
     # ---- the one method subclasses must implement -------------------------- #
     @abstractmethod
@@ -91,6 +114,8 @@ class LLMProvider(ABC):
             if self.fallback is None:
                 raise
             log.warning("%s failed (%s); asking the fallback model %s", self, e, self.fallback)
+            self._emit("fallback", model=str(self.fallback.model))
+            self.fallback.on_text, self.fallback.on_event = self.on_text, self.on_event
             return self.fallback.generate_json(
                 system=system, user=user, output_model=output_model, max_attempts=max_attempts
             )
@@ -115,6 +140,7 @@ class LLMProvider(ABC):
                     "%s attempt %d/%d failed after %.1fs (%s); retrying in %gs",
                     self, attempt, max_attempts, time.monotonic() - t0, e, delay,
                 )
+                self._emit("retry", attempt=attempt + 1, timed_out="no answer within" in str(e))
                 _sleep(delay)
                 continue  # same prompt: an empty reply is not something the model can correct
             log.debug("%s attempt %d: %d chars in %.1fs", self, attempt, len(raw), time.monotonic() - t0)

@@ -100,6 +100,24 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         }
         @keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--accent-wash); } }
 
+        /* Footnote grid: one tile per footnote, filled as the AI model reads it */
+        .reading { margin-top: 18px; }
+        .reading-line { font-size: 0.9375rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+        .reading-line .left { color: var(--muted); font-weight: 400; }
+        .tiles { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; }
+        .tile-group { display: grid; gap: 5px; justify-items: center; }
+        .tile-row { display: flex; gap: 3px; }
+        .tile { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--hairline-strong); }
+        .tile.writing { background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+        .tile.done { background: var(--accent); border-color: var(--accent); }
+        .tile.failed { background: var(--check-wash); border-color: var(--check); }
+        .tile-label { font-size: 0.6875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .reading-note { margin-top: 12px; font-size: 0.875rem; color: var(--muted); }
+        .reading-note.problem { color: var(--check); }
+        @media (prefers-reduced-motion: no-preference) {
+            .tile { transition: background-color 0.35s var(--ease-out), border-color 0.35s var(--ease-out); }
+        }
+
         /* ---- Banners --------------------------------------------------------- */
         .banner {
             border: 1px solid var(--hairline); background: var(--sheet); border-radius: 8px;
@@ -441,8 +459,13 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
                     <div class="progress" id="progress" hidden>
                         <h2 id="progressTitle">Checking your essay</h2>
-                        <p>Usually under a minute. Keep this tab open.</p>
-                        <ol class="stages" id="stages" aria-live="polite"></ol>
+                        <p id="progressHint">Usually under a minute. Keep this tab open.</p>
+                        <div class="reading" id="reading" hidden>
+                            <p class="reading-line" id="readingLine"></p>
+                            <div class="tiles" id="tiles" aria-hidden="true"></div>
+                            <p class="reading-note" id="readingNote" aria-live="polite" hidden></p>
+                        </div>
+                        <ol class="stages" id="stages"></ol>
                     </div>
 
                     <div id="uploadError" hidden></div>
@@ -908,6 +931,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 formData.append("file", file);
                 formData.append("track_changes", document.getElementById("trackChanges").checked);
                 formData.append("bibliography", document.getElementById("bibliography").checked);
+                formData.append("progress", "true");
                 let response;
                 try {
                     response = await fetch("/api/process", { method: "POST", body: formData });
@@ -915,7 +939,9 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     throw new Error("We couldn't reach the server. Check your connection and try again.");
                 }
                 if (!response.ok) throw new Error(await detailOf(response, "Something went wrong processing your document. Please try again."));
-                const data = await response.json();
+                let data = await response.json();
+                // 202: processing in the background; follow it until the result is ready
+                if (response.status === 202) data = await followProgress(data.id, progress);
                 await progress.finish();
                 data.filename = data.filename || file.name;
                 if (config.payments) history.replaceState(null, "", `/?session=${encodeURIComponent(data.id)}`);
@@ -929,46 +955,167 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             }
         }
 
-        // Named stages. The server works in one request, so the AI stage stays current until it answers;
-        // the stages after it ran on the server before the answer arrived, so they're ticked off then.
+        // Named stages, moved on by the server's own progress (GET /api/progress/{id}), with a tile
+        // per footnote that fills as the AI model reads it, a time-left estimate, and a plain line
+        // for anything the tool is doing about a problem.
+        const STAGE_INDEX = { reading: 1, formatting: 2, checking: 3, writing_doc: 4 };
+        const TILE_STATES = { failed: "couldn't be read, kept as written", done: "read", writing: "being read" };
+
         function startProgress(name) {
             document.getElementById("uploadForm").hidden = true;
             const panel = document.getElementById("progress");
             panel.hidden = false;
             document.getElementById("progressTitle").textContent = `Checking ${name}`;
+            const hint = document.getElementById("progressHint");
+            hint.textContent = "Usually under a minute. Keep this tab open.";
+            const reading = document.getElementById("reading");
+            const tiles = document.getElementById("tiles");
+            const line = document.getElementById("readingLine");
+            const note = document.getElementById("readingNote");
+            reading.hidden = true;
+            tiles.innerHTML = "";
+            note.hidden = true;
             const list = document.getElementById("stages");
             list.innerHTML = STAGES.map(s => `<li class="stage"><span class="mark">${ICON_CHECK}</span><span>${s}</span><span class="time"></span></li>`).join("");
             const items = [...list.children];
-            const set = (i, state) => {
-                items.forEach((li, j) => li.className = `stage ${j < i ? "done" : j === i ? state : ""}`);
-                items.forEach((li, j) => li.setAttribute("aria-current", j === i && state === "current" ? "step" : "false"));
-            };
-            set(0, "current");
             const started = Date.now();
-            let current = 0;
-            const toAi = setTimeout(() => { current = 1; set(1, "current"); }, 900);
+            let current = 0, stageSince = started, readingSince = null, total = 0, lastAnnounced = 0;
+            const set = (i) => {
+                if (i !== current) stageSince = Date.now();
+                current = i;
+                items.forEach((li, j) => li.className = `stage ${j < i ? "done" : j === i ? "current" : ""}`);
+                items.forEach((li, j) => li.setAttribute("aria-current", j === i ? "step" : "false"));
+            };
+            set(0);
             const tick = setInterval(() => {
-                const secs = Math.round((Date.now() - started) / 1000);
-                items.forEach(li => li.querySelector(".time").textContent = "");
-                if (current === 1 && secs >= 3) items[1].querySelector(".time").textContent = `${secs}s`;
+                const secs = Math.round((Date.now() - stageSince) / 1000);
+                items.forEach((li, j) => li.querySelector(".time").textContent = j === current && secs >= 3 ? `${secs}s` : "");
+                if ((Date.now() - started) / 1000 > 90) hint.textContent = "Taking longer than usual. Keep this tab open: it's still working.";
             }, 1000);
+
+            function buildTiles(n) {
+                total = n;
+                const groups = [];
+                for (let first = 1; first <= n; first += 5) {
+                    const last = Math.min(first + 4, n);
+                    const row = [];
+                    for (let k = first; k <= last; k++) row.push(`<span class="tile" data-n="${k}" title="Footnote ${k}: waiting"></span>`);
+                    groups.push(`<div class="tile-group"><div class="tile-row">${row.join("")}</div><span class="tile-label">${first === last ? first : `${first}–${last}`}</span></div>`);
+                }
+                tiles.innerHTML = groups.join("");
+                reading.hidden = n === 0;
+            }
+
+            function timeLeft(done) {
+                // Too early to say until a few footnotes (and a tenth of them) are done
+                if (!readingSince || done < Math.max(3, Math.ceil(total / 10)) || done >= total) return "";
+                const spent = (Date.now() - readingSince) / 1000;
+                const left = (total - done) * spent / done;
+                if (left < 10) return "nearly done";
+                if (left < 60) return `about ${Math.ceil(left / 5) * 5}s left`;
+                const mins = Math.floor(left / 60), secs = Math.round((left % 60) / 10) * 10;
+                return `about ${mins} min${secs ? ` ${secs}s` : ""} left`;
+            }
+
+            function noteText(snap) {
+                const latest = snap.notes[snap.notes.length - 1];
+                // Shown until something moves on after it (or for 20s at most)
+                if (latest && latest.ago < 20 && snap.idle >= latest.ago - 0.5) {
+                    const n = latest.count, s = n === 1 ? "" : "s";
+                    const text = {
+                        reask: "The AI model skipped some footnotes in this batch, so they're being asked about again.",
+                        split: `The AI model didn't answer, so these ${n} footnotes are being asked about in smaller groups.`,
+                        single: `Asking about footnote ${latest.number} on its own.`,
+                        repair: `Footnote ${latest.number} came back incomplete; asking again.`,
+                        retry: "The AI model didn't answer properly; trying again.",
+                        slow: "The AI model didn't answer in time; trying again.",
+                        fallback: "Trying a backup AI model.",
+                        deadline: `This is taking too long, so ${n} footnote${s} will be left as you wrote ${n === 1 ? "it" : "them"}. The results will show which.`,
+                        retry_failed: `Trying the ${n} footnote${s} the AI model couldn't read once more.`,
+                    }[latest.kind];
+                    if (text) return { text, problem: latest.kind !== "single" };
+                }
+                if (snap.stage === "reading" && snap.idle >= 25) {
+                    return { text: `The AI model is slow right now; still waiting (${Math.round(snap.idle)}s).`, problem: true };
+                }
+                return null;
+            }
+
             const stop = () => {
-                clearTimeout(toAi); clearInterval(tick);
+                clearInterval(tick);
                 panel.hidden = true;
                 document.getElementById("uploadForm").hidden = false;
             };
             return {
                 stop,
+                update(snap) {
+                    const stage = STAGE_INDEX[snap.stage] ?? 1;
+                    if (stage >= 1 && readingSince === null) readingSince = Date.now();
+                    if (stage > current) set(stage);
+                    if (snap.total && snap.total !== total) buildTiles(snap.total);
+                    if (!total) return;
+                    const done = new Set(snap.done), failed = new Set(snap.failed), writing = new Set(snap.writing);
+                    tiles.querySelectorAll(".tile").forEach(t => {
+                        const n = Number(t.dataset.n);
+                        const state = failed.has(n) ? "failed" : done.has(n) ? "done" : writing.has(n) ? "writing" : "";
+                        if (t.dataset.state === state) return;
+                        t.dataset.state = state;
+                        t.className = `tile ${state}`;
+                        t.title = `Footnote ${n}: ${TILE_STATES[state] || "waiting"}`;
+                    });
+                    const count = done.size;
+                    if (stage > 1 || count >= total) {
+                        line.innerHTML = `All ${total} footnotes read` + (failed.size ? ` <span class="left">· ${failed.size} couldn't be read</span>` : "");
+                    } else {
+                        const left = snap.idle < 10 ? timeLeft(count) : "";  // no estimate while it's stalled
+                        line.innerHTML = `Reading your footnotes · ${count} of ${total}` + (left ? ` <span class="left">· ${left}</span>` : "");
+                    }
+                    // Announce every quarter or so, not every poll
+                    if (count - lastAnnounced >= Math.max(1, Math.ceil(total / 4))) {
+                        lastAnnounced = count;
+                        announce(`${count} of ${total} footnotes read.`);
+                    }
+                    const n = noteText(snap);
+                    note.hidden = !n || stage > 1;
+                    if (n) { note.textContent = n.text; note.classList.toggle("problem", n.problem); }
+                },
                 async finish() {
-                    clearTimeout(toAi); clearInterval(tick);
+                    clearInterval(tick);
                     const step = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 140;
                     for (let i = Math.max(current, 1); i <= STAGES.length; i++) {
-                        set(i, "current");
+                        set(i);
                         if (step) await new Promise(r => setTimeout(r, step));
                     }
                     stop();
                 },
             };
+        }
+
+        // Poll the server's progress for a document until its result (or error) is ready.
+        async function followProgress(id, progress) {
+            progress.update({ stage: "reading", total: 0, done: [], failed: [], writing: [], notes: [], idle: 0 });
+            let errors = 0, lastChange = Date.now(), lastKey = "";
+            for (;;) {
+                await new Promise(r => setTimeout(r, document.hidden ? 1500 : 700));
+                let snap;
+                try {
+                    const response = await fetch(`/api/progress/${encodeURIComponent(id)}`);
+                    if (response.status === 404) throw new Error("The server lost track of this document (it may have restarted). Please try again.");
+                    if (!response.ok) throw new TypeError();
+                    snap = await response.json();
+                    errors = 0;
+                } catch (error) {
+                    if (!(error instanceof TypeError)) throw error;
+                    if (++errors >= 3) throw new Error("We lost contact with the server. Check your connection and try again.");
+                    continue;
+                }
+                progress.update(snap);
+                if (snap.status === "done") return snap.result;
+                if (snap.status === "failed") throw new Error(snap.error?.detail || "Something went wrong processing your document. Please try again.");
+                const key = `${snap.stage}|${snap.done.length}|${snap.writing.length}|${snap.notes.length}`;
+                if (key !== lastKey) { lastKey = key; lastChange = Date.now(); }
+                if (Date.now() - lastChange > 15 * 60 * 1000) throw new Error("This document is taking far too long. Please try again later.");
+            }
         }
 
         function showUploadError(message) {
@@ -994,7 +1141,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
         function displayResults(data) {
             result = data;
-            const failed = new Set(data.failed_footnotes || []);
+            // Footnotes the AI model couldn't read (with payments off, only the footnotes say so)
+            const failed = new Set(data.failed_footnotes || data.footnotes.filter(f => f.extraction_failed).map(f => f.number));
             const notesFor = new Map();
             const general = [];
             for (const w of data.warnings || []) {

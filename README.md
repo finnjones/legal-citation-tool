@@ -63,17 +63,26 @@ or type it into the Model field in the web app. `aglc providers` lists what's av
 If the model sends back an empty reply, times out or its host is overloaded, the request is
 retried after 1s and then 3s (on OpenRouter, the retry is routed away from the upstream host
 that failed). A batch that still fails is asked again in batches of 5, then one footnote at a
-time, so one bad request doesn't leave a whole batch unformatted. You can also name a second
-model to ask when the first gives up:
+time, so one bad request doesn't leave a whole batch unformatted.
+
+Each request has a hard limit, `AGLC_REQUEST_DEADLINE` (default 90s): on OpenAI and OpenRouter the
+reply is streamed and given up on at the deadline, even if the host keeps the connection open with
+keep-alive bytes. Replies are capped at `AGLC_MAX_OUTPUT_TOKENS` (default 16000), so a model stuck
+repeating itself stops. A whole document gets `AGLC_DOCUMENT_DEADLINE` (default 300s) of model time;
+footnotes not read by then are left as written and marked, rather than keeping the student waiting.
+
+You can also name a second model to ask when the first gives up:
 
 ```bash
 AGLC_LLM_FALLBACK=openrouter:<model id>   # any provider:model; only used on failure
 ```
 
 On OpenRouter, some upstream hosts are skipped altogether: `AGLC_OPENROUTER_IGNORE` is a
-comma-separated list of OpenRouter provider names, by default `DigitalOcean` (it sent fast empty
-replies for DeepSeek V4.1 Flash in testing). Set it empty to use every host. If skipping them
-leaves no host for the model, they are allowed again rather than failing.
+comma-separated list of OpenRouter provider names, by default `DigitalOcean,Sail Research` (in
+testing with DeepSeek V4.1 Flash, the first sent fast empty replies and the second answered a batch of
+15 footnotes with one footnote and no citations). Set it empty to use every host. If skipping them
+leaves no host for the model, they are allowed again rather than failing. A host that answers less than
+half a batch during a run is avoided for the rest of that run, as is one that sends an empty reply.
 
 A footnote left unchanged because extraction failed (rather than deliberately left for
 review) has `extraction_failed` set (`"provider_error"` or `"not_returned"`) in the result

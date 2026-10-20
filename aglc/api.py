@@ -8,6 +8,7 @@ import logging
 import re
 import shutil
 import tempfile
+import threading
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
@@ -22,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from lxml.etree import XMLSyntaxError
 
 from . import __version__, billing, guards, pipeline, retention, site
+from .progress import Progress, jobs, safe
 from .docx_io import UnsafeDocxError
 from .llm.base import LLMError, available_providers, default_spec, get_provider
 from .models import ProcessResult
@@ -209,6 +211,7 @@ async def process_document(
     track_changes: Annotated[bool, Form()] = True,
     bibliography: Annotated[bool, Form()] = True,
     fix_body: Annotated[bool, Form()] = True,
+    progress: Annotated[bool, Form()] = False,
 ) -> dict:
     """Process a Word document and return formatted citations.
 
@@ -218,6 +221,8 @@ async def process_document(
         track_changes: Whether to use tracked changes in output
         bibliography: Whether to generate a bibliography
         fix_body: Whether to fix footnote numbers and headings in the body text
+        progress: Answer straight away (202, `{id, status: "processing"}`) and process in the
+            background; GET /api/progress/{id} then reports progress and, at the end, the result
 
     Returns:
         JSON with id, footnotes, bibliography, warnings, body_fixes. With payments on
@@ -239,6 +244,7 @@ async def process_document(
     session_dir = _sessions_dir() / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
     started = False
+    slot = None
 
     try:
         # Save original filename for later download
@@ -251,43 +257,101 @@ async def process_document(
         # Store original filename for download
         (session_dir / "original_filename.txt").write_text(original_stem)
 
-        # Process in thread pool
         output_file = session_dir / "output.docx"
         options = {"model": model, "bibliography": bibliography, "track_changes": track_changes, "fix_body": fix_body}
-        process = lambda **again: run_in_threadpool(  # noqa: E731
-            pipeline.process_docx, input_file, output_file, model,
+        process = lambda **again: pipeline.process_docx(  # noqa: E731
+            input_file, output_file, model,
             bibliography=bibliography, track_changes=track_changes, fix_body=fix_body, session=session_id, **again,
         )
+        job = _Job(session_id, session_dir, file.filename, paid, process, options)
         if paid:
             await run_in_threadpool(billing.check_footnote_cap, input_file)  # 413, before any LLM call
-            with billing.processing_slot():  # 503 when too many documents are in flight
-                billing.start_document(session_id, file.filename, visitor)
-                started = True
-                result: ProcessResult = await process()
-                # Nobody pays for footnotes the model failed to read: try those once more now.
-                failed = pipeline.failed_footnotes(result)
-                # Not when the provider looks down: the Extractor has already retried, and asking
-                # again at once only doubles the wait. The free re-run is there for later.
-                if failed and result.extraction is not None and not result.extraction.provider_down:
-                    log.info("retrying %d footnotes the model failed to read", len(failed))
-                    result = await process(previous=result.extraction, only=failed)
-            full = _result_json(session_id, result)
-            return billing.save_result(session_id, file.filename, full, extraction=result.extraction, options=options)
-        result = await process()
-        full = _result_json(session_id, result)
-        # Kept for the same 24 hours as the documents, so a complaint can be looked into.
-        billing.write_result(session_dir, file.filename, full, extraction=result.extraction, options=options)
-        return full
+            slot = billing.processing_slot()  # 503 when too many documents are in flight
+            slot.__enter__()
+            billing.start_document(session_id, file.filename, visitor)
+            started = True
+        if progress:
+            job.start(slot)  # the job releases the slot when it finishes
+            response.status_code = status.HTTP_202_ACCEPTED
+            return {"id": session_id, "status": "processing"}
+        try:
+            return await run_in_threadpool(job.run)
+        finally:
+            if slot is not None:
+                slot.__exit__(None, None, None)
 
     except Exception as e:
         # Clean up on error
         shutil.rmtree(session_dir, ignore_errors=True)
         if started:
             billing.fail_document(session_id)
+        if slot is not None and progress:
+            slot.__exit__(None, None, None)  # the job never started
         if isinstance(e, HTTPException):
             raise
         log.exception("processing session %s failed", session_id[:8])
         raise HTTPException(status_code=_status_for(e), detail=_describe(e)) from e
+
+
+class _Job:
+    """One document's processing: the pipeline, the paid second pass, saving the result."""
+
+    def __init__(self, session_id: str, session_dir: Path, filename: str, paid: bool, process, options: dict) -> None:
+        self.session_id, self.session_dir, self.filename = session_id, session_dir, filename
+        self.paid, self.process, self.options = paid, process, options
+
+    def run(self, progress: Progress | None = None) -> dict:
+        """Process and save; the response body (with payments on, the preview)."""
+        kwargs = {"progress": progress} if progress is not None else {}
+        result: ProcessResult = self.process(**kwargs)
+        if self.paid:
+            # Nobody pays for footnotes the model failed to read: try those once more now.
+            failed = pipeline.failed_footnotes(result)
+            # Not when the provider looks down: the Extractor has already retried, and asking
+            # again at once only doubles the wait. The free re-run is there for later.
+            if failed and result.extraction is not None and not result.extraction.provider_down:
+                log.info("retrying %d footnotes the model failed to read", len(failed))
+                safe(progress)("note", {"kind": "retry_failed", "count": len(failed)})
+                result = self.process(previous=result.extraction, only=failed, **kwargs)
+            full = _result_json(self.session_id, result)
+            return billing.save_result(self.session_id, self.filename, full, extraction=result.extraction,
+                                       options=self.options)
+        full = _result_json(self.session_id, result)
+        # Kept for the same 24 hours as the documents, so a complaint can be looked into.
+        billing.write_result(self.session_dir, self.filename, full, extraction=result.extraction, options=self.options)
+        return full
+
+    def start(self, slot) -> None:
+        """Run in the background, reporting to `jobs`; the page polls /api/progress/{id}."""
+        report = jobs.start(self.session_id)
+
+        def work() -> None:
+            try:
+                jobs.finish(self.session_id, result=self.run(report))
+            except Exception as e:  # noqa: BLE001 - reported to the page, logged in full here
+                log.exception("processing session %s failed", self.session_id[:8])
+                shutil.rmtree(self.session_dir, ignore_errors=True)
+                if self.paid:
+                    billing.fail_document(self.session_id)
+                status_code = e.status_code if isinstance(e, HTTPException) else _status_for(e)
+                detail = e.detail if isinstance(e, HTTPException) else _describe(e)
+                jobs.finish(self.session_id, error={"status": status_code, "detail": detail})
+            finally:
+                if slot is not None:
+                    slot.__exit__(None, None, None)
+
+        threading.Thread(target=work, name=f"aglc-job-{self.session_id[:8]}", daemon=True).start()
+
+
+@app.get("/api/progress/{session_id}")
+async def get_progress(session_id: str) -> dict:
+    """How far a document started with `progress=true` has got: footnote numbers read so far
+    (never their text), the stage, what the tool is doing about any problem, and at the end
+    the result (`status: "done"`) or the error (`status: "failed"`)."""
+    snapshot = jobs.snapshot(session_id)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="That document isn't being processed (it may have finished a while ago).")
+    return snapshot
 
 
 @app.post("/api/rerun/{session_id}")

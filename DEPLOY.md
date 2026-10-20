@@ -149,6 +149,16 @@ deploy job only runs for pushes to `main`. Migrations run automatically when the
 first opens the database (`aglc/store.py`), so a deploy needs no separate step; take the
 nightly backup (or a manual `.backup`) before deploying a release that adds one.
 
+## 5a. Live progress (one server process)
+
+The page sends `progress=true` with each upload: `/api/process` answers at once (202) and the page
+polls `GET /api/progress/{id}` every 0.7s for the footnotes read so far, then the result. Each poll
+is short, so Cloudflare's 100-second limit on a request that sends nothing back (error 524) no
+longer applies to long documents. The progress is held in memory, so run **one** uvicorn worker
+(`aglc serve` does); with several, a poll can land on a worker that doesn't know the document.
+Model time is bounded by `AGLC_REQUEST_DEADLINE` (per request, default 90s) and
+`AGLC_DOCUMENT_DEADLINE` (per document, default 300s).
+
 ## 6. Logs
 
 - uvicorn's access log keeps only the first 8 characters of session ids (`aglc/guards.py`),

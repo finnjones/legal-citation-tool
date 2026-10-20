@@ -16,6 +16,7 @@ from .llm.base import LLMProvider, get_provider
 from .models import CitationSegment, Extraction, Footnote, ProcessResult, Warning_
 from .formatters import formatter_for
 from .normalise import normalise_citation
+from .progress import Progress, safe
 from .validate import check_footnote_rendering
 
 log = logging.getLogger("aglc")
@@ -28,13 +29,15 @@ def process_footnotes(
     bibliography: bool = True,
     previous: Extraction | None = None,
     only: set[int] | None = None,
+    progress: Progress | None = None,
 ) -> ProcessResult:
     """Extract, normalise and render. With `previous` and `only`, extract just the footnotes
-    numbered in `only` again and reuse `previous` for the rest."""
+    numbered in `only` again and reuse `previous` for the rest. `progress` is told what is
+    happening as it happens (see aglc/progress.py)."""
     if not isinstance(provider, LLMProvider):
         provider = get_provider(provider)
-    extraction = extract_footnotes(footnotes, provider, previous=previous, only=only)
-    result = _render(extraction, bibliography=bibliography)
+    extraction = extract_footnotes(footnotes, provider, previous=previous, only=only, progress=progress)
+    result = _render(extraction, bibliography=bibliography, progress=progress)
     result.extraction = extraction
     return result
 
@@ -45,12 +48,15 @@ def extract_footnotes(
     *,
     previous: Extraction | None = None,
     only: set[int] | None = None,
+    progress: Progress | None = None,
 ) -> Extraction:
-    extractor = Extractor(provider)
+    extractor = Extractor(provider, progress=progress)
     if previous is None or only is None:
         extracted = extractor.extract(footnotes)
         return Extraction(footnotes=extracted, warnings=extractor.warnings, provider_down=extractor.provider_down)
     kept = {fn.number: fn for fn in previous.footnotes if fn.number not in only}
+    if kept:
+        safe(progress)("done", {"numbers": sorted(kept)})  # read the first time round
     redo = extractor.extract([fn for fn in footnotes if fn.number in only], context=list(kept.values()))
     merged = {**kept, **{fn.number: fn for fn in redo}}
     warnings = [m for m in previous.warnings if not (warning_footnotes(m) & only)] + extractor.warnings
@@ -61,7 +67,9 @@ def extract_footnotes(
     )
 
 
-def _render(extraction: Extraction, *, bibliography: bool) -> ProcessResult:
+def _render(extraction: Extraction, *, bibliography: bool, progress: Progress | None = None) -> ProcessResult:
+    report = safe(progress)
+    report("stage", {"name": "formatting"})
     extracted = [fn.model_copy(deep=True) for fn in extraction.footnotes]  # normalising edits in place
     warnings: list[Warning_] = [Warning_(message=m) for m in extraction.warnings]
     for fn in extracted:
@@ -73,6 +81,7 @@ def _render(extraction: Extraction, *, bibliography: bool) -> ProcessResult:
     _share_short_titles(extracted)
 
     # Deterministic check that the formatter printed every field (aglc/validate.py)
+    report("stage", {"name": "checking"})
     for fn in extracted:
         warnings += [Warning_(footnote=fn.number, message=m) for m in check_footnote_rendering(fn, formatter_for)]
 
@@ -112,16 +121,23 @@ def process_docx(
     previous: Extraction | None = None,
     only: set[int] | None = None,
     session: str | None = None,
+    progress: Progress | None = None,
 ) -> ProcessResult:
     """Process `src` into `dst`. With `previous` and `only`, re-extract just those footnotes
     (see process_footnotes); everything after extraction is redone for the whole document.
-    `session` (the API's session id) labels the summary log line."""
+    `session` (the API's session id) labels the summary log line; `progress` is told what is
+    happening (see aglc/progress.py)."""
     t0 = time.monotonic()
+    report = safe(progress)
     if not isinstance(provider, LLMProvider):
         provider = get_provider(provider)
     footnotes = read_footnotes(src)
     log.info("read %d footnotes from %s", len(footnotes), Path(src).name)
-    result = process_footnotes(footnotes, provider, bibliography=bibliography, previous=previous, only=only)
+    report("total", {"footnotes": len(footnotes)})
+    result = process_footnotes(
+        footnotes, provider, bibliography=bibliography, previous=previous, only=only, progress=progress
+    )
+    report("stage", {"name": "writing_doc"})
     result.body_fixes = write_document(
         src,
         dst,

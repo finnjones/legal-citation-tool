@@ -2,6 +2,8 @@
 
 import logging
 import os
+import threading
+from types import SimpleNamespace
 from typing import Any
 
 from aglc.llm.base import LLMError, LLMProvider, TransientLLMError, register_provider
@@ -20,6 +22,8 @@ class OpenAIProvider(LLMProvider):
     api_key_env: str | None = None
     #: default endpoint (None -> OpenAI)
     default_base_url: str | None = None
+    #: the request field capping the reply's length (OpenAI's reasoning models reject max_tokens)
+    max_tokens_param = "max_completion_tokens"
 
     def __init__(self, model: str, **options: Any) -> None:
         super().__init__(model, **options)
@@ -27,14 +31,29 @@ class OpenAIProvider(LLMProvider):
         self._use_fallback = False
         #: upstream hosts (as named in OpenRouter's `provider` field) that sent an empty reply
         self._failed_hosts: list[str] = []
+        #: False once the endpoint has refused a streamed request
+        self._stream = bool(options.get("stream", True))
+        #: the upstream host (OpenRouter's `provider` field) of the latest reply
+        self._last_host: str | None = None
+
+    def avoid_last_host(self) -> bool:
+        """Send the next requests to another upstream host than the one that just answered
+        (its reply was valid JSON but useless, eg one footnote of fifteen)."""
+        host = self._last_host
+        if not host or host in self._failed_hosts:
+            return False
+        log.info("%s: avoiding upstream host %s, which answered only part of the batch", self, host)
+        self._failed_hosts.append(host)
+        return True
 
     def _client_kwargs(self) -> dict[str, Any]:
         api_key = self.options.get("api_key") or (os.environ.get(self.api_key_env) if self.api_key_env else None)
         return {
             "api_key": api_key,
             "base_url": self.options.get("base_url") or self.default_base_url,
-            # a stalled upstream host should fail (and be retried) rather than hang the run
-            "timeout": float(self.options.get("timeout") or os.environ.get("AGLC_TIMEOUT") or 90),
+            # a silent connection: the request's own deadline (_deadline) is the real limit,
+            # since a host that sends keep-alive bytes never trips this
+            "timeout": self._deadline(),
             # one retry, not two: a stalled host should be abandoned quickly
             "max_retries": int(self.options.get("max_retries", 1)),
         }
@@ -42,6 +61,16 @@ class OpenAIProvider(LLMProvider):
     def _extra_body(self, structured: bool) -> dict[str, Any] | None:
         """Vendor-specific request fields (see OpenRouterProvider)."""
         return None
+
+    def _deadline(self) -> float:
+        """Seconds one request may take in all, from $AGLC_REQUEST_DEADLINE (or the older
+        $AGLC_TIMEOUT), default 90."""
+        value = self.options.get("timeout") or os.environ.get("AGLC_REQUEST_DEADLINE") or os.environ.get("AGLC_TIMEOUT")
+        return float(value or 90)
+
+    def _max_tokens(self) -> int:
+        """A cap on the reply, so a model stuck repeating itself stops: $AGLC_MAX_OUTPUT_TOKENS."""
+        return int(self.options.get("max_tokens") or os.environ.get("AGLC_MAX_OUTPUT_TOKENS") or 16000)
 
     @property
     def client(self):
@@ -63,16 +92,93 @@ class OpenAIProvider(LLMProvider):
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             response_format=response_format,
         )
+        kwargs[self.max_tokens_param] = self._max_tokens()
         extra = self._extra_body(structured)
         if extra:
             kwargs["extra_body"] = extra
         import openai
 
         try:
-            return self.client.chat.completions.create(**kwargs)
+            if self._stream:
+                try:
+                    return self._with_deadline(lambda abort: self._streamed(kwargs, abort))
+                except openai.BadRequestError as e:
+                    if "stream" not in str(e).lower():
+                        raise
+                    log.info("%s doesn't take streamed requests; asking without streaming", self)
+                    self._stream = False
+            return self._with_deadline(lambda abort: self.client.chat.completions.create(**kwargs))
         except (openai.APIConnectionError, openai.InternalServerError, openai.RateLimitError) as e:
             # timeouts, dropped connections, 5xx and 429: worth another try, unlike a bad key
             raise TransientLLMError(f"{self.name}:{self.model}: {type(e).__name__}: {e}") from e
+
+    def _with_deadline(self, call):
+        """Run `call(abort)` with a hard limit on the whole request. A host that keeps the
+        connection open with keep-alive bytes (OpenRouter does, while the model works) never
+        trips the client's read timeout, so the request runs in a worker thread and is given up
+        on at the deadline; `abort` is set, and the client closed, so the worker ends soon after."""
+        deadline = self._deadline()
+        abort = threading.Event()
+        box: dict[str, Any] = {}
+        finished = threading.Event()
+
+        def run() -> None:
+            try:
+                box["value"] = call(abort)
+            except BaseException as e:  # noqa: BLE001 - handed back to the caller
+                box["error"] = e
+            finally:
+                finished.set()
+
+        threading.Thread(target=run, name="aglc-llm-request", daemon=True).start()
+        if not finished.wait(deadline):
+            abort.set()
+            client, self._client = self._client, None  # a fresh client for the next request
+            if client is not None:
+                try:
+                    client.close()
+                except Exception:  # noqa: BLE001 - closing is best effort
+                    pass
+            raise TransientLLMError(f"{self.name}:{self.model}: no answer within {deadline:g}s")
+        if "error" in box:
+            raise box["error"]
+        return box["value"]
+
+    def _streamed(self, kwargs: dict[str, Any], abort: threading.Event):
+        """The reply as it arrives, put back together in the shape of a non-streamed response
+        (choices[0].message, finish_reason, provider, id). Each piece of text is passed to
+        `self.on_text` so progress can be shown while the model writes."""
+        stream = self.client.chat.completions.create(stream=True, **kwargs)
+        content: list[str] = []
+        refusal: list[str] = []
+        reasoning: list[str] = []
+        finish_reason = error = host = response_id = None
+        try:
+            for chunk in stream:
+                if abort.is_set():
+                    break
+                host = getattr(chunk, "provider", None) or host
+                response_id = getattr(chunk, "id", None) or response_id
+                if not chunk.choices:
+                    continue
+                choice = chunk.choices[0]
+                delta = choice.delta
+                if delta is not None:
+                    if delta.content:
+                        content.append(delta.content)
+                        self._emit_text(delta.content)
+                    if getattr(delta, "refusal", None):
+                        refusal.append(delta.refusal)
+                    if isinstance(getattr(delta, "reasoning", None), str):
+                        reasoning.append(delta.reasoning)
+                finish_reason = choice.finish_reason or finish_reason
+                error = getattr(choice, "error", None) or error
+        finally:
+            stream.close()
+        message = SimpleNamespace(content="".join(content), refusal="".join(refusal) or None,
+                                  reasoning="".join(reasoning) or None)
+        choice = SimpleNamespace(message=message, finish_reason=finish_reason, error=error)
+        return SimpleNamespace(choices=[choice], provider=host, id=response_id)
 
     def _complete_json(self, *, system: str, user: str, schema: dict[str, Any], schema_name: str) -> str:
         import openai
@@ -93,6 +199,8 @@ class OpenAIProvider(LLMProvider):
                 self._use_fallback = True
                 response = self._create(prompted_system, user, json_object, structured=False)
 
+        host = getattr(response, "provider", None)
+        self._last_host = host if isinstance(host, str) and host else None
         if not response.choices:
             raise TransientLLMError(f"{self.name}:{self.model} returned no choices ({_diagnose(response, None)})")
         choice = response.choices[0]
@@ -138,9 +246,11 @@ class OpenRouterProvider(OpenAIProvider):
 
     api_key_env = "OPENROUTER_API_KEY"
     default_base_url = "https://openrouter.ai/api/v1"
+    max_tokens_param = "max_tokens"
     #: upstream hosts never routed to unless $AGLC_OPENROUTER_IGNORE says otherwise: DigitalOcean
-    #: sent fast empty replies for DeepSeek V4.1 Flash in testing (Oct 2026)
-    default_ignored_hosts = ("DigitalOcean",)
+    #: sent fast empty replies for DeepSeek V4.1 Flash in testing (Oct 2026); Sail Research
+    #: answered a 15-footnote batch with one footnote and no citations, every time (21 Oct 2026)
+    default_ignored_hosts = ("DigitalOcean", "Sail Research")
 
     def __init__(self, model: str, **options: Any) -> None:
         super().__init__(model, **options)

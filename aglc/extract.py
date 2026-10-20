@@ -17,6 +17,7 @@ and avoid asking a model to be its own database:
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from functools import lru_cache
@@ -27,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from . import validate
 from .llm.base import LLMError, LLMProvider
+from .progress import Progress, safe
 from .models import (
     Citation,
     CitationSegment,
@@ -383,6 +385,27 @@ class _TextMapper:
 # --------------------------------------------------------------------------- #
 
 
+class _WritingWatcher:
+    """Reads a streamed reply as it arrives and reports each of the batch's footnotes the model
+    has started writing (its `"number": 17` key), so the page can show them under way."""
+
+    _NUMBER = re.compile(r'"number"\s*:\s*(\d+)')
+
+    def __init__(self, numbers: list[int], report: Progress) -> None:
+        self._wanted = set(numbers)
+        self._seen: set[int] = set()
+        self._tail = ""
+        self._report = report
+
+    def __call__(self, text: str) -> None:
+        window = self._tail + text
+        self._tail = window[-40:]  # a key split across two pieces is still found
+        new = {int(m) for m in self._NUMBER.findall(window)} & self._wanted - self._seen
+        if new:
+            self._seen |= new
+            self._report("writing", {"numbers": sorted(new)})
+
+
 class Extractor:
     #: a failed batch is asked again in pieces this size, then one footnote at a time
     split_size = 5
@@ -390,9 +413,23 @@ class Extractor:
     #: failed batch is no longer split (each top-level batch is still tried once)
     max_failures_in_a_row = 4
 
-    def __init__(self, provider: LLMProvider, batch_size: int = 15, strict: bool = True, verify: bool = True) -> None:
+    def __init__(
+        self,
+        provider: LLMProvider,
+        batch_size: int = 15,
+        strict: bool = True,
+        verify: bool = True,
+        progress: Progress | None = None,
+        deadline: float | None = None,
+    ) -> None:
         self.provider = provider
         self.batch_size = batch_size
+        #: told what is happening as it happens (see aglc/progress.py)
+        self._report = safe(progress)
+        #: seconds the whole document may spend asking the model, from $AGLC_DOCUMENT_DEADLINE
+        #: (default 300); footnotes not read by then are left as written, for the free re-run
+        self.deadline = deadline if deadline is not None else float(os.environ.get("AGLC_DOCUMENT_DEADLINE") or 300)
+        self._deadline_at = float("inf")
         #: verify: run the deterministic coverage/grounding checks in aglc/validate.py
         self.verify = verify
         #: strict: a footnote whose extraction still drops content after a repair round is
@@ -407,6 +444,7 @@ class Extractor:
         extracted (eg when re-running only the ones that failed), for resolving '(n x)'."""
         self.warnings = []
         self._failures_in_a_row = 0
+        self._deadline_at = time.monotonic() + self.deadline
         order = [fn.number for fn in footnotes]
         results: dict[int, Footnote] = {fn.number: fn.model_copy(deep=True) for fn in footnotes}
         # Footnotes fully resolved so far (across all batches, in call order), used both to build
@@ -426,14 +464,28 @@ class Extractor:
 
         return [results[n] for n in order]
 
-    def _request(self, user_prompt: str, system_prompt: str) -> ExtractionBatch | LLMError:
+    def _request(self, user_prompt: str, system_prompt: str, numbers: list[int] | None = None) -> ExtractionBatch | LLMError:
+        """Ask the model, reporting which of `numbers` it starts writing as its reply streams in."""
+        self.provider.on_text = _WritingWatcher(numbers or [], self._report) if numbers else None
+        self.provider.on_event = self._provider_event
         try:
             response = self.provider.generate_json(system=system_prompt, user=user_prompt, output_model=ExtractionBatch)
         except LLMError as e:
             self._failures_in_a_row += 1
             return e
+        finally:
+            self.provider.on_text = self.provider.on_event = None
         self._failures_in_a_row = 0
         return response
+
+    def _provider_event(self, kind: str, data: dict) -> None:
+        if kind == "retry":
+            self._report("note", {"kind": "slow" if data.get("timed_out") else "retry"})
+        elif kind == "fallback":
+            self._report("note", {"kind": "fallback"})
+
+    def _out_of_time(self) -> bool:
+        return time.monotonic() > self._deadline_at
 
     def _provider_down(self) -> bool:
         return self._failures_in_a_row >= self.max_failures_in_a_row
@@ -448,13 +500,21 @@ class Extractor:
         self.warnings.append(f"extraction failed for footnotes [{numbers}]: {error}; left unchanged")
         for fn in batch:
             results[fn.number].extraction_failed = "provider_error"
+        self._report("done", {"numbers": [fn.number for fn in batch], "failed": True})
 
     def _extract_batch(
         self, batch: list[Footnote], results: dict[int, Footnote], resolved: dict[int, Footnote], system_prompt: str
     ) -> None:
+        if self._out_of_time():
+            # Asking any more would keep the student waiting too long: the rest can be re-run free.
+            log.warning("out of time for footnotes %s", ", ".join(str(fn.number) for fn in batch))
+            self._report("note", {"kind": "deadline", "count": len(batch)})
+            self._give_up(batch, results, LLMError(f"the model took longer than {self.deadline:g}s for this document"))
+            return
+        numbers_in_batch = [fn.number for fn in batch]
         user_prompt = self._build_user_prompt(batch, self._build_index(resolved))
         t0 = time.monotonic()
-        response = self._request(user_prompt, system_prompt)
+        response = self._request(user_prompt, system_prompt, numbers_in_batch)
         if isinstance(response, LLMError):
             numbers = ", ".join(str(fn.number) for fn in batch)
             log.warning("extraction failed for footnotes [%s] after %.1fs: %s", numbers, time.monotonic() - t0, response)
@@ -463,6 +523,7 @@ class Extractor:
                 # in smaller pieces (15 -> 5s -> one at a time) before giving up on any of them.
                 size = self.split_size if len(batch) > self.split_size else 1
                 log.info("  asking again in batches of %d", size)
+                self._report("note", {"kind": "split", "size": size, "count": len(batch)})
                 for i in range(0, len(batch), size):
                     if self._provider_down():
                         self._give_up(batch[i:], results, response)
@@ -479,7 +540,9 @@ class Extractor:
             # The model answered for only a few of the batch; re-asking the whole batch is
             # far cheaper than one call per missing footnote.
             log.info("  only %d/%d footnotes answered; re-asking the batch", answered, len(batch))
-            retry = self._request(user_prompt, system_prompt)
+            self.provider.avoid_last_host()  # a host that half-answers tends to do it every time
+            self._report("note", {"kind": "reask", "answered": answered, "count": len(batch)})
+            retry = self._request(user_prompt, system_prompt, numbers_in_batch)
             if not isinstance(retry, LLMError):
                 better = {lf.number: lf for lf in retry.footnotes}
                 if sum(1 for fn in batch if better.get(fn.number) and better[fn.number].segments) > answered:
@@ -492,11 +555,13 @@ class Extractor:
             if llm_fn is None:
                 self.warnings.append(f"footnote {fn.number}: missing from LLM response; left unchanged")
                 results[fn.number].extraction_failed = "not_returned"
+                self._report("done", {"numbers": [fn.number], "failed": True})
                 continue
             if not llm_fn.segments and fn.original.text.strip():
                 results[fn.number].extraction_failed = "not_returned"  # kept as written, below
             results[fn.number].segments = self._convert_verified(fn, llm_fn, resolved, system_prompt)
             resolved[fn.number] = results[fn.number]
+            self._report("done", {"numbers": [fn.number], "failed": results[fn.number].extraction_failed is not None})
 
     # ---- verification (see aglc/validate.py) ------------------------------------ #
 
@@ -511,6 +576,7 @@ class Extractor:
             return segments
 
         log.info("  footnote %d: extraction left out %d pieces of text; asking again", fn.number, len(missing))
+        self._report("note", {"kind": "repair", "number": fn.number})
         repaired = self._repair(fn, missing, resolved, system_prompt)
         if repaired is not None:
             segments2, missing2 = self._convert_and_check(fn, repaired, resolved)
@@ -551,14 +617,15 @@ class Extractor:
             "captured: in a citation field, a pinpoint, pinpoint_judges, the signal, or a text "
             "segment for commentary. Extract the footnote again."
         )
-        response = self._request(user, system_prompt)
+        response = self._request(user, system_prompt, [fn.number])
         if isinstance(response, LLMError):
             return None
         return next((lf for lf in response.footnotes if lf.number == fn.number and lf.segments), None)
 
     def _retry_single(self, fn: Footnote, resolved: dict[int, Footnote], system_prompt: str) -> LLMFootnote | None:
         log.info("  footnote %d came back empty; asking for it on its own", fn.number)
-        response = self._request(self._build_user_prompt([fn], self._build_index(resolved)), system_prompt)
+        self._report("note", {"kind": "single", "number": fn.number})
+        response = self._request(self._build_user_prompt([fn], self._build_index(resolved)), system_prompt, [fn.number])
         if isinstance(response, LLMError):
             return None
         match = next((lf for lf in response.footnotes if lf.number == fn.number), None)

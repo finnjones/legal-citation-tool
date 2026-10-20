@@ -314,7 +314,7 @@ def test_openai_provider_basic(monkeypatch):
     mock_openai_module.OpenAI = mock_openai_init
     monkeypatch.setitem(__import__("sys").modules, "openai", mock_openai_module)
 
-    provider = get_provider("openai:gpt-4")
+    provider = get_provider("openai:gpt-4", stream=False)
     result = provider.generate_json(
         system="sys",
         user="user",
@@ -351,7 +351,7 @@ def test_openai_provider_refusal(monkeypatch):
     mock_openai_module.OpenAI = mock_openai_init
     monkeypatch.setitem(__import__("sys").modules, "openai", mock_openai_module)
 
-    provider = get_provider("openai:gpt-4")
+    provider = get_provider("openai:gpt-4", stream=False)
     with pytest.raises(LLMError, match="Model refused"):
         provider.generate_json(
             system="sys",
@@ -511,6 +511,31 @@ def test_fake_provider_records_calls():
 # ============================================================================
 
 
+class _FakeStream:
+    """What the SDK returns for stream=True: the chunks of a reply, then close()."""
+
+    def __init__(self, response):
+        self.response = response
+        self.closed = False
+
+    def __iter__(self):
+        for choice in getattr(self.response, "choices", None) or []:
+            delta = type("D", (), {"content": choice.message.content, "refusal": getattr(choice.message, "refusal", None)})()
+            yield type("Chunk", (), {
+                "id": getattr(self.response, "id", None), "provider": getattr(self.response, "provider", None),
+                "choices": [type("CC", (), {"delta": delta, "finish_reason": getattr(choice, "finish_reason", None),
+                                             "error": getattr(choice, "error", None)})()],
+            })()
+
+    def close(self):
+        self.closed = True
+
+
+def _maybe_streamed(req, response):
+    already_a_stream = hasattr(response, "__iter__")
+    return _FakeStream(response) if req.get("stream") and not already_a_stream else response
+
+
 class _RecordingOpenAI:
     """Stands in for openai.OpenAI; records constructor and request kwargs."""
 
@@ -527,7 +552,7 @@ class _RecordingOpenAI:
                 outer.requests.append(req)
                 msg = type("M", (), {"content": '{"value": "ok"}', "refusal": None})()
                 choice = type("C", (), {"message": msg, "finish_reason": "stop"})()
-                return type("R", (), {"choices": [choice]})()
+                return _maybe_streamed(req, type("R", (), {"choices": [choice]})())
 
         self.chat = type("Chat", (), {"completions": _Completions()})()
 
@@ -551,7 +576,7 @@ def test_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
     assert req["model"] == "deepseek/deepseek-v4.1-flash-1017"
     assert req["response_format"]["type"] == "json_schema"
     assert req["extra_body"] == {
-        "provider": {"require_parameters": True, "allow_fallbacks": True, "data_collection": "deny", "ignore": ["DigitalOcean"]},
+        "provider": {"require_parameters": True, "allow_fallbacks": True, "data_collection": "deny", "ignore": ["DigitalOcean", "Sail Research"]},
         "reasoning": {"enabled": False},
     }
 
@@ -665,7 +690,7 @@ class _ScriptedCompletions:
         item = self.script[min(len(self.requests) - 1, len(self.script) - 1)]
         if isinstance(item, Exception):
             raise item
-        return item
+        return _maybe_streamed(req, item)
 
 
 def _scripted_provider(monkeypatch, spec, script):
@@ -703,8 +728,8 @@ def test_openrouter_retry_after_empty_reply_avoids_that_host(monkeypatch):
     )
     assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
     first, second = (r["extra_body"]["provider"] for r in completions.requests)
-    assert first["ignore"] == ["DigitalOcean"] and first["allow_fallbacks"] is True
-    assert second["ignore"] == ["DigitalOcean", "FlakyHost"]
+    assert first["ignore"] == ["DigitalOcean", "Sail Research"] and first["allow_fallbacks"] is True
+    assert second["ignore"] == ["DigitalOcean", "Sail Research", "FlakyHost"]
 
 
 def test_openrouter_ignored_hosts_come_from_the_environment(monkeypatch):
@@ -749,7 +774,7 @@ def test_openrouter_allows_failed_hosts_again_when_none_left(monkeypatch):
         [_completion("", host="OnlyHost"), no_endpoints, _completion('{"name": "A", "age": 1}', host="OnlyHost")],
     )
     assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
-    assert completions.requests[1]["extra_body"]["provider"]["ignore"] == ["DigitalOcean", "OnlyHost"]
+    assert completions.requests[1]["extra_body"]["provider"]["ignore"] == ["DigitalOcean", "Sail Research", "OnlyHost"]
     assert "ignore" not in completions.requests[2]["extra_body"]["provider"]  # the default list too
 
 
@@ -774,3 +799,88 @@ def test_openai_auth_error_is_not_retried(monkeypatch):
     with pytest.raises(openai.AuthenticationError):
         provider.generate_json(system="s", user="u", output_model=SimpleModel)
     assert len(completions.requests) == 1
+
+
+# ============================================================================
+# OpenAI / OpenRouter: a hard deadline on each request, streamed replies
+# ============================================================================
+
+
+class _HangingStream:
+    """A reply that never finishes, like a host sending keep-alive bytes forever."""
+
+    def __init__(self):
+        import threading
+
+        self.closed = threading.Event()
+
+    def __iter__(self):
+        self.closed.wait(5)
+        return iter([])
+
+    def close(self):
+        self.closed.set()
+
+
+def test_a_request_that_never_finishes_is_given_up_at_the_deadline(monkeypatch):
+    import time
+
+    from aglc.llm.base import TransientLLMError
+
+    hanging = _HangingStream()
+    provider, completions = _scripted_provider(monkeypatch, "openrouter:x/y", [hanging])
+    monkeypatch.setenv("AGLC_REQUEST_DEADLINE", "0.2")
+    t0 = time.monotonic()
+    with pytest.raises(TransientLLMError, match="no answer within 0.2s"):
+        provider._complete_json(system="s", user="u", schema={}, schema_name="X")
+    assert time.monotonic() - t0 < 2
+    assert provider._client is None  # the stuck client is dropped; the next request gets a new one
+
+
+def test_requests_stream_and_cap_the_reply(monkeypatch):
+    provider, completions = _scripted_provider(monkeypatch, "openrouter:x/y", [_completion('{"name": "A", "age": 1}')])
+    seen = []
+    provider.on_text = seen.append
+    assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "A"
+    req = completions.requests[0]
+    assert req["stream"] is True and req["max_tokens"] == 16000
+    assert "".join(seen) == '{"name": "A", "age": 1}'
+    # OpenAI's own API names the cap differently
+    provider, completions = _scripted_provider(monkeypatch, "openai:gpt-test", [_completion('{"name": "A", "age": 1}')])
+    provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert completions.requests[0]["max_completion_tokens"] == 16000
+
+
+def test_an_endpoint_that_refuses_streaming_is_asked_without_it(monkeypatch):
+    import openai
+
+    import httpx
+
+    refused = openai.BadRequestError("stream is not supported", response=httpx.Response(400, request=_http_request()),
+                                     body=None)
+    provider, completions = _scripted_provider(
+        monkeypatch, "openai:gpt-test", [refused, _completion('{"name": "B", "age": 2}')])
+    assert provider.generate_json(system="s", user="u", output_model=SimpleModel).name == "B"
+    assert completions.requests[0].get("stream") is True and "stream" not in completions.requests[1]
+    assert provider._stream is False
+
+
+def test_retries_and_the_fallback_model_are_reported(monkeypatch):
+    from aglc.llm import get_provider as gp
+
+    events = []
+    provider = gp("fake:primary", fallback="fake:backup", responses=["", "", ""])
+    provider.fallback._responses = ['{"name": "C", "age": 3}']
+    provider.options["retry_delays"] = [0]
+    provider.on_event = lambda kind, data: events.append(kind)
+    provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert events == ["retry", "retry", "fallback"]
+
+
+def test_a_host_that_half_answers_is_avoided_for_the_rest_of_the_run(monkeypatch):
+    provider, completions = _scripted_provider(
+        monkeypatch, "openrouter:x/y", [_completion('{"name": "A", "age": 1}', host="PartialHost")] * 2)
+    provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert provider.avoid_last_host() is True and provider.avoid_last_host() is False  # once
+    provider.generate_json(system="s", user="u", output_model=SimpleModel)
+    assert "PartialHost" in completions.requests[1]["extra_body"]["provider"]["ignore"]
