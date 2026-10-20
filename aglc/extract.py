@@ -205,6 +205,29 @@ def _keep_et_al(citation: Citation, original: str) -> Citation:
     return citation
 
 
+#: Source types whose title is quoted and roman (r 5.2, 6.6.1, 7.10, 7.15), and its field
+_QUOTED_TITLES = {"journal_article": "title", "book_chapter": "chapter_title", "newspaper": "title", "website": "title"}
+
+
+def _keep_title_italics(citation: Citation, span: RichText) -> Citation:
+    """A case or Act name inside a quoted title stays italic ('... under the *Summary
+    Offences and Other Legislation Amendment Act 2019* (Qld)'). The title field is a plain
+    str, so keep the italics the student gave it in the footnote; none are added. A title
+    that is italic throughout is an article title mistakenly italicised, so it's left roman."""
+    src = citation.source
+    field = _QUOTED_TITLES.get(src.type)
+    if field is None or getattr(src, f"{field}_rich") is not None:
+        return citation
+    title = getattr(src, field)
+    found = _TextMapper(span).find(title) if title else None
+    if found is None:
+        return citation
+    styles = {run.italic for run in found.runs if run.text.strip()}
+    if styles != {True, False}:
+        return citation
+    return citation.model_copy(update={"source": src.model_copy(update={f"{field}_rich": found})})
+
+
 def _author_names(source: Source) -> list[str]:
     names = list(getattr(source, "authors", None) or []) + list(getattr(source, "editors", None) or [])
     if getattr(source, "author", None):
@@ -579,6 +602,7 @@ class Extractor:
                 citation = _keep_italics(citation, span)
                 if seg.refers_to_footnote is None:
                     citation = _keep_et_al(citation, span.text)
+                citation = _keep_title_italics(citation, span)
                 citation = _dedupe_signal(citation, out)
                 citation = _drop_repeated_start_page(citation, seg.original)
                 if self.verify and seg.refers_to_footnote is None:  # references carry earlier footnotes' data

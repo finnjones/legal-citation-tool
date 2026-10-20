@@ -39,6 +39,28 @@ from .base import BIB_SECONDARY, Formatter, missing, register
 _LQ, _RQ = "‘", "’"
 
 
+_QUOTE_KEY = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
+
+
+def _key(ch: str) -> str:
+    return " " if ch.isspace() else ch.translate(_QUOTE_KEY).casefold()
+
+
+def _quoted(title: str, rich: RichText | None) -> RichText:
+    """A quoted title, roman except for any case or Act name the student italicised in it
+    (`rich`, the title as written in the footnote). Their italics are used only when `rich`
+    is the same title, up to case, quote style and surrounding whitespace."""
+    out = RichText.plain(_LQ)
+    chars = [(ch, run.italic) for run in rich.runs for ch in run.text] if rich else []
+    start = "".join(_key(ch) for ch, _ in chars).find("".join(_key(ch) for ch in title)) if title else -1
+    if start == -1:
+        out.append(title)
+    else:
+        for ch, (_, italic) in zip(title, chars[start:]):
+            out.append(ch, italic)
+    return out.append(_RQ)
+
+
 # --------------------------------------------------------------------------- #
 # Author formatting (r 4.1)
 # --------------------------------------------------------------------------- #
@@ -223,7 +245,7 @@ class JournalArticleFormatter(Formatter):
         out = RichText()
         authors = format_names(src.authors, invert_first=invert_author, et_al=src.et_al) if src.authors else missing("authors")
         out.append(f"{authors}, ")
-        out.append(f"{_LQ}{src.title}{_RQ}")
+        out.extend(_quoted(src.title, src.title_rich))
         if src.part:
             out.append(f" (Pt {src.part})")
         out.append(f" {_year_volume_issue(src)} ")
@@ -370,7 +392,7 @@ class BookChapterFormatter(Formatter):
         out = RichText()
         authors = format_names(src.authors, invert_first=invert_author, et_al=src.et_al) if src.authors else missing("authors")
         out.append(f"{authors}, ")
-        out.append(f"{_LQ}{src.chapter_title}{_RQ}")
+        out.extend(_quoted(src.chapter_title, src.chapter_title_rich))
         if src.translators:
             # r 6.7: translator(s) of the chapter, before 'in ...'.
             out.append(f", tr {format_names(src.translators)}")
@@ -504,7 +526,7 @@ class NewspaperFormatter(Formatter):
         out = RichText()
         if src.authors:
             out.append(format_names(src.authors, invert_first=invert_author, et_al=src.et_al) + ", ")
-        out.append(f"{_LQ}{src.title}{_RQ}")
+        out.extend(_quoted(src.title, src.title_rich))
         date = src.date or missing("date")
         if src.periodical:
             # r 7.11.3: periodicals/newsletters indexed by date rather than
@@ -585,7 +607,7 @@ class WebsiteFormatter(Formatter):
         authors = [a for a in src.authors if a != src.website_name]
         if authors:
             out.append(format_names(authors, invert_first=invert_author, et_al=src.et_al) + ", ")
-        out.append(f"{_LQ}{src.title}{_RQ}, ")
+        out.extend(_quoted(src.title, src.title_rich)).append(", ")
         out.append(src.website_name or missing("website_name"), italic=True)
         # r 7.15: 'Web Page' is the guide's default when the document type is
         # unclear (the model defaults document_type to it too).

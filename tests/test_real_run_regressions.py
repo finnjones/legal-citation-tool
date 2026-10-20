@@ -467,3 +467,53 @@ def test_a_reference_by_author_surname_defines_no_short_title():
     out = [f.formatted.to_markup() for f in result.footnotes]
     assert out[0] == "Michelle Sanson, *Statutory Interpretation* (Oxford University Press, 2nd ed, 2016) 215."
     assert out[2] == "Sanson (n 27) 216."
+
+
+# An Act named in an article title lost its italics: AGLC4 keeps legislation and case
+# names italic inside a quoted title, and the student had them right.
+
+_marked = _rich
+
+
+_HEMMINGS_TITLE = ("A Danger to Protest: The Freedom of Peaceful Assembly and Disruptive Protest under the "
+                   "Summary Offences and Other Legislation Amendment Act 2019 (Qld)")
+
+
+def _hemmings(markup_title: str) -> str:
+    """Extract and render the student's footnote, with its title written as `markup_title`."""
+    original = (f"Toby Hemmings and Azadeh Dastyari, ‘{markup_title}’ (Journal Article, 2021) 27(2) "
+                "*Australian Journal of Human Rights* 1")
+    fns = [_marked(5, original + ".")]
+    source = {"type": "journal_article", "authors": ["Toby Hemmings", "Azadeh Dastyari"], "title": _HEMMINGS_TITLE,
+              "year": "2021", "volume": "27", "issue": "2", "journal": "Australian Journal of Human Rights",
+              "starting_page": "1"}
+    out = _extract(fns, [{"number": 5, "segments": [
+        {"kind": "citation", "original": fns[0].original.text[:-1], "citation": {"source": source}}]}])
+    for seg in out[0].segments:
+        if isinstance(seg, CitationSegment):
+            seg.citation = _norm(seg.citation)
+    return render_document(out, bibliography=False).footnotes[0].formatted.to_markup()
+
+
+def test_act_name_inside_an_article_title_stays_italic():
+    title = _HEMMINGS_TITLE.replace("Summary", "*Summary").replace(" 2019", " 2019*")
+    assert _hemmings(title) == (
+        "Toby Hemmings and Azadeh Dastyari, ‘A Danger to Protest: The Freedom of Peaceful Assembly and Disruptive "
+        "Protest under the *Summary Offences and Other Legislation Amendment Act 2019* (Qld)’ (2021) 27(2) "
+        "*Australian Journal of Human Rights* 1."
+    )
+
+
+def test_article_title_gets_no_italics_the_student_did_not_use():
+    plain = f"Toby Hemmings and Azadeh Dastyari, ‘{_HEMMINGS_TITLE}’ (2021) 27(2) *Australian Journal of Human Rights* 1."
+    assert _hemmings(_HEMMINGS_TITLE) == plain
+    # an article title italicised throughout is a mistake, not a case or Act name
+    assert _hemmings(f"*{_HEMMINGS_TITLE}*") == plain
+
+
+def test_case_name_inside_a_chapter_title_stays_italic():
+    title = "Revisiting *Mabo v Queensland [No 2]* (1992)"
+    src = BookChapterSource(authors=["Jane Doe"], chapter_title="Revisiting Mabo v Queensland [No 2] (1992)",
+                            chapter_title_rich=_marked(1, title).original, editors=["John Roe"],
+                            book_title="Native Title", publisher="Federation Press", year="2010", starting_page="1")
+    assert _full(Citation(source=src)).startswith("Jane Doe, ‘Revisiting *Mabo v Queensland [No 2]* (1992)’ in ")
