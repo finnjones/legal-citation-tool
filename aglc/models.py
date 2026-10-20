@@ -12,6 +12,7 @@ from enum import Enum
 from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 
 
 # --------------------------------------------------------------------------- #
@@ -151,6 +152,9 @@ class JournalArticleSource(_SourceBase):
     type: Literal["journal_article"] = "journal_article"
     authors: list[str] = Field(default_factory=list)
     title: str
+    #: `title` with the italics it had in the footnote, for a case or Act name inside the
+    #: quoted title. Filled in by extraction, never by the model.
+    title_rich: SkipJsonSchema[RichText | None] = None
     part: str | None = Field(default=None, description="Article published in parts (r 5.8): '1' -> '(Pt 1)'")
     year: str | None = None
     year_style: Literal["round", "square"] | None = Field(
@@ -188,6 +192,9 @@ class BookChapterSource(_SourceBase):
     type: Literal["book_chapter"] = "book_chapter"
     authors: list[str] = Field(default_factory=list)
     chapter_title: str
+    #: `chapter_title` with the italics it had in the footnote, for a case or Act name inside the
+    #: quoted title. Filled in by extraction, never by the model.
+    chapter_title_rich: SkipJsonSchema[RichText | None] = None
     translators: list[str] = Field(default_factory=list, description="Translators of the chapter (r 6.7)")
     editors: list[str] = Field(default_factory=list)
     book_title: str
@@ -214,6 +221,9 @@ class NewspaperSource(_SourceBase):
     type: Literal["newspaper"] = "newspaper"
     authors: list[str] = Field(default_factory=list)
     title: str
+    #: `title` with the italics it had in the footnote, for a case or Act name inside the
+    #: quoted title. Filled in by extraction, never by the model.
+    title_rich: SkipJsonSchema[RichText | None] = None
     newspaper: str
     section: str | None = Field(default=None, description="Section/supplement, eg 'Epicure' -> '*Epicure*, *The Age*'")
     periodical: bool = Field(
@@ -233,6 +243,9 @@ class WebsiteSource(_SourceBase):
     type: Literal["website"] = "website"
     authors: list[str] = Field(default_factory=list, description="Person or organisation author, if any")
     title: str
+    #: `title` with the italics it had in the footnote, for a case or Act name inside the
+    #: quoted title. Filled in by extraction, never by the model.
+    title_rich: SkipJsonSchema[RichText | None] = None
     website_name: str | None = None
     document_type: str | None = Field(default="Web Page", description="r 7.15: 'Web Page', 'Blog Post', 'Forum Post', 'Podcast'...")
     date: str | None = Field(default=None, description="Full date of publication/last update, if any")
