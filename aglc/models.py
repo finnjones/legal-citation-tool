@@ -385,12 +385,21 @@ class Warning_(BaseModel):
     message: str
 
 
+class Change(BaseModel):
+    """One kind of change made to a footnote, in plain words (see aglc/explain.py)."""
+    kind: str = Field(description="eg 'act_year_italic', 'pinpoint_comma', 'span', 'ibid'")
+    text: str = Field(description="eg 'The year is part of an Act’s title, so it’s italic too'")
+    rule: str | None = Field(default=None, description="The AGLC4 rule, eg 'r 3.1.2' or 'ch 5'")
+
+
 class FootnoteResult(BaseModel):
     number: int
     original: RichText
     formatted: RichText
     #: see ExtractionFailure: set when this footnote is unchanged because extraction failed
     extraction_failed: ExtractionFailure | None = None
+    #: what changed and why, one entry per kind of change (empty when unchanged)
+    changes: list[Change] = Field(default_factory=list)
 
     @property
     def changed(self) -> bool:
