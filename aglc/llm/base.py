@@ -9,7 +9,7 @@ Providers are selected with a spec string "<provider>:<model>", eg
     anthropic:claude-opus-5
     openai:gpt-5
     gemini:gemini-2.5-pro
-    openrouter:deepseek/deepseek-v4-flash   (any model on openrouter.ai)
+    openrouter:deepseek/deepseek-v4.1-flash-1017   (any model on openrouter.ai)
     openai-compatible:llama3.1        (Ollama, LM Studio, vLLM, Groq...)
 
 via `get_provider(spec)` or the AGLC_LLM environment variable.
@@ -28,7 +28,7 @@ from pydantic import BaseModel, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
-DEFAULT_SPEC = "anthropic:claude-opus-5"
+DEFAULT_SPEC = "openrouter:deepseek/deepseek-v4.1-flash-1017"
 
 log = logging.getLogger("aglc")
 

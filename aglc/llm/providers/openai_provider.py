@@ -134,7 +134,7 @@ def _diagnose(response: Any, choice: Any) -> str:
 @register_provider("openrouter")
 class OpenRouterProvider(OpenAIProvider):
     """OpenRouter (https://openrouter.ai): one API key, hundreds of models, eg
-    openrouter:deepseek/deepseek-v4-flash. Key from $OPENROUTER_API_KEY."""
+    openrouter:deepseek/deepseek-v4.1-flash-1017. Key from $OPENROUTER_API_KEY."""
 
     api_key_env = "OPENROUTER_API_KEY"
     default_base_url = "https://openrouter.ai/api/v1"

@@ -27,7 +27,7 @@ references, short titles, signals and a generated bibliography.
 aglc/llm/base.py          LLMProvider (abstract): generate_json(system, user, output_model) -> validated pydantic model
                           registry + get_provider("provider:model") / $AGLC_LLM
 aglc/llm/providers/
-    anthropic_provider.py anthropic:claude-opus-5   (default; native structured outputs)
+    anthropic_provider.py anthropic:claude-opus-5   
     openai_provider.py    openai:<model>            (response_format json_schema)
                           openai-compatible:<model> (any OpenAI-compatible base_url: Ollama, LM Studio, vLLM, OpenRouter, Groq)
     gemini_provider.py    gemini:<model>            (response_json_schema)
@@ -40,7 +40,7 @@ aglc/llm/providers/
 - To add a vendor, write a subclass decorated with `@register_provider("name")`, then import it in
   `providers/__init__.py`.
 - Provider selection, in order: the CLI's `--model`, then the API's `model` field, then `$AGLC_LLM`,
-  then the default `anthropic:claude-opus-5`.
+  then the default `openrouter:deepseek/deepseek-v4.1-flash-1017`.
 - Vendor SDKs are optional extras (`pip install aglc[openai]`) and are imported lazily.
 
 ## Paid hosting (optional)
