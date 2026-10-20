@@ -213,6 +213,10 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .notes p { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: baseline; }
         .notes p::before { content: "Check"; font-weight: 600; color: var(--check); }
         .chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+        /* What changed and why: one quiet line per kind of change, with its rule */
+        .why { list-style: none; margin-top: 10px; display: grid; gap: 4px; font-size: 0.875rem; line-height: 1.5; color: var(--muted); }
+        .why .nowrap { white-space: nowrap; }
+        .why .chip { display: inline-block; min-height: 0; margin-left: 8px; padding: 0 6px; line-height: 1.5; }
         .chip {
             display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px;
             font-size: 0.75rem; font-weight: 500; color: var(--muted);
@@ -460,7 +464,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite"><em>Mabo v Queensland (No 2)</em> (1992) 175 C.L.R. 1 at 42 per Brennan J.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline><em>Mabo v Queensland [No 2]</em> (1992) 175 CLR 1, 42 (Brennan J) (‘<em>Mabo</em>’).</p>
-                                <div class="chips"><span class="chip" title="AGLC4 rule 1.4.4: short titles">r 1.4.4 Short title</span></div>
+                                <ul class="why" aria-label="What changed"><li>Defines the short title ‘Mabo’ for later references to this <span class="nowrap">source<span class="chip" title="AGLC4 rule 1.4.4">r 1.4.4</span></span></li><li>A case’s number goes in square brackets: ‘[No <span class="nowrap">2]’<span class="chip" title="AGLC4 rule 2.1.13">r 2.1.13</span></span></li><li>Judges are named in brackets after the pinpoint, without <span class="nowrap">‘per’<span class="chip" title="AGLC4 rule 2.4.1">r 2.4.1</span></span></li><li>A comma and a space go before a <span class="nowrap">pinpoint<span class="chip" title="AGLC4 rule 2.2.5">r 2.2.5</span></span></li><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<span class="chip" title="AGLC4 rule 1.1.6">r 1.1.6</span></span></li><li>No full stops in <span class="nowrap">abbreviations<span class="chip" title="AGLC4 rule 1.6.1">r 1.6.1</span></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -469,7 +473,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite">Ibid, at 45.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline>Ibid 45.</p>
-                                <div class="chips"><span class="chip" title="AGLC4 rule 1.4.3: Ibid">r 1.4.3 Ibid</span></div>
+                                <ul class="why" aria-label="What changed"><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<span class="chip" title="AGLC4 rule 1.1.6">r 1.1.6</span></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -479,7 +483,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite"><em>Mabo</em>, above n 1, 60.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline><em>Mabo</em> (n 1) 60.</p>
-                                <div class="chips"><span class="chip" title="AGLC4 rule 1.4.1: subsequent references">r 1.4.1 (n&nbsp;x)</span></div>
+                                <ul class="why" aria-label="What changed"><li>AGLC4 refers back with ‘(n&nbsp;1)’, not ‘above n <span class="nowrap">1’<span class="chip" title="AGLC4 rule 1.4.1">r 1.4.1</span></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -1089,13 +1093,12 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
         function resultCell(e, i) {
             const notes = e.notes.map(humanNote);
-            const chips = rulesFor(e);
             const notesHtml = notes.length ? `<div class="notes">${notes.map(m => `<p><span>${escapeHtml(m)}</span></p>`).join("")}</div>` : "";
-            const chipsHtml = chips.length ? `<div class="chips">${chips.map(([r, name]) => `<span class="chip" title="AGLC4 rule ${r}: ${RULE_TITLES[r]}">r ${r} ${escapeHtml(name)}</span>`).join("")}</div>` : "";
+            const whyLines = whyHtml(e);
             if (e.unread) return `<p class="placeholder">Left as written. The AI model couldn't read this footnote.</p>`;
             if (e.locked) return `<p class="placeholder">${ICON_LOCK}<span>Result hidden until you unlock</span></p>${notesHtml}`;
             if (!e.changed) return `<p class="placeholder">${notes.length ? "Left as written" : "No change needed"}</p>${notesHtml}`;
-            return `<p class="cite now" data-index="${i}"></p>${notesHtml}${chipsHtml}`;
+            return `<p class="cite now" data-index="${i}"></p>${notesHtml}${whyLines}`;
         }
 
         function renderCitationBodies() {
@@ -1104,6 +1107,30 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 const e = entries[Number(el.dataset.index)];
                 el.innerHTML = markup ? diffHtml(e.original_html, e.formatted_html) : markMissing(e.formatted_html);
             });
+        }
+
+        // What changed and why, one line per kind of change, as the server worked it out
+        // (aglc/explain.py). Results saved before it did fall back to the few rule chips
+        // the text alone shows.
+        function whyHtml(e) {
+            if (!Array.isArray(e.changes)) {
+                const chips = rulesFor(e);
+                return chips.length ? `<div class="chips">${chips.map(([r, name]) => `<span class="chip" title="AGLC4 rule ${r}: ${RULE_TITLES[r]}">r ${r} ${escapeHtml(name)}</span>`).join("")}</div>` : "";
+            }
+            if (!e.changes.length) return "";
+            return `<ul class="why" aria-label="What changed">${e.changes.map(c => `<li>${whyLine(c)}</li>`).join("")}</ul>`;
+        }
+
+        // The rule chip is kept on the same line as the last word, so it never wraps alone
+        function whyLine({ text, rule }) {
+            if (!rule) return escapeHtml(text);
+            const at = text.lastIndexOf(" ") + 1;
+            return `${escapeHtml(text.slice(0, at))}<span class="nowrap">${escapeHtml(text.slice(at))}<span class="chip" title="${ruleTitle(rule)}">${escapeHtml(rule)}</span></span>`;
+        }
+
+        // "r 3.1.2" -> "AGLC4 rule 3.1.2"; "rr 1.1.6–1.1.7" -> "AGLC4 rules 1.1.6–1.1.7"; "ch 5" -> "AGLC4 chapter 5"
+        function ruleTitle(rule) {
+            return "AGLC4 " + rule.replace(/^rr /, "rules ").replace(/^r /, "rule ").replace(/^ch /, "chapter ");
         }
 
         // Rule chips, only where the result or a warning says which rule applied

@@ -336,6 +336,8 @@ def _result_json(session_id: str, result: ProcessResult) -> dict:
                 "formatted": fn.formatted.to_markup(),
                 "formatted_html": _richtext_to_html(fn.formatted),
                 "changed": fn.changed,
+                # what changed and why, in plain words: [{"kind", "text", "rule"}] (aglc/explain.py)
+                "changes": [c.model_dump() for c in fn.changes] if fn.changed else [],
                 # "provider_error" / "not_returned" when left unchanged because extraction failed
                 "extraction_failed": fn.extraction_failed,
             }

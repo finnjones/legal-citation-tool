@@ -30,6 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from .explain import explain
 from .formatters import BIB_CASES, BIB_ORDER, BIB_SECONDARY, Formatter, formatter_for
 from .models import (
     BibliographySection,
@@ -446,8 +447,10 @@ def render_document(footnotes: list[Footnote], *, bibliography: bool = True) -> 
         formatted = _render_footnote(
             fn, plans, first_footnote, short_title_text, append_definition, disambiguate
         )
+        source_types = [formatter_for(seg.citation).source_type for seg in _citation_segments(fn)]
         results.append(FootnoteResult(
-            number=fn.number, original=fn.original, formatted=formatted, extraction_failed=fn.extraction_failed
+            number=fn.number, original=fn.original, formatted=formatted, extraction_failed=fn.extraction_failed,
+            changes=explain(fn.original, formatted, source_types),
         ))
         if "[MISSING:" in formatted.text:
             warnings.append(Warning_(footnote=fn.number, message=f"Footnote {fn.number} has missing data"))
