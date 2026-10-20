@@ -90,6 +90,9 @@ carries, alongside the source:
   - Example: `Eric Barendt, Freedom of Speech (Oxford University Press, 2nd ed, 2005)` →
     `authors: ["Eric Barendt"]`, `title: "Freedom of Speech"`, `publisher: "Oxford University Press"`,
     `edition: "2"`, `year: "2005"`.
+  - **"et al"** (any source with `authors`): copy only the names actually given, and set
+    `et_al: true`. Never drop it. Example: `David Hamer et al, Laying Down the Law (LexisNexis
+    Butterworths, 12th ed, 2023)` → `authors: ["David Hamer"]`, `et_al: true`.
 - **`book_chapter`** (r 6.6) — `authors`, `chapter_title`, `editors`, `book_title`, `publisher`,
   `edition`, `year`, `starting_page`.
   - Example: `Jane Smith, 'Native Title' in John Doe (ed), Land Law (Federation Press, 2015) 55` →

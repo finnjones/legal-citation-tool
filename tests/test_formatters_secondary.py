@@ -17,6 +17,7 @@ from aglc.formatters.secondary import (
     format_names,
     invert_name,
     surname,
+    surname_list,
 )
 from aglc.models import (
     BookChapterSource,
@@ -79,6 +80,13 @@ def test_format_names_one_two_three_and_four():
     assert format_names(["James Edelman", "Elise Bant"]) == "James Edelman and Elise Bant"
     assert format_names(["A", "B", "C"]) == "A, B and C"
     assert format_names(["Paul Rishworth", "X", "Y", "Z"]) == "Paul Rishworth et al"
+
+
+def test_format_names_keeps_et_al_given_in_the_footnote():
+    # r 4.1.2: 'David Hamer et al' names one author and says there are more
+    assert format_names(["David Hamer"], et_al=True) == "David Hamer et al"
+    assert format_names(["David Hamer"], invert_first=True, et_al=True) == "Hamer, David et al"
+    assert surname_list(["David Hamer"], et_al=True) == "Hamer et al"
 
 
 def test_format_names_invert_first_only():

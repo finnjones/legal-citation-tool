@@ -342,3 +342,41 @@ def test_write_document_no_changes_is_a_noop_for_footnotes(tmp_path, sample_essa
     with zipfile.ZipFile(dst) as z:
         out_fn = z.read(FOOTNOTES_PATH)
     assert src_fn == out_fn
+
+
+# --------------------------------------------------------------------------- #
+# Invisible differences (a trailing space, an italic space) are not edits
+# --------------------------------------------------------------------------- #
+
+
+def _one_footnote_docx(tmp_path, tokens: list[tuple]) -> str:
+    from tests.fixtures.build_fixtures import build_docx
+
+    dst = tmp_path / "one.docx"
+    build_docx(dst, [("para", [("text", "Body.", False), ("fnref", 1)])], [(1, [tokens])])
+    return str(dst)
+
+
+def _written_footnote(tmp_path, src: str, formatted: RichText) -> bytes:
+    original = read_footnotes(src)[0].original
+    dst = tmp_path / "out.docx"
+    write_document(src, dst, [FootnoteResult(number=1, original=original, formatted=formatted)],
+                   track_changes=True, author="AGLC Bot")
+    with zipfile.ZipFile(dst) as z:
+        return z.read(FOOTNOTES_PATH)
+
+
+def test_whitespace_only_differences_write_no_tracked_changes(tmp_path):
+    src = _one_footnote_docx(tmp_path, [("text", "Crimes Act ", True), ("text", "(n 1) s 214A. ", False)])
+    xml = _written_footnote(tmp_path, src, _rt(("Crimes Act", True), (" (n 1) s 214A.", False)))
+    assert b"<w:ins" not in xml and b"<w:del" not in xml
+
+
+def test_a_real_edit_next_to_an_italic_space_leaves_the_space_alone(tmp_path):
+    src = _one_footnote_docx(tmp_path, [("text", "Kvelde ", True), ("text", "[2023] NSWSC 1560 [202].", False)])
+    xml = _written_footnote(tmp_path, src, _rt(("Kvelde", True), (" [2023] NSWSC 1560, [202].", False)))
+    root = etree.fromstring(xml)
+    deleted = "".join(t.text or "" for t in root.iter(qn("w:delText")))
+    inserted = "".join(t.text or "" for ins in root.iter(qn("w:ins")) for t in ins.iter(qn("w:t")))
+    assert deleted.strip() and inserted.strip()  # the comma edit is there...
+    assert "," in inserted and "Kvelde" not in deleted + inserted  # ...and the case name isn't touched

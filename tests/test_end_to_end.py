@@ -46,9 +46,10 @@ def test_process_docx_end_to_end(tmp_path, provider, track_changes):
     assert {f.number: f.formatted.to_markup() for f in result.footnotes} == EXPECTED
     assert result.warnings == []
 
-    # What Word shows (with tracked changes accepted) is the formatted text.
-    reread = {f.number: f.original.to_markup() for f in read_footnotes(out)}
-    assert reread == EXPECTED
+    # What Word shows (with tracked changes accepted) is the formatted text. Spaces keep
+    # their original italics (an unchanged space isn't rewritten), hence visible().
+    reread = {f.number: f.original.visible().to_markup() for f in read_footnotes(out)}
+    assert reread == {f.number: f.formatted.visible().to_markup() for f in result.footnotes}
 
     # Bibliography: grouped per r 1.13, and the output is a valid Word package.
     headings = [s.heading for s in result.bibliography]

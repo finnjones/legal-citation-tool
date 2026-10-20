@@ -3,6 +3,7 @@ examples/test_essay.docx). Each test reproduces what the model actually returned
 
 import json
 
+from aglc import pipeline
 from aglc.document import render_document
 from aglc.extract import Extractor
 from aglc.formatters import formatter_for
@@ -306,3 +307,163 @@ def test_webpage_and_web_page_count_as_the_same_word():
     seg = CitationSegment(citation=Citation(source=WebsiteSource(
         title="Legal Formalism", website_name="Cornell", document_type="Web Page", date="2023", url="https://x")))
     assert V.missing_from_extraction("‘Legal Formalism’, Cornell (Webpage, 2023) <https://x>.", [seg]) == []
+
+
+# ---- run on a real statutory interpretation assignment (Oct 2026) ------------------ #
+# The student saw footnotes marked Amended with nothing visibly changed, 'et al' removed,
+# and italics taken off a Hansard reference; replaying the later draft also showed a
+# '(n x)' with the wrong number swapped for a different source.
+
+
+def _rich(n: int, markup: str) -> Footnote:
+    """'*Crimes Act *(n 1)' -> a footnote with those italic runs (the space is italic too)."""
+    rt = RichText()
+    for i, part in enumerate(markup.split("*")):
+        rt.append(part, italic=i % 2 == 1)
+    return Footnote(number=n, original=rt)
+
+
+def _cite(original: str, source: dict, ref: int | None = None, **citation) -> dict:
+    return {"kind": "citation", "original": original, "refers_to_footnote": ref,
+            "citation": {"source": source, **citation}}
+
+
+def _act(title: str, year: str) -> dict:
+    return {"type": "legislation", "kind": "act", "title": title, "year": year, "jurisdiction": "NSW"}
+
+
+def _sec(value: str) -> dict:
+    return {"kind": "section", "value": value}
+
+
+_DOT = {"kind": "text", "text": "."}
+
+
+def _process(fns: list[Footnote], llm_footnotes: list[dict]):
+    raw = json.dumps({"footnotes": llm_footnotes})
+    return pipeline.process_footnotes(fns, get_provider("fake:x", responses=[raw]), bibliography=False)
+
+
+def test_a_trailing_space_or_an_italic_space_is_not_an_amendment():
+    fns = [_rich(1, "*Crimes Act 1900* (NSW) s 214A (‘*Crimes Act*’)."),
+           _rich(2, "*Interpretation Act 1987* (NSW) s 33 (‘*Interpretation Act*’)."),
+           _rich(3, "*Crimes Act *(n 1) s 214A. "),
+           _rich(4, "Ibid s 214A(1)(b). ")]
+    result = _process(fns, [
+        {"number": 1, "segments": [_cite("Crimes Act 1900 (NSW) s 214A (‘Crimes Act’)", _act("Crimes Act", "1900"),
+                                         pinpoints=[_sec("214A")], short_title="Crimes Act"), _DOT]},
+        {"number": 2, "segments": [_cite("Interpretation Act 1987 (NSW) s 33 (‘Interpretation Act’)", _act("Interpretation Act", "1987"),
+                                         pinpoints=[_sec("33")], short_title="Interpretation Act"), _DOT]},
+        {"number": 3, "segments": [_cite("Crimes Act (n 1) s 214A", {"type": "other", "text": "Crimes Act (n 1) s 214A"}, 1,
+                                         pinpoints=[_sec("214A")], short_title="Crimes Act"), _DOT]},
+        {"number": 4, "segments": [_cite("Ibid s 214A(1)(b)", {"type": "other", "text": "Ibid s 214A(1)(b)"}, 3,
+                                         pinpoints=[_sec("214A(1)(b)")]), _DOT]},
+    ])
+    assert [f.changed for f in result.footnotes] == [False, False, False, False]
+    # the space after the final full stop is kept, not closed over ('(b). .')
+    assert result.footnotes[3].formatted.text == "Ibid s 214A(1)(b). "
+
+
+_HAMER = "David Hamer et al, *Laying Down the Law* (LexisNexis Butterworths, 12th ed, 2023) 648-649."
+
+
+def _hamer_book(**extra) -> dict:
+    return {"type": "book", "authors": ["David Hamer"], "title": "Laying Down the Law",
+            "publisher": "LexisNexis Butterworths", "edition": "12", "year": "2023", **extra}
+
+
+def test_et_al_is_kept_when_the_model_returns_only_the_named_author():
+    result = _process([_rich(14, _HAMER), _rich(15, "Commentary."), _rich(20, "Hamer (n 14) 650.")], [
+        {"number": 14, "segments": [_cite(_HAMER.replace("*", "")[:-1], _hamer_book(),
+                                          pinpoints=[{"kind": "page", "value": "648-649", "plural": True}]), _DOT]},
+        {"number": 15, "segments": [{"kind": "text", "text": "Commentary."}]},
+        {"number": 20, "segments": [_cite("Hamer (n 14) 650", {"type": "other", "text": "Hamer (n 14) 650"}, 14,
+                                          pinpoints=[{"kind": "page", "value": "650"}], short_title="Hamer"), _DOT]},
+    ])
+    out = [f.formatted.to_markup() for f in result.footnotes]
+    assert out[0] == "David Hamer et al, *Laying Down the Law* (LexisNexis Butterworths, 12th ed, 2023) 648–9."
+    assert out[2] == "Hamer et al (n 14) 650."
+
+
+def test_et_al_is_kept_when_the_model_sets_it_or_leaves_it_on_the_name():
+    for book in (_hamer_book(et_al=True), _hamer_book(authors=["David Hamer et al"])):
+        result = _process([_rich(14, _HAMER)], [
+            {"number": 14, "segments": [_cite(_HAMER.replace("*", "")[:-1], book,
+                                              pinpoints=[{"kind": "page", "value": "648-649", "plural": True}]), _DOT]},
+        ])
+        assert result.footnotes[0].formatted.to_markup().startswith("David Hamer et al, *Laying Down the Law*")
+
+
+def test_an_unclassified_hansard_reference_keeps_its_italics():
+    hansard = ("New South Wales, *Parliamentary Debates*, Legislative Assembly, 30 March 2022, 8938 "
+               "(Mark Speakman, Attorney-General) (‘*Parliamentary Debates*’). ")
+    text = hansard.replace("*", "").split(" (‘")[0]
+    result = _process([_rich(5, hansard), _rich(6, "Commentary."), _rich(28, "*Parliamentary Debates* (n 5) 8939.")], [
+        {"number": 5, "segments": [_cite(text + " (‘Parliamentary Debates’)", {"type": "other", "text": text},
+                                         short_title="Parliamentary Debates"), _DOT]},
+        {"number": 6, "segments": [{"kind": "text", "text": "Commentary."}]},
+        {"number": 28, "segments": [_cite("Parliamentary Debates (n 5) 8939", {"type": "other", "text": "Parliamentary Debates (n 5) 8939"}, 5,
+                                          pinpoints=[{"kind": "page", "value": "8939"}], short_title="Parliamentary Debates"), _DOT]},
+    ])
+    assert result.footnotes[0].formatted.visible().to_markup() == _rich(5, hansard).original.visible().to_markup()
+    assert result.footnotes[2].formatted.to_markup() == "*Parliamentary Debates* (n 5) 8939."
+    assert not any(f.changed for f in result.footnotes)
+
+
+_KVELDE = "Kvelde v The State of New South Wales [2023] NSWSC 1560 [202] (‘Kvelde’)"
+
+
+def _kvelde_run(name: str) -> tuple:
+    fns = [_rich(1, "*Crimes Act 1900* (NSW) s 214A (‘*Crimes Act*’)."),
+           _rich(11, "*Kvelde v The State of New South Wales* [2023] NSWSC 1560 [202] (‘*Kvelde*’)."),
+           _rich(12, "*Crimes Act* (n 1) s 214A(1)(c)."),
+           _rich(17, f"*{name}* (n 12) [228]."),
+           _rich(18, "Ibid [415]."),
+           _rich(19, "*Crimes Act* (n 1) s 214A(2).")]
+    result = _process(fns, [
+        {"number": 1, "segments": [_cite("Crimes Act 1900 (NSW) s 214A (‘Crimes Act’)", _act("Crimes Act", "1900"),
+                                         pinpoints=[_sec("214A")], short_title="Crimes Act"), _DOT]},
+        {"number": 11, "segments": [_cite(_KVELDE, {"type": "case", "name": "Kvelde v The State of New South Wales", "year": "2023",
+                                                    "court_id": "NSWSC", "judgment_number": "1560"},
+                                          pinpoints=[{"kind": "paragraph", "value": "202"}], short_title="Kvelde"), _DOT]},
+        {"number": 12, "segments": [_cite("Crimes Act (n 1) s 214A(1)(c)", {"type": "other", "text": "Crimes Act (n 1) s 214A(1)(c)"}, 1,
+                                          pinpoints=[_sec("214A(1)(c)")], short_title="Crimes Act"), _DOT]},
+        {"number": 17, "segments": [_cite(f"{name} (n 12) [228]", {"type": "other", "text": f"{name} (n 12) [228]"}, 12,
+                                          pinpoints=[{"kind": "paragraph", "value": "228"}], short_title=name), _DOT]},
+        {"number": 18, "segments": [_cite("Ibid [415]", {"type": "other", "text": "Ibid [415]"}, 17,
+                                          pinpoints=[{"kind": "paragraph", "value": "415"}]), _DOT]},
+        {"number": 19, "segments": [_cite("Crimes Act (n 1) s 214A(2)", {"type": "other", "text": "Crimes Act (n 1) s 214A(2)"}, 1,
+                                          pinpoints=[_sec("214A(2)")], short_title="Crimes Act"), _DOT]},
+    ])
+    return {f.number: f.formatted.to_markup() for f in result.footnotes}, [w.message for w in result.warnings]
+
+
+def test_a_reference_with_the_wrong_footnote_number_points_to_the_named_source():
+    out, warnings = _kvelde_run("Kvelde")
+    assert out[17] == "*Kvelde* (n 11) [228]."  # not '*Crimes Act* (n 1) [228].'
+    assert out[18] == "Ibid [415]."  # still Kvelde
+    assert out[19] == "*Crimes Act* (n 1) s 214A(2)."  # not turned into 'Ibid'
+    assert any("footnote 17: '(n 12)' points to footnote 12, which doesn't cite 'Kvelde'; changed to footnote 11" in w
+               for w in warnings)
+
+
+def test_a_reference_naming_no_earlier_source_is_kept_as_written():
+    out, warnings = _kvelde_run("Smith")
+    assert out[17] == "*Smith* (n 12) [228]."
+    assert any(w.startswith("footnote 17: could not resolve reference to footnote 12") for w in warnings)
+
+
+def test_a_reference_by_author_surname_defines_no_short_title():
+    # r 1.4.1: 'Sanson (n 27)' uses the surname; the full citation gets no "(‘Sanson’)"
+    book = {"type": "book", "authors": ["Michelle Sanson"], "title": "Statutory Interpretation",
+            "publisher": "Oxford University Press", "edition": "2", "year": "2016"}
+    full = "Michelle Sanson, Statutory Interpretation (Oxford University Press, 2nd ed, 2016) 215"
+    result = _process([_rich(27, f"{full}."), _rich(28, "Commentary."), _rich(30, "Sanson (n 27) 216.")], [
+        {"number": 27, "segments": [_cite(full, book, pinpoints=[{"kind": "page", "value": "215"}]), _DOT]},
+        {"number": 28, "segments": [{"kind": "text", "text": "Commentary."}]},
+        {"number": 30, "segments": [_cite("Sanson (n 27) 216", {"type": "other", "text": "Sanson (n 27) 216"}, 27,
+                                          pinpoints=[{"kind": "page", "value": "216"}], short_title="Sanson"), _DOT]},
+    ])
+    out = [f.formatted.to_markup() for f in result.footnotes]
+    assert out[0] == "Michelle Sanson, *Statutory Interpretation* (Oxford University Press, 2nd ed, 2016) 215."
+    assert out[2] == "Sanson (n 27) 216."

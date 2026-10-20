@@ -251,7 +251,7 @@ def _render_disambiguated_subsequent(
     title = _disambiguation_title(citation)
     if title:
         out.append(", ")
-        if formatter.italic_short_title:
+        if formatter.short_title_italic(citation):
             out.append(title, italic=True)
         else:
             out.append(OPEN_QUOTE + title + CLOSE_QUOTE)
@@ -302,7 +302,7 @@ def _render_citation(
             # The definition introduces the author's own short title where they gave one
             # (r 1.4.4); short_title_text may be an author surname for secondary sources.
             out.append(" (" + OPEN_QUOTE)
-            out.append(citation.short_title or short_title_text[key], italic=formatter.italic_short_title)
+            out.append(citation.short_title or short_title_text[key], italic=formatter.short_title_italic(citation))
             out.append(CLOSE_QUOTE + ")")
     elif plan.kind == "ibid":
         # r 1.4.3: 'Ibid' is capitalised at the start of a footnote; a
@@ -374,7 +374,13 @@ def _render_footnote(
         prev_was_citation = True
         prev_citation = seg.citation
 
-    return _ensure_closing_punctuation(out)
+    # Close the footnote before any trailing whitespace, and keep the original's own
+    # trailing whitespace, so a space after the final full stop is never an edit.
+    text = out.text
+    out = _ensure_closing_punctuation(out.slice(0, len(text.rstrip())))
+    original = fn.original.text
+    out.append(original[len(original.rstrip()):])
+    return out
 
 
 # --------------------------------------------------------------------------- #

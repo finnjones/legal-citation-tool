@@ -126,6 +126,22 @@ def _clean_authors(authors: list[str]) -> list[str]:
     return out
 
 
+_ET_AL = re.compile(r"(?i)[\s,]*\bet\.?\s+al\b\.?$")
+
+
+def _authors_and_et_al(source) -> tuple[list[str], bool]:
+    """r 4.1.2: the cleaned authors, and whether the footnote said 'et al'. The model may
+    set `et_al`, or leave 'et al' on the last name ('David Hamer et al') or as a name of
+    its own; either way it is kept, never dropped."""
+    et_al = source.et_al
+    authors = []
+    for a in source.authors:
+        trimmed = _ET_AL.sub("", a)
+        et_al = et_al or trimmed != a
+        authors.append(trimmed)
+    return _clean_authors(authors), et_al
+
+
 def _surname(author: str) -> str:
     author = author.strip()
     if "," in author:
@@ -345,7 +361,7 @@ def _normalise_legislation(source: LegislationSource) -> tuple[LegislationSource
 def _normalise_journal_article(source: JournalArticleSource) -> tuple[JournalArticleSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
-    data["authors"] = _clean_authors(source.authors)
+    data["authors"], data["et_al"] = _authors_and_et_al(source)
     data["title"] = (source.title or "").strip()
     if source.journal:
         data["journal"] = source.journal.strip()
@@ -371,7 +387,7 @@ def _clean_publisher(name: str) -> str:
 def _normalise_book(source: BookSource) -> tuple[BookSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
-    data["authors"] = _clean_authors(source.authors)
+    data["authors"], data["et_al"] = _authors_and_et_al(source)
     data["editors"] = _clean_authors(source.editors)
     data["title"] = (source.title or "").strip()
     for field in ("publisher", "edition", "year", "volume"):
@@ -387,7 +403,7 @@ def _normalise_book(source: BookSource) -> tuple[BookSource, list[str]]:
 def _normalise_book_chapter(source: BookChapterSource) -> tuple[BookChapterSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
-    data["authors"] = _clean_authors(source.authors)
+    data["authors"], data["et_al"] = _authors_and_et_al(source)
     data["editors"] = _clean_authors(source.editors)
     data["chapter_title"] = (source.chapter_title or "").strip()
     data["book_title"] = (source.book_title or "").strip()
@@ -419,7 +435,7 @@ def _normalise_report(source: ReportSource) -> tuple[ReportSource, list[str]]:
 def _normalise_newspaper(source: NewspaperSource) -> tuple[NewspaperSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
-    data["authors"] = _clean_authors(source.authors)
+    data["authors"], data["et_al"] = _authors_and_et_al(source)
     data["title"] = (source.title or "").strip()
     data["newspaper"] = (source.newspaper or "").strip()
     for field in ("place", "date", "page"):
@@ -444,7 +460,7 @@ def _looks_like_body(name: str) -> bool:
 def _normalise_website(source: WebsiteSource) -> tuple[WebsiteSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
-    data["authors"] = _clean_authors(source.authors)
+    data["authors"], data["et_al"] = _authors_and_et_al(source)
     data["title"] = (source.title or "").strip()
     if data.get("website_name"):
         data["website_name"] = _clean_field(data["website_name"])
@@ -478,7 +494,12 @@ def _normalise_treaty(source: TreatySource) -> tuple[TreatySource, list[str]]:
 
 def _normalise_other(source: OtherSource) -> tuple[OtherSource, list[str]]:
     data = source.model_dump()
-    data["text"] = (source.text or "").strip()
+    text = source.text or ""
+    data["text"] = text.strip()
+    if source.rich is not None:
+        lead = len(text) - len(text.lstrip())
+        rich = source.rich.slice(lead, lead + len(data["text"]))
+        data["rich"] = rich if rich.text == data["text"] else None
     return OtherSource(**data), []
 
 

@@ -8,10 +8,12 @@ Nothing in this module talks to an LLM or to Word; it is pure data.
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 
 
 # --------------------------------------------------------------------------- #
@@ -66,6 +68,28 @@ class RichText(BaseModel):
     def to_markup(self) -> str:
         """Render with *asterisks* around italic runs. Used by tests and the CLI."""
         return "".join(f"*{r.text}*" if r.italic else r.text for r in self.runs)
+
+    def visible(self) -> "RichText":
+        """A copy reduced to what a reader can see, for deciding whether a footnote changed:
+        no leading or trailing whitespace, and whitespace never italic (an italic space looks
+        the same as a roman one)."""
+        out = RichText()
+        for run in self.runs:
+            for part in re.findall(r"\s+|\S+", run.text):
+                out.append(part, run.italic and not part.isspace())
+        text = out.text
+        lead, trail = len(text) - len(text.lstrip()), len(text) - len(text.rstrip())
+        return out.slice(lead, len(text) - trail)
+
+    def slice(self, start: int, end: int) -> "RichText":
+        """Characters [start, end) of the text, keeping their italics."""
+        out, pos = RichText(), 0
+        for run in self.runs:
+            lo, hi = max(start, pos), min(end, pos + len(run.text))
+            if lo < hi:
+                out.append(run.text[lo - pos : hi - pos], run.italic)
+            pos += len(run.text)
+        return out
 
     def __str__(self) -> str:  # pragma: no cover - convenience
         return self.to_markup()
@@ -150,6 +174,7 @@ class JournalArticleSource(_SourceBase):
 
     type: Literal["journal_article"] = "journal_article"
     authors: list[str] = Field(default_factory=list)
+    et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
     title: str
     part: str | None = Field(default=None, description="Article published in parts (r 5.8): '1' -> '(Pt 1)'")
     year: str | None = None
@@ -173,6 +198,7 @@ class BookSource(_SourceBase):
 
     type: Literal["book"] = "book"
     authors: list[str] = Field(default_factory=list)
+    et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
     editors: list[str] = Field(default_factory=list, description="Only when the book itself is edited (no authors)")
     title: str
     translators: list[str] = Field(default_factory=list, description="r 6.7: ', tr Joan Riviere'")
@@ -187,6 +213,7 @@ class BookChapterSource(_SourceBase):
 
     type: Literal["book_chapter"] = "book_chapter"
     authors: list[str] = Field(default_factory=list)
+    et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
     chapter_title: str
     translators: list[str] = Field(default_factory=list, description="Translators of the chapter (r 6.7)")
     editors: list[str] = Field(default_factory=list)
@@ -213,6 +240,7 @@ class NewspaperSource(_SourceBase):
 
     type: Literal["newspaper"] = "newspaper"
     authors: list[str] = Field(default_factory=list)
+    et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
     title: str
     newspaper: str
     section: str | None = Field(default=None, description="Section/supplement, eg 'Epicure' -> '*Epicure*, *The Age*'")
@@ -232,6 +260,7 @@ class WebsiteSource(_SourceBase):
 
     type: Literal["website"] = "website"
     authors: list[str] = Field(default_factory=list, description="Person or organisation author, if any")
+    et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
     title: str
     website_name: str | None = None
     document_type: str | None = Field(default="Web Page", description="r 7.15: 'Web Page', 'Blog Post', 'Forum Post', 'Podcast'...")
@@ -257,6 +286,9 @@ class OtherSource(_SourceBase):
 
     type: Literal["other"] = "other"
     text: str
+    #: `text` with the italics it had in the footnote (eg *Parliamentary Debates*), so that
+    #: emitting it verbatim doesn't strip them. Filled in by extraction, never by the model.
+    rich: SkipJsonSchema[RichText | None] = None
 
 
 Source = Annotated[
@@ -350,7 +382,9 @@ class FootnoteResult(BaseModel):
 
     @property
     def changed(self) -> bool:
-        return self.original.to_markup() != self.formatted.to_markup()
+        """A change the student can see: a trailing space, or a space that is italic in one and
+        roman in the other, doesn't count (and so isn't written to the document either)."""
+        return self.original.visible().to_markup() != self.formatted.visible().to_markup()
 
 
 class BodyFix(BaseModel):

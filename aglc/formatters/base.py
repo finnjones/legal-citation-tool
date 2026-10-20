@@ -52,10 +52,15 @@ class Formatter(ABC):
         without an author-defined short title)."""
         return citation.short_title or ""
 
+    def short_title_italic(self, citation: Citation) -> bool:
+        """Whether this citation's short title is italicised; `italic_short_title` unless a
+        formatter can tell from the source itself (see OtherFormatter)."""
+        return self.italic_short_title
+
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         """Subsequent reference (AGLC4 r 1.4). Default: 'Short Title (n 3) 42'."""
         out = RichText()
-        out.append(short_title, italic=self.italic_short_title)
+        out.append(short_title, italic=self.short_title_italic(citation))
         if self.uses_n_reference:
             out.append(f" (n {first_footnote})")
         pin = self.pinpoints(citation.pinpoints)

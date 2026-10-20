@@ -1131,6 +1131,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             m = m.replace(/^left out of the AGLC citation: (.+)$/i, "Left out of the citation: $1. Check it isn't needed.");
             m = m.replace(/^trailing text not covered by extraction; appended verbatim$/i, "Text at the end of the footnote was kept exactly as you wrote it.");
             m = m.replace(/^could not resolve reference to footnote (\d+) \((.*)\); recorded as an unclassified source$/i, "Couldn't match $2 to footnote $1, so it is kept as written.");
+            m = m.replace(/^'\(n (\d+)\)' points to footnote \d+, which doesn't cite '(.+)'; changed to footnote (\d+), where it is cited$/i, "Your (n $1) pointed to a footnote that doesn't cite $2, so it now points to footnote $3, where $2 is cited. Check that's the one you meant.");
             m = m.replace(/^kept text the extraction skipped: (.+)$/i, "Kept as you wrote it: $1.");
             m = m.replace(/^Unknown report series: '(.+)'$/, "‘$1’ isn't a report series we recognise. Check its abbreviation.");
             m = m.replace(/^Unknown court identifier: '(.+)'$/, "‘$1’ isn't a court we recognise. Check the medium neutral citation.");
@@ -1482,7 +1483,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
         function diffHtml(beforeHtml, afterHtml) {
             const a = tokenize(beforeHtml), b = tokenize(afterHtml);
-            const key = t => (/^\s+$/.test(t.text) ? " " : t.text) + (t.italic ? "\u0001" : "");
+            // An italic space looks the same as a roman one, so whitespace ignores italics
+            const key = t => (/^\s+$/.test(t.text) ? " " : t.text + (t.italic ? "\u0001" : ""));
             const n = a.length, m = b.length;
             const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
             for (let i = n - 1; i >= 0; i--) {

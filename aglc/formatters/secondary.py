@@ -89,17 +89,18 @@ def invert_name(name: str) -> str:
     return f"{parts[-1]}, {' '.join(parts[:-1])}"
 
 
-def format_names(names: list[str], *, invert_first: bool = False) -> str:
+def format_names(names: list[str], *, invert_first: bool = False, et_al: bool = False) -> str:
     """r 4.1.2: one -> 'A'; two/three -> 'A, B and C'; more than three -> the
     first-listed name followed by 'et al' (also applied in subsequent
-    references, r 1.4.1). `invert_first` applies r 1.13's bibliography rule
-    (only the first-listed author's name is inverted)."""
+    references, r 1.4.1). `et_al`: the footnote itself gave the first author
+    and 'et al' rather than every name. `invert_first` applies r 1.13's
+    bibliography rule (only the first-listed author's name is inverted)."""
     if not names:
         return ""
     names = list(names)
     if invert_first:
         names[0] = invert_name(names[0])
-    if len(names) > 3:
+    if et_al or len(names) > 3:
         return f"{names[0]} et al"
     if len(names) == 1:
         return names[0]
@@ -108,10 +109,10 @@ def format_names(names: list[str], *, invert_first: bool = False) -> str:
     return f"{', '.join(names[:-1])} and {names[-1]}"
 
 
-def surname_list(names: list[str]) -> str:
+def surname_list(names: list[str], *, et_al: bool = False) -> str:
     """The r 1.4.1 default short title for multiple authors: their surnames,
     joined the same way as r 4.1.2 (eg 'Edelman and Bant', 'Rishworth et al')."""
-    return format_names([surname(n) for n in names])
+    return format_names([surname(n) for n in names], et_al=et_al)
 
 def _names(source) -> list[str]:
     if getattr(source, "authors", None):
@@ -220,7 +221,7 @@ class JournalArticleFormatter(Formatter):
         src = citation.source
         assert isinstance(src, JournalArticleSource)
         out = RichText()
-        authors = format_names(src.authors, invert_first=invert_author) if src.authors else missing("authors")
+        authors = format_names(src.authors, invert_first=invert_author, et_al=src.et_al) if src.authors else missing("authors")
         out.append(f"{authors}, ")
         out.append(f"{_LQ}{src.title}{_RQ}")
         if src.part:
@@ -243,7 +244,7 @@ class JournalArticleFormatter(Formatter):
             return citation.short_title
         src = citation.source
         assert isinstance(src, JournalArticleSource)
-        return surname_list(src.authors) if src.authors else src.title
+        return surname_list(src.authors, et_al=src.et_al) if src.authors else src.title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         src = citation.source
@@ -289,7 +290,7 @@ class BookFormatter(Formatter):
         # an editor instead leads with the author and puts ", ed Editor"
         # after the title (handled below).
         if src.authors:
-            out.append(format_names(src.authors, invert_first=invert_author) + ", ")
+            out.append(format_names(src.authors, invert_first=invert_author, et_al=src.et_al) + ", ")
         elif src.editors:
             out.append(format_editors(src.editors, invert_first=invert_author) + ", ")
         else:
@@ -323,7 +324,7 @@ class BookFormatter(Formatter):
         src = citation.source
         assert isinstance(src, BookSource)
         if src.authors:
-            return surname_list(src.authors)
+            return surname_list(src.authors, et_al=src.et_al)
         if src.editors:
             return format_editors([surname(e) for e in src.editors])
         return src.title
@@ -367,7 +368,7 @@ class BookChapterFormatter(Formatter):
         src = citation.source
         assert isinstance(src, BookChapterSource)
         out = RichText()
-        authors = format_names(src.authors, invert_first=invert_author) if src.authors else missing("authors")
+        authors = format_names(src.authors, invert_first=invert_author, et_al=src.et_al) if src.authors else missing("authors")
         out.append(f"{authors}, ")
         out.append(f"{_LQ}{src.chapter_title}{_RQ}")
         if src.translators:
@@ -399,7 +400,7 @@ class BookChapterFormatter(Formatter):
         assert isinstance(src, BookChapterSource)
         # r 6.6.1 note: subsequent references use the chapter's own author(s),
         # not the book's editor(s).
-        return surname_list(src.authors) if src.authors else src.chapter_title
+        return surname_list(src.authors, et_al=src.et_al) if src.authors else src.chapter_title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         src = citation.source
@@ -502,7 +503,7 @@ class NewspaperFormatter(Formatter):
         assert isinstance(src, NewspaperSource)
         out = RichText()
         if src.authors:
-            out.append(format_names(src.authors, invert_first=invert_author) + ", ")
+            out.append(format_names(src.authors, invert_first=invert_author, et_al=src.et_al) + ", ")
         out.append(f"{_LQ}{src.title}{_RQ}")
         date = src.date or missing("date")
         if src.periodical:
@@ -539,7 +540,7 @@ class NewspaperFormatter(Formatter):
             return citation.short_title
         src = citation.source
         assert isinstance(src, NewspaperSource)
-        return surname_list(src.authors) if src.authors else src.title
+        return surname_list(src.authors, et_al=src.et_al) if src.authors else src.title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         src = citation.source
@@ -583,7 +584,7 @@ class WebsiteFormatter(Formatter):
         # r 7.15: author omitted if identical to the web page title.
         authors = [a for a in src.authors if a != src.website_name]
         if authors:
-            out.append(format_names(authors, invert_first=invert_author) + ", ")
+            out.append(format_names(authors, invert_first=invert_author, et_al=src.et_al) + ", ")
         out.append(f"{_LQ}{src.title}{_RQ}, ")
         out.append(src.website_name or missing("website_name"), italic=True)
         # r 7.15: 'Web Page' is the guide's default when the document type is
@@ -606,7 +607,7 @@ class WebsiteFormatter(Formatter):
         src = citation.source
         assert isinstance(src, WebsiteSource)
         if src.authors:
-            return surname_list(src.authors)
+            return surname_list(src.authors, et_al=src.et_al)
         return src.website_name or src.title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:

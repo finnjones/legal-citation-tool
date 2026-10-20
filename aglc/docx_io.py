@@ -344,7 +344,8 @@ def _diff_tokens(old: list[tuple[str, bool]], new: list[tuple[str, bool]]) -> li
     """Word-level diff. Returns ops (kind, text, italic) with kind in
     "equal" | "del" | "ins", in emission order. A token whose text is unchanged
     but whose italic flag changed is emitted as a del of the old run plus an
-    ins of the new one (a formatting-only change)."""
+    ins of the new one (a formatting-only change). Whitespace is never a
+    formatting-only change: an italic space looks the same as a roman one."""
     a_text = [t for t, _ in old]
     b_text = [t for t, _ in new]
     sm = difflib.SequenceMatcher(None, a_text, b_text, autojunk=False)
@@ -354,7 +355,7 @@ def _diff_tokens(old: list[tuple[str, bool]], new: list[tuple[str, bool]]) -> li
             for k in range(i2 - i1):
                 otext, oital = old[i1 + k]
                 _, nital = new[j1 + k]
-                if oital == nital:
+                if oital == nital or otext.isspace():
                     ops.append(("equal", otext, oital))
                 else:
                     ops.append(("del", otext, oital))
