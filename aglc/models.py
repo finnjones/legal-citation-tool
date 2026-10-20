@@ -280,6 +280,55 @@ class ParliamentaryDebatesSource(_SourceBase):
     )
 
 
+class SubmissionSource(_SourceBase):
+    """AGLC4 r 7.5.2: written submissions to government and parliamentary inquiries,
+    committees and agencies (including royal commissions)."""
+
+    type: Literal["submission"] = "submission"
+    author: str | None = Field(
+        default=None, description="Person or body that made the submission; none if anonymous (a code name counts)"
+    )
+    submission_number: str | None = Field(default=None, description="Only if the body allocated one, eg '119'")
+    body: str | None = Field(
+        default=None,
+        description="Committee, agency or royal commission it was made to, eg 'Senate Standing Committees on Economics', "
+        "'Australian Competition and Consumer Commission', 'Royal Commission into Family Violence'",
+    )
+    legislature: str | None = Field(
+        default=None, description="For a parliamentary committee, eg 'Parliament of Australia', 'Parliament of Victoria'"
+    )
+    inquiry: str | None = Field(
+        default=None, description="Name of the inquiry, eg 'Inquiry into Drug Law Reform'; none for a royal commission"
+    )
+    date: str | None = Field(default=None, description="Full date, or as much of it as appears")
+
+
+class CommitteeEvidenceSource(_SourceBase):
+    """AGLC4 r 7.5.3: evidence given at a parliamentary committee hearing (Committee
+    Hansard). Pinpoints are pages."""
+
+    type: Literal["committee_evidence"] = "committee_evidence"
+    committee: str | None = Field(default=None, description="eg 'House Standing Committee on Tax and Revenue'")
+    legislature: str | None = Field(default=None, description="eg 'Parliament of Australia'")
+    location: str | None = Field(default=None, description="Where the hearing was held, eg 'Canberra'")
+    date: str | None = Field(default=None, description="Full date of the hearing, eg '30 November 2016'")
+    speaker: str | None = Field(default=None, description="Name of the person giving evidence as written")
+    speaker_position: str | None = Field(
+        default=None, description="Anything after the speaker's name in the brackets, eg 'Air Chief Marshal'"
+    )
+
+
+class ConventionDebatesSource(_SourceBase):
+    """AGLC4 r 7.5.4: debates of the Australasian federal conventions (1890s). Pinpoints
+    are pages."""
+
+    type: Literal["convention_debates"] = "convention_debates"
+    title: str = Field(description="eg 'Official Record of the Debates of the Australasian Federal Convention'")
+    location: str | None = Field(default=None, description="eg 'Sydney', 'Adelaide', 'Melbourne'")
+    date: str | None = Field(default=None, description="Full date of the debate, eg '2 September 1897'")
+    speaker: str | None = Field(default=None, description="Name of the speaker as written, eg 'Sir John Downer'")
+
+
 class ExplanatoryMemorandumSource(_SourceBase):
     """AGLC4 r 3.7: explanatory memoranda, statements and notes to a Bill."""
 
@@ -365,6 +414,9 @@ Source = Annotated[
         ReportSource,
         ResearchPaperSource,
         ParliamentaryDebatesSource,
+        SubmissionSource,
+        CommitteeEvidenceSource,
+        ConventionDebatesSource,
         ExplanatoryMemorandumSource,
         NewspaperSource,
         WebsiteSource,
@@ -376,7 +428,8 @@ Source = Annotated[
 
 SOURCE_TYPES = [
     CaseSource, LegislationSource, JournalArticleSource, BookSource, BookChapterSource,
-    ReportSource, ResearchPaperSource, ParliamentaryDebatesSource, ExplanatoryMemorandumSource,
+    ReportSource, ResearchPaperSource, ParliamentaryDebatesSource, SubmissionSource, CommitteeEvidenceSource,
+    ConventionDebatesSource, ExplanatoryMemorandumSource,
     NewspaperSource, WebsiteSource, TreatySource, OtherSource,
 ]
 

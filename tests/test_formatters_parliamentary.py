@@ -1,4 +1,5 @@
-"""Tests for parliamentary materials: debates (AGLC4 r 7.5.1, r 24.4.1), explanatory
+"""Tests for parliamentary materials: debates (AGLC4 r 7.5.1, r 24.4.1), submissions
+(r 7.5.2), committee evidence (r 7.5.3), convention debates (r 7.5.4), explanatory
 memoranda (r 3.7), research papers (r 7.2, incl r 7.2.3 parliamentary research papers)
 and committee reports (r 7.1.2). Full citations of the guide's own examples are in
 tests/aglc4_examples/parliamentary.json; these tests cover what those can't: repeat
@@ -11,6 +12,8 @@ from aglc.formatters.base import BIB_LEGISLATION, BIB_OTHER, BIB_SECONDARY
 from aglc.models import (
     Citation,
     CitationSegment,
+    CommitteeEvidenceSource,
+    ConventionDebatesSource,
     ExplanatoryMemorandumSource,
     Footnote,
     ParliamentaryDebatesSource,
@@ -18,6 +21,7 @@ from aglc.models import (
     ReportSource,
     ResearchPaperSource,
     RichText,
+    SubmissionSource,
     TextSegment,
 )
 from aglc.normalise import normalise_citation
@@ -35,6 +39,27 @@ BENNETT = ResearchPaperSource(
     document_number="8", institution="Parliamentary Library, Parliament of Australia", date="22 September 2008",
 )
 ADOPTION_EN = ExplanatoryMemorandumSource(document_type="Explanatory Notes", title="Adoption Bill", year="2009", jurisdiction="Qld")
+MOBIL = SubmissionSource(
+    author="Mobil Oil Australia", submission_number="25", body="Australian Competition and Consumer Commission",
+    inquiry="Inquiry into the Price of Unleaded Petrol", date="27 July 2007",
+)
+MOBIL_FULL = (
+    "Mobil Oil Australia, Submission No 25 to Australian Competition and Consumer Commission, "
+    "*Inquiry into the Price of Unleaded Petrol* (27 July 2007)"
+)
+ANON = SubmissionSource(submission_number="12", body="Law Reform Committee", legislature="Parliament of Victoria",
+                        inquiry="Inquiry into Drug Law Reform", date="2017")
+HOUSTON = CommitteeEvidenceSource(
+    committee="Senate Standing Committee on Foreign Affairs, Defence and Trade", legislature="Parliament of Australia",
+    location="Canberra", date="26 February 2007", speaker="Angus Houston", speaker_position="Air Chief Marshal",
+)
+HOUSTON_FULL = (
+    "Evidence to Senate Standing Committee on Foreign Affairs, Defence and Trade, Parliament of Australia, "
+    "Canberra, 26 February 2007, 12 (Angus Houston, Air Chief Marshal)"
+)
+BARTON = ConventionDebatesSource(title="Official Record of the Debates of the Australasian Federal Convention",
+                                 location="Sydney", date="2 September 1897", speaker="Edmund Barton")
+BARTON_FULL = "*Official Record of the Debates of the Australasian Federal Convention*, Sydney, 2 September 1897, 19 (Edmund Barton)"
 OTHER = ReportSource(author="Australian Law Reform Commission", title="Elder Abuse", document_type="Discussion Paper",
                      document_number="83", date="December 2016")
 
@@ -183,3 +208,156 @@ def test_research_paper_bibliography_inverts_the_first_author():
     c = _cite(BENNETT, "15")
     assert formatter_for(c).bibliography_category == BIB_SECONDARY
     assert formatter_for(c).bibliography(c).text.startswith("Bennett, Scott, ‘The Rise")
+
+
+# --------------------------------------------------------------------------- #
+# Submissions (r 7.5.2)
+# --------------------------------------------------------------------------- #
+
+
+def test_submission_subsequent_reference_uses_the_author():
+    # r 1.4.1: a body that is the author is repeated in full.
+    out = _render([_cite(MOBIL, "6–7")], [_cite(OTHER)], [_cite(MOBIL, "8")], [_cite(MOBIL, "9")])
+    assert out[0] == MOBIL_FULL + " 6–7."
+    assert out[2] == "Mobil Oil Australia (n 1) 8."
+    assert out[3] == "Ibid 9."
+    out = _render([_cite(MOBIL, "6", short_title="Mobil Submission")], [_cite(OTHER)], [_cite(MOBIL, "8")])
+    assert out[0] == MOBIL_FULL + " 6 (‘Mobil Submission’)."
+    assert out[2] == "Mobil Submission (n 1) 8."
+
+
+def test_two_submissions_by_one_author_add_the_inquiry():
+    # r 1.4.1: several works by the same author are told apart by their (italic) title.
+    second = MOBIL.model_copy(update={"submission_number": "4", "inquiry": "Petrol Prices and Australian Consumers",
+                                      "date": "2007"})
+    out = _render([_cite(MOBIL, "6")], [_cite(second, "2")], [_cite(MOBIL, "7")])
+    assert out[2] == "Mobil Oil Australia, *Inquiry into the Price of Unleaded Petrol* (n 1) 7."
+
+
+def test_anonymous_submission_is_repeated_in_full_or_by_its_short_title():
+    out = _render([_cite(ANON, "3")], [_cite(OTHER)], [_cite(ANON, "4")])
+    assert out[0] == ("Submission No 12 to Law Reform Committee, Parliament of Victoria, "
+                      "*Inquiry into Drug Law Reform* (2017) 3.")
+    assert out[2] == out[0].replace(") 3.", ") 4.")
+    out = _render([_cite(ANON, "3", short_title="Submission 12")], [_cite(OTHER)], [_cite(ANON, "4")])
+    assert out[0].endswith("(2017) 3 (‘Submission 12’).")
+    assert out[2] == "Submission 12 (n 1) 4."
+
+
+def test_submission_normaliser_drops_anonymous_and_the_royal_commissions_inquiry():
+    # r 7.5.2: no author if anonymous; no inquiry name for a royal commission.
+    c, warnings = normalise_citation(Citation(source=SubmissionSource(
+        author="Anonymous", submission_number="No. 489", body="to the Royal Commission into Family Violence",
+        inquiry="Royal Commission into Family Violence", date="29th May 2015")))
+    assert _full(c) == "Submission No 489 to the Royal Commission into Family Violence (29 May 2015)"
+    assert warnings == []
+    moved = _cite(SubmissionSource(author="Anonymous 489", inquiry="Royal Commission into Family Violence", date="29 May 2015"))
+    assert _full(moved) == "Anonymous 489, Submission to Royal Commission into Family Violence (29 May 2015)"
+
+
+def test_submission_missing_its_body_is_flagged():
+    c, warnings = normalise_citation(Citation(source=SubmissionSource(author="Mobil Oil Australia", date="2007")))
+    assert _full(c) == "Mobil Oil Australia, Submission to [MISSING: body] (2007)"
+    assert warnings == ["Submission missing the body it was made to"]
+
+
+def test_submission_author_is_never_cut_to_a_surname():
+    # Most submissions are by bodies the corporate-author word list doesn't know.
+    out = _render([_cite(ANON.model_copy(update={"author": "Anonymous 489"}), "3")], [_cite(OTHER)],
+                  [_cite(ANON.model_copy(update={"author": "Anonymous 489"}), "4")])
+    assert out[2] == "Anonymous 489 (n 1) 4."
+    c = _cite(MOBIL, "6")
+    assert formatter_for(c).bibliography_category == BIB_OTHER
+    assert formatter_for(c).bibliography(c).to_markup() == MOBIL_FULL
+
+
+def test_submission_words_count_as_captured():
+    seg = CitationSegment(citation=Citation(source=ANON, pinpoints=[Pinpoint(value="3")]))
+    original = "Anonymous, Sub No 12 to Law Reform Committee, Parliament of Victoria, Inquiry into Drug Law Reform (2017) 3."
+    assert validate.missing_from_extraction(original, [seg]) == []
+
+
+# --------------------------------------------------------------------------- #
+# Evidence to parliamentary committees (r 7.5.3)
+# --------------------------------------------------------------------------- #
+
+
+def test_committee_evidence_is_repeated_in_full_without_a_short_title():
+    out = _render([_cite(HOUSTON, "12")], [_cite(OTHER)], [_cite(HOUSTON, "14")], [_cite(HOUSTON, "15")])
+    assert out[0] == HOUSTON_FULL + "."
+    assert out[2] == HOUSTON_FULL.replace(", 12 (", ", 14 (") + "."
+    assert out[3] == "Ibid 15."
+
+
+def test_committee_evidence_short_title_is_defined_then_used():
+    out = _render([_cite(HOUSTON, "12", short_title="Houston Evidence")], [_cite(OTHER)], [_cite(HOUSTON, "14")])
+    assert out[0] == HOUSTON_FULL + " (‘Houston Evidence’)."
+    assert out[2] == "Houston Evidence (n 1) 14."
+
+
+def test_a_different_witness_at_the_same_hearing_is_a_new_citation():
+    other = HOUSTON.model_copy(update={"speaker": "Brendan Nelson", "speaker_position": None})
+    out = _render([_cite(HOUSTON, "12", short_title="Houston Evidence")], [_cite(other, "20")])
+    assert out[1] == HOUSTON_FULL.replace("12 (Angus Houston, Air Chief Marshal)", "20 (Brendan Nelson)") + "."
+
+
+def test_committee_evidence_normaliser_strips_titles_and_the_committee_page_prefix():
+    # r 7.5.3 note: 'SL&C' etc before Committee Hansard page numbers are omitted.
+    bare = HOUSTON.model_copy(update={"committee": "Evidence to " + HOUSTON.committee, "speaker": None,
+                                      "speaker_position": None, "date": "26th February 2007"})
+    c, warnings = normalise_citation(Citation(source=bare, pinpoints=[Pinpoint(value="FAD&T 12")],
+                                              pinpoint_judges="Air Chief Marshal Angus Houston, Air Chief Marshal"))
+    assert c.pinpoint_judges is None and warnings == []
+    assert c.source.speaker == "Air Chief Marshal Angus Houston"  # ranks aren't titles we can safely strip
+    c = _cite(HOUSTON.model_copy(update={"speaker": "Mr Peter Strong"}), "SL&C 2")
+    assert _full(c).endswith(", 2 (Peter Strong, Air Chief Marshal)")
+    assert c.source_key == _cite(HOUSTON.model_copy(update={"speaker": "Peter Strong"})).source_key
+
+
+def test_committee_evidence_missing_fields_are_flagged_not_invented():
+    c = _cite(CommitteeEvidenceSource(committee="Senate Economics References Committee", date="1 May 2020"), "3")
+    assert _full(c) == ("Evidence to Senate Economics References Committee, [MISSING: legislature], "
+                        "[MISSING: location], 1 May 2020, 3")
+
+
+def test_committee_evidence_and_witness_titles_count_as_captured():
+    seg = CitationSegment(citation=Citation(source=HOUSTON.model_copy(update={"speaker": "Peter Strong", "speaker_position": None}),
+                                            pinpoints=[Pinpoint(value="12")]))
+    original = ("Proof Committee Hansard, Senate Standing Committee on Foreign Affairs, Defence and Trade, Parliament of "
+                "Australia, Canberra, 26 February 2007, 12 (Mr Peter Strong).")
+    assert validate.missing_from_extraction(original, [seg]) == []
+
+
+# --------------------------------------------------------------------------- #
+# Australasian federal convention debates (r 7.5.4)
+# --------------------------------------------------------------------------- #
+
+
+def test_convention_debates_are_repeated_in_full_without_a_short_title():
+    # Every day of a convention has the same title, so the title can't be the short form.
+    out = _render([_cite(BARTON, "19")], [_cite(OTHER)], [_cite(BARTON, "20")], [_cite(BARTON, "21")])
+    assert out[0] == BARTON_FULL + "."
+    assert out[2] == BARTON_FULL.replace(", 19 (", ", 20 (") + "."
+    assert out[3] == "Ibid 21."
+
+
+def test_convention_debates_short_title_is_italic():
+    out = _render([_cite(BARTON, "19", short_title="Convention Debates")], [_cite(OTHER)], [_cite(BARTON, "20")])
+    assert out[0] == BARTON_FULL + " (‘*Convention Debates*’)."
+    assert out[2] == "*Convention Debates* (n 1) 20."
+
+
+def test_convention_speaker_drops_titles_but_keeps_sir():
+    # r 7.5.4: titles such as 'the Hon', 'Mr' and 'Dr' are omitted, but not 'Sir'.
+    c = _cite(BARTON.model_copy(update={"speaker": "Mr Edmund Barton QC"}), "19")
+    assert _full(c) == BARTON_FULL
+    downer = _cite(BARTON.model_copy(update={"speaker": "the Hon Sir John Downer"}))
+    assert downer.source.speaker == "Sir John Downer"
+    moved = _cite(BARTON.model_copy(update={"speaker": None}), "19", pinpoint_judges="Mr Edmund Barton")
+    assert moved.pinpoint_judges is None and _full(moved) == BARTON_FULL
+
+
+def test_convention_debates_go_under_other_in_the_bibliography():
+    c = _cite(BARTON, "19")
+    assert formatter_for(c).bibliography_category == BIB_OTHER
+    assert formatter_for(c).bibliography(c).to_markup() == BARTON_FULL.replace(", 19", "")

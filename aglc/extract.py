@@ -115,6 +115,12 @@ def _display_name(source: Source) -> str:
     if source.type == "parliamentary_debates":
         parts = (source.jurisdiction, "Parliamentary Debates", source.chamber, source.date, source.speaker)
         return ", ".join(p for p in parts if p)
+    if source.type == "submission":
+        parts = (source.author, "Submission", source.submission_number, source.body, source.inquiry, source.date)
+        return ", ".join(p for p in parts if p)
+    if source.type == "committee_evidence":
+        parts = ("Evidence", source.committee, source.location, source.date, source.speaker)
+        return ", ".join(p for p in parts if p)
     return getattr(source, "text", "") or ""
 
 
