@@ -112,6 +112,9 @@ def _display_name(source: Source) -> str:
         value = getattr(source, attr, None)
         if value:
             return value
+    if source.type == "parliamentary_debates":
+        parts = (source.jurisdiction, "Parliamentary Debates", source.chamber, source.date, source.speaker)
+        return ", ".join(p for p in parts if p)
     return getattr(source, "text", "") or ""
 
 

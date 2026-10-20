@@ -1,0 +1,545 @@
+[
+ {
+  "id": "7.5.1-47",
+  "rule": "7.5.1",
+  "page": 115,
+  "citation": {
+   "source": {
+    "type": "parliamentary_debates",
+    "jurisdiction": "Commonwealth",
+    "chamber": "Senate",
+    "date": "7 February 2017",
+    "speaker": "George Brandis",
+    "speaker_position": "Attorney-General"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "39"
+    }
+   ]
+  },
+  "expected_full": "Commonwealth, *Parliamentary Debates*, Senate, 7 February 2017, 39 (George Brandis, Attorney-General)"
+ },
+ {
+  "id": "7.5.1-48",
+  "rule": "7.5.1",
+  "page": 115,
+  "citation": {
+   "source": {
+    "type": "parliamentary_debates",
+    "jurisdiction": "Victoria",
+    "chamber": "Legislative Council",
+    "date": "14 December 2017"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "6854"
+    }
+   ]
+  },
+  "expected_full": "Victoria, *Parliamentary Debates*, Legislative Council, 14 December 2017, 6854"
+ },
+ {
+  "id": "1.4.6-92",
+  "rule": "1.4.6",
+  "page": 14,
+  "citation": {
+   "source": {
+    "type": "parliamentary_debates",
+    "jurisdiction": "Commonwealth",
+    "chamber": "Senate",
+    "date": "17 June 2008"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "2626"
+    }
+   ]
+  },
+  "expected_full": "Commonwealth, *Parliamentary Debates*, Senate, 17 June 2008, 2626"
+ },
+ {
+  "id": "1.5.1-105",
+  "rule": "1.5.1",
+  "page": 16,
+  "citation": {
+   "source": {
+    "type": "parliamentary_debates",
+    "jurisdiction": "Commonwealth",
+    "chamber": "House of Representatives",
+    "date": "7 August 2007",
+    "speaker": "Malcolm Brough",
+    "speaker_position": "Minister for Families, Community Services and Indigenous Affairs and Minister Assisting the Prime Minister for Indigenous Affairs"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "10"
+    }
+   ]
+  },
+  "expected_full": "Commonwealth, *Parliamentary Debates*, House of Representatives, 7 August 2007, 10 (Malcolm Brough, Minister for Families, Community Services and Indigenous Affairs and Minister Assisting the Prime Minister for Indigenous Affairs)"
+ },
+ {
+  "id": "24.4.1-45",
+  "rule": "24.4.1",
+  "page": 261,
+  "citation": {
+   "source": {
+    "type": "parliamentary_debates",
+    "jurisdiction": "United Kingdom",
+    "chamber": "House of Commons",
+    "date": "16 February 1998",
+    "speaker": "Jack Straw"
+   },
+   "pinpoints": [
+    {
+     "kind": "volume",
+     "value": "306"
+    },
+    {
+     "kind": "column",
+     "value": "778"
+    }
+   ]
+  },
+  "expected_full": "United Kingdom, *Parliamentary Debates*, House of Commons, 16 February 1998, vol 306, col 778 (Jack Straw)"
+ },
+ {
+  "id": "24.4.1-46",
+  "rule": "24.4.1",
+  "page": 261,
+  "citation": {
+   "source": {
+    "type": "parliamentary_debates",
+    "jurisdiction": "United Kingdom",
+    "chamber": "House of Lords",
+    "date": "3 May 2007",
+    "speaker": "Baroness Morgan"
+   },
+   "pinpoints": [
+    {
+     "kind": "volume",
+     "value": "691"
+    },
+    {
+     "kind": "column",
+     "value": "1158"
+    }
+   ]
+  },
+  "expected_full": "United Kingdom, *Parliamentary Debates*, House of Lords, 3 May 2007, vol 691, col 1158 (Baroness Morgan)"
+ },
+ {
+  "id": "3.7-58",
+  "rule": "3.7",
+  "page": 77,
+  "citation": {
+   "source": {
+    "type": "explanatory_memorandum",
+    "document_type": "Explanatory Memorandum",
+    "title": "Charter of Human Rights and Responsibilities Bill",
+    "year": "2006",
+    "jurisdiction": "Vic"
+   },
+   "pinpoints": []
+  },
+  "expected_full": "Explanatory Memorandum, Charter of Human Rights and Responsibilities Bill 2006 (Vic)"
+ },
+ {
+  "id": "3.7-59",
+  "rule": "3.7",
+  "page": 77,
+  "citation": {
+   "source": {
+    "type": "explanatory_memorandum",
+    "document_type": "Explanatory Notes",
+    "title": "Adoption Bill",
+    "year": "2009",
+    "jurisdiction": "Qld"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "5-6"
+    },
+    {
+     "kind": "page",
+     "value": "29"
+    }
+   ]
+  },
+  "expected_full": "Explanatory Notes, Adoption Bill 2009 (Qld) 5–6, 29"
+ },
+ {
+  "id": "3.7-60",
+  "rule": "3.7",
+  "page": 77,
+  "citation": {
+   "source": {
+    "type": "explanatory_memorandum",
+    "document_type": "Explanatory Statement",
+    "title": "Human Rights Bill",
+    "year": "2003",
+    "jurisdiction": "ACT"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "3"
+    }
+   ]
+  },
+  "expected_full": "Explanatory Statement, Human Rights Bill 2003 (ACT) 3"
+ },
+ {
+  "id": "7.2.2-28",
+  "rule": "7.2.2",
+  "page": 111,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "Matthew H Kramer"
+    ],
+    "title": "The Illusion of Neutrality: Abortion and the Foundations of Justice",
+    "document_type": "Research Paper",
+    "institution": "Faculty of Law, University of Cambridge",
+    "date": "January 2017",
+    "document_number": "9/2017"
+   },
+   "pinpoints": []
+  },
+  "expected_full": "Matthew H Kramer, ‘The Illusion of Neutrality: Abortion and the Foundations of Justice’ (Research Paper No 9/2017, Faculty of Law, University of Cambridge, January 2017)"
+ },
+ {
+  "id": "7.2.2-30",
+  "rule": "7.2.2",
+  "page": 111,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "John Howe",
+     "Ingrid Landau"
+    ],
+    "title": "“Light Touch” Labour Regulation by State Governments in Australia: A Preliminary Assessment",
+    "document_type": "Working Paper",
+    "institution": "Centre for Employment and Labour Relations Law, The University of Melbourne",
+    "date": "December 2006",
+    "document_number": "40",
+    "url": "http://papers.ssrn.com/sol3/papers.cfm?abstract_id=961528"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "6"
+    }
+   ]
+  },
+  "expected_full": "John Howe and Ingrid Landau, ‘“Light Touch” Labour Regulation by State Governments in Australia: A Preliminary Assessment’ (Working Paper No 40, Centre for Employment and Labour Relations Law, The University of Melbourne, December 2006) 6 <http://papers.ssrn.com/sol3/papers.cfm?abstract_id=961528>"
+ },
+ {
+  "id": "7.2.2-31",
+  "rule": "7.2.2",
+  "page": 111,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "Jens Tapking",
+     "Jing Yang"
+    ],
+    "title": "Horizontal and Vertical Integration in Securities Trading and Settlement",
+    "document_type": "Working Paper",
+    "institution": "Bank of England",
+    "date": "2004",
+    "document_number": "245"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "11-12"
+    }
+   ]
+  },
+  "expected_full": "Jens Tapking and Jing Yang, ‘Horizontal and Vertical Integration in Securities Trading and Settlement’ (Working Paper No 245, Bank of England, 2004) 11–12"
+ },
+ {
+  "id": "7.2.3-33",
+  "rule": "7.2.3",
+  "page": 112,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "Amanda Biggs"
+    ],
+    "title": "Medicare: A Quick Guide",
+    "document_type": "Research Paper",
+    "institution": "Parliamentary Library, Parliament of Australia",
+    "date": "12 July 2016"
+   },
+   "pinpoints": []
+  },
+  "expected_full": "Amanda Biggs, ‘Medicare: A Quick Guide’ (Research Paper, Parliamentary Library, Parliament of Australia, 12 July 2016)"
+ },
+ {
+  "id": "7.2.3-34",
+  "rule": "7.2.3",
+  "page": 112,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "Scott Bennett"
+    ],
+    "title": "The Rise of the Australian Greens",
+    "document_type": "Research Paper",
+    "institution": "Parliamentary Library, Parliament of Australia",
+    "date": "22 September 2008",
+    "document_number": "8"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "15"
+    }
+   ]
+  },
+  "expected_full": "Scott Bennett, ‘The Rise of the Australian Greens’ (Research Paper No 8, Parliamentary Library, Parliament of Australia, 22 September 2008) 15"
+ },
+ {
+  "id": "7.2.3-35",
+  "rule": "7.2.3",
+  "page": 112,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "Kate Raynor",
+     "Igor Dosen",
+     "Caley Otter"
+    ],
+    "title": "Housing Affordability in Victoria",
+    "document_type": "Research Paper",
+    "institution": "Parliamentary Library and Information Service, Parliament of Victoria",
+    "date": "December 2017",
+    "document_number": "6"
+   },
+   "pinpoints": []
+  },
+  "expected_full": "Kate Raynor, Igor Dosen and Caley Otter, ‘Housing Affordability in Victoria’ (Research Paper No 6, Parliamentary Library and Information Service, Parliament of Victoria, December 2017)"
+ },
+ {
+  "id": "7.2.3-36",
+  "rule": "7.2.3",
+  "page": 112,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "Caley Otter"
+    ],
+    "title": "Voluntary Assisted Dying Bill 2017",
+    "document_type": "Research Note",
+    "institution": "Parliamentary Library and Information Service, Parliament of Victoria",
+    "date": "October 2017",
+    "document_number": "1"
+   },
+   "pinpoints": []
+  },
+  "expected_full": "Caley Otter, ‘Voluntary Assisted Dying Bill 2017’ (Research Note No 1, Parliamentary Library and Information Service, Parliament of Victoria, October 2017)"
+ },
+ {
+  "id": "7.2.4-37",
+  "rule": "7.2.4",
+  "page": 112,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "Ian Mutton"
+    ],
+    "title": "Extra-Territoriality: A Case Study",
+    "document_type": "Conference Paper",
+    "institution": "International Trade Law Conference",
+    "date": "29 May 1997"
+   },
+   "pinpoints": []
+  },
+  "expected_full": "Ian Mutton, ‘Extra-Territoriality: A Case Study’ (Conference Paper, International Trade Law Conference, 29 May 1997)"
+ },
+ {
+  "id": "7.2.5-40",
+  "rule": "7.2.5",
+  "page": 113,
+  "citation": {
+   "source": {
+    "type": "research_paper",
+    "authors": [
+     "Jonathan G Ercanbrack"
+    ],
+    "title": "The Law of Islamic Finance in the United Kingdom: Legal Pluralism and Financial Competition",
+    "document_type": "PhD Thesis",
+    "institution": "University of London",
+    "date": "2011"
+   },
+   "pinpoints": []
+  },
+  "expected_full": "Jonathan G Ercanbrack, ‘The Law of Islamic Finance in the United Kingdom: Legal Pluralism and Financial Competition’ (PhD Thesis, University of London, 2011)"
+ },
+ {
+  "id": "7.1.2-5",
+  "rule": "7.1.2",
+  "page": 107,
+  "citation": {
+   "source": {
+    "type": "report",
+    "author": "Environment and Natural Resources Committee, Parliament of Victoria",
+    "title": "Inquiry into the Environment Effects Statement Process in Victoria",
+    "document_type": "Parliamentary Paper",
+    "date": "September 2011",
+    "document_number": "59"
+   },
+   "pinpoints": []
+  },
+  "expected_full": "Environment and Natural Resources Committee, Parliament of Victoria, *Inquiry into the Environment Effects Statement Process in Victoria* (Parliamentary Paper No 59, September 2011)"
+ },
+ {
+  "id": "7.1.2-6",
+  "rule": "7.1.2",
+  "page": 107,
+  "citation": {
+   "source": {
+    "type": "report",
+    "author": "Law Reform Committee, Parliament of Victoria",
+    "title": "Inquiry into Alternative Dispute Resolution and Restorative Justice",
+    "document_type": "Final Report",
+    "date": "May 2009"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "26"
+    }
+   ]
+  },
+  "expected_full": "Law Reform Committee, Parliament of Victoria, *Inquiry into Alternative Dispute Resolution and Restorative Justice* (Final Report, May 2009) 26"
+ },
+ {
+  "id": "7.1.2-7",
+  "rule": "7.1.2",
+  "page": 108,
+  "citation": {
+   "source": {
+    "type": "report",
+    "author": "Senate Legal and Constitutional References Committee, Parliament of Australia",
+    "title": "Administration and Operation of the Migration Act 1958",
+    "document_type": "Report",
+    "date": "March 2006"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "280-1"
+    },
+    {
+     "kind": "paragraph",
+     "value": "9.30-9.38"
+    }
+   ]
+  },
+  "expected_full": "Senate Legal and Constitutional References Committee, Parliament of Australia, *Administration and Operation of the Migration Act 1958* (Report, March 2006) 280–1 [9.30]–[9.38]"
+ },
+ {
+  "id": "7.1.2-8",
+  "rule": "7.1.2",
+  "page": 108,
+  "citation": {
+   "source": {
+    "type": "report",
+    "author": "Senate Standing Committee for the Scrutiny of Bills, Parliament of Australia",
+    "title": "Alert Digest",
+    "document_type": "Digest",
+    "date": "13 August 2007",
+    "document_number": "9 of 2007"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "11"
+    }
+   ]
+  },
+  "expected_full": "Senate Standing Committee for the Scrutiny of Bills, Parliament of Australia, *Alert Digest* (Digest No 9 of 2007, 13 August 2007) 11"
+ },
+ {
+  "id": "7.1.2-9",
+  "rule": "7.1.2",
+  "page": 108,
+  "citation": {
+   "source": {
+    "type": "report",
+    "author": "Legislation Review Committee, Parliament of New South Wales",
+    "title": "Legislation Review Digest",
+    "document_type": "Digest",
+    "date": "10 November 2008",
+    "document_number": "13 of 2008"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "6"
+    }
+   ]
+  },
+  "expected_full": "Legislation Review Committee, Parliament of New South Wales, *Legislation Review Digest* (Digest No 13 of 2008, 10 November 2008) 6"
+ },
+ {
+  "id": "7.1.2-10",
+  "rule": "7.1.2",
+  "page": 108,
+  "citation": {
+   "source": {
+    "type": "report",
+    "author": "Department of Parliamentary Services (Cth)",
+    "title": "Bills Digest",
+    "document_type": "Digest",
+    "date": "27 January 2009",
+    "document_number": "75 of 2008–09"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "8"
+    }
+   ]
+  },
+  "expected_full": "Department of Parliamentary Services (Cth), *Bills Digest* (Digest No 75 of 2008–09, 27 January 2009) 8"
+ },
+ {
+  "id": "7.1.2-12",
+  "rule": "7.1.2",
+  "page": 108,
+  "citation": {
+   "source": {
+    "type": "report",
+    "author": "Senate Standing Committee for the Scrutiny of Bills, Parliament of Australia",
+    "title": "Tenth Report of 2016",
+    "document_type": "Report",
+    "date": "30 November 2016"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "671"
+    }
+   ]
+  },
+  "expected_full": "Senate Standing Committee for the Scrutiny of Bills, Parliament of Australia, *Tenth Report of 2016* (Report, 30 November 2016) 671"
+ }
+]

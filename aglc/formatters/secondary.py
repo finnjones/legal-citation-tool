@@ -1,5 +1,5 @@
-"""Secondary sources: journal articles, books, book chapters, reports,
-newspapers and internet materials (AGLC4 ch 4-7).
+"""Secondary sources: journal articles, books, book chapters, reports, research
+papers, newspapers and internet materials (AGLC4 ch 4-7).
 
 Shared author-formatting rules (r 4.1) and the r 1.13 bibliography rules
 (name inversion of the first author only, no pinpoints, no full stop) are
@@ -29,6 +29,7 @@ from ..models import (
     JournalArticleSource,
     NewspaperSource,
     ReportSource,
+    ResearchPaperSource,
     RichText,
     WebsiteSource,
 )
@@ -474,6 +475,71 @@ class ReportFormatter(Formatter):
             out.append(" " + pin)
         if citation.pinpoint_judges:
             out.append(f" ({citation.pinpoint_judges})")
+        return out
+
+
+# --------------------------------------------------------------------------- #
+# Research papers, parliamentary research papers, theses (AGLC4 r 7.2)
+# --------------------------------------------------------------------------- #
+
+
+@register
+class ResearchPaperFormatter(Formatter):
+    """r 7.2.1: Author, 'Title' (Document Type No Number, Institution/Forum, Full Date)
+    Pinpoint. r 7.2.3: for parliamentary research papers, notes and briefs the
+    institution is 'Parliamentary Library, Legislature' (or the jurisdiction's own
+    research service, eg 'Parliamentary Research Service' in New South Wales)."""
+
+    source_type = "research_paper"
+    uses_n_reference = True
+    italic_short_title = False
+    defines_short_title = False
+    bibliography_category = BIB_SECONDARY
+
+    def full(self, citation: Citation) -> RichText:
+        return self._render(citation, invert_author=False)
+
+    def bibliography(self, citation: Citation) -> RichText:
+        stripped = citation.model_copy(update={"pinpoints": [], "pinpoint_judges": None})
+        return self._render(stripped, invert_author=True)
+
+    def _render(self, citation: Citation, invert_author: bool) -> RichText:
+        src = citation.source
+        assert isinstance(src, ResearchPaperSource)
+        out = RichText()
+        if src.authors:
+            out.append(format_names(src.authors, invert_first=invert_author) + ", ")
+        out.append(f"{_LQ}{src.title}{_RQ}")
+        doc_type = src.document_type or missing("document_type")
+        parts = [f"{doc_type} No {src.document_number}" if src.document_number else doc_type]
+        # A body that is itself the author isn't repeated as the institution.
+        if src.institution and src.institution not in src.authors:
+            parts.append(src.institution)
+        elif not src.institution:
+            parts.append(missing("institution"))
+        parts.append(src.date or missing("date"))
+        out.append(f" ({', '.join(parts)})")
+        pin = self.pinpoints(citation.pinpoints)
+        if pin:
+            out.append(f" {pin}")
+        if src.url:
+            out.append(f" <{src.url}>")  # r 4.4
+        return out
+
+    def short_title(self, citation: Citation) -> str:
+        if citation.short_title and _title_based(citation):
+            return citation.short_title
+        src = citation.source
+        assert isinstance(src, ResearchPaperSource)
+        return surname_list(src.authors) if src.authors else src.title
+
+    def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
+        out = RichText()
+        out.append(f"{_LQ}{short_title}{_RQ}" if _title_based(citation) else short_title)
+        out.append(f" (n {first_footnote})")
+        pin = self.pinpoints(citation.pinpoints)
+        if pin:
+            out.append(" " + pin)
         return out
 
 

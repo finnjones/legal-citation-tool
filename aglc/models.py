@@ -92,6 +92,7 @@ class PinpointKind(str, Enum):
     volume = "volume"        # vol 1  (followed by ", " before a page: 'vol 1, 339 [7.7]')
     book = "book"            # bk 2
     footnote = "footnote"    # 42 n 7
+    column = "column"        # col 778 (UK parliamentary debates, r 24.4.1)
     other = "other"          # verbatim; value is emitted exactly as given
 
 
@@ -208,6 +209,57 @@ class ReportSource(_SourceBase):
     date: str | None = Field(default=None, description="Month Year, or Year, as given")
 
 
+class ResearchPaperSource(_SourceBase):
+    """AGLC4 r 7.2: research papers, working papers, parliamentary research papers, notes
+    and briefs (r 7.2.3), conference papers and theses. The title is quoted, not italic."""
+
+    type: Literal["research_paper"] = "research_paper"
+    authors: list[str] = Field(default_factory=list)
+    title: str
+    document_type: str | None = Field(
+        default=None, description="As it appears on the source, eg 'Research Paper', 'Working Paper', 'Research Note', 'e-brief'"
+    )
+    document_number: str | None = Field(default=None, description="As it appears, eg '8', '9/2017', '1/2014'")
+    institution: str | None = Field(
+        default=None,
+        description="Most specific body then umbrella body, eg 'Parliamentary Library, Parliament of Australia', "
+        "'NSW Parliamentary Research Service, Parliament of New South Wales'",
+    )
+    date: str | None = Field(default=None, description="Full date, or as much of it as appears, eg 'December 2017'")
+    url: str | None = None
+
+
+class ParliamentaryDebatesSource(_SourceBase):
+    """AGLC4 r 7.5.1 (and r 24.4.1 for the UK): parliamentary debates ('Hansard'),
+    including second reading speeches (r 3.7 note). Pinpoints are pages (UK: vol and col)."""
+
+    type: Literal["parliamentary_debates"] = "parliamentary_debates"
+    jurisdiction: str | None = Field(
+        default=None, description="As written, eg 'Commonwealth', 'New South Wales', 'NSW', 'United Kingdom'"
+    )
+    chamber: str | None = Field(
+        default=None, description="eg 'Senate', 'House of Representatives', 'Legislative Assembly', 'Legislative Council'"
+    )
+    date: str | None = Field(default=None, description="Full date of the debate, eg '30 March 2022'")
+    speaker: str | None = Field(default=None, description="Name of the speaker as written, eg 'Mark Speakman'")
+    speaker_position: str | None = Field(
+        default=None, description="Anything after the speaker's name in the brackets, eg 'Attorney-General'"
+    )
+
+
+class ExplanatoryMemorandumSource(_SourceBase):
+    """AGLC4 r 3.7: explanatory memoranda, statements and notes to a Bill."""
+
+    type: Literal["explanatory_memorandum"] = "explanatory_memorandum"
+    document_type: str = Field(
+        default="Explanatory Memorandum",
+        description="'Explanatory Memorandum', 'Revised Explanatory Memorandum', 'Explanatory Statement', 'Explanatory Notes'...",
+    )
+    title: str = Field(description="Title of the Bill without its year, eg 'Charter of Human Rights and Responsibilities Bill'")
+    year: str | None = None
+    jurisdiction: str | None = Field(default=None, description="AGLC abbreviation: Cth, NSW, Vic, Qld, WA, SA, Tas, ACT, NT")
+
+
 class NewspaperSource(_SourceBase):
     """AGLC4 r 7.10."""
 
@@ -267,6 +319,9 @@ Source = Annotated[
         BookSource,
         BookChapterSource,
         ReportSource,
+        ResearchPaperSource,
+        ParliamentaryDebatesSource,
+        ExplanatoryMemorandumSource,
         NewspaperSource,
         WebsiteSource,
         TreatySource,
@@ -277,7 +332,8 @@ Source = Annotated[
 
 SOURCE_TYPES = [
     CaseSource, LegislationSource, JournalArticleSource, BookSource, BookChapterSource,
-    ReportSource, NewspaperSource, WebsiteSource, TreatySource, OtherSource,
+    ReportSource, ResearchPaperSource, ParliamentaryDebatesSource, ExplanatoryMemorandumSource,
+    NewspaperSource, WebsiteSource, TreatySource, OtherSource,
 ]
 
 
