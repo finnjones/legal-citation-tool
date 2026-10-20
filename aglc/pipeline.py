@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -110,15 +111,17 @@ def process_docx(
     fix_body: bool = True,
     previous: Extraction | None = None,
     only: set[int] | None = None,
+    session: str | None = None,
 ) -> ProcessResult:
     """Process `src` into `dst`. With `previous` and `only`, re-extract just those footnotes
-    (see process_footnotes); everything after extraction is redone for the whole document."""
+    (see process_footnotes); everything after extraction is redone for the whole document.
+    `session` (the API's session id) labels the summary log line."""
     t0 = time.monotonic()
+    if not isinstance(provider, LLMProvider):
+        provider = get_provider(provider)
     footnotes = read_footnotes(src)
     log.info("read %d footnotes from %s", len(footnotes), Path(src).name)
     result = process_footnotes(footnotes, provider, bibliography=bibliography, previous=previous, only=only)
-    changed = sum(f.changed for f in result.footnotes)
-    log.info("formatted: %d footnotes changed, %d warnings", changed, len(result.warnings))
     result.body_fixes = write_document(
         src,
         dst,
@@ -127,10 +130,56 @@ def process_docx(
         track_changes=track_changes,
         fix_body=fix_body,
     )
-    if result.body_fixes:
-        log.info("body text: %d fixes", len(result.body_fixes))
-    log.info("wrote %s (%.1fs total)", Path(dst).name, time.monotonic() - t0)
+    log.info("%s", run_summary(result, provider, session, time.monotonic() - t0))
     return result
+
+
+# Kinds of warning, for the summary log line. Some warnings quote the footnote, so the line
+# names only these fixed phrases (or "other"), never the warning itself. First match wins.
+_WARNING_KINDS = (
+    "extraction failed",
+    "missing from LLM response",
+    "LLM returned no segments",
+    "left unchanged for manual review",
+    "could not resolve",
+    "points to footnote",
+    "may have dropped",
+    "left out of the AGLC citation",
+    "kept text the extraction skipped",
+    "trailing text not covered",
+    "formatter omitted",
+    "has no pinpoint",
+    "has missing data",
+    "unknown report series",
+    "unknown court identifier",
+    "unknown jurisdiction",
+    "missing year",
+    "missing jurisdiction",
+    "missing journal name",
+    "missing author",
+    "starting page",
+    "removed",
+)
+
+
+def warning_kinds(result) -> Counter[str]:
+    """How many warnings of each kind in _WARNING_KINDS. `result` is anything `failed_footnotes` takes."""
+    counts: Counter[str] = Counter()
+    for message in _messages(result):
+        text = message.lower()
+        counts[next((k for k in _WARNING_KINDS if k.lower() in text), "other")] += 1
+    return counts
+
+
+def run_summary(result: ProcessResult, provider: LLMProvider, session: str | None, seconds: float) -> str:
+    """One line per document with no student text: counts, the model and the time taken."""
+    kinds = ", ".join(f"{kind} {n}" for kind, n in warning_kinds(result).most_common()) or "none"
+    return (
+        f"formatted session {session[:8] if session else '-'} with {provider.name}:{provider.model}:"
+        f" {len(result.footnotes)} footnotes, {sum(f.changed for f in result.footnotes)} changed,"
+        f" {len(failed_footnotes(result))} extraction failures, {len(result.body_fixes)} body fixes;"
+        f" {len(result.warnings)} warnings ({kinds}); {seconds:.1f}s"
+    )
 
 
 # --------------------------------------------------------------------------- #

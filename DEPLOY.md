@@ -154,6 +154,25 @@ nightly backup (or a manual `.backup`) before deploying a release that adds one.
 - uvicorn's access log keeps only the first 8 characters of session ids (`aglc/guards.py`),
   since a session id unlocks a paid document. It still records client IP addresses:
   keep journald retention short (eg `MaxRetentionSec=14day`) and say so on the privacy page.
+- Make the journal persistent, or a reboot empties it: in `/etc/systemd/journald.conf` set
+  ```ini
+  [Journal]
+  Storage=persistent
+  MaxRetentionSec=14day
+  ```
+  then `sudo systemctl restart systemd-journald`. Match `MaxRetentionSec` to
+  `AGLC_LOG_RETENTION_DAYS` (§4a).
+- Read the service's log with `journalctl -u <unit>` (the name of the systemd unit that runs
+  uvicorn), eg `journalctl -u aglc --since "2 days ago"`, or `-f` to follow it live. Each
+  document leaves one summary line:
+  `formatted session 1a2b3c4d with openrouter:<model>: 32 footnotes, 20 changed, 0 extraction
+  failures, 3 body fixes; 5 warnings (could not resolve 2, has no pinpoint 3); 41.2s`.
+  The 8 characters are the start of the session id, which is also the name of the session's
+  folder (in `aglc_sessions` in the temp dir, under `/tmp/systemd-private-*` if the unit sets
+  `PrivateTmp=yes`; or `$AGLC_DATA_DIR/sessions` with payments on). Until the retention sweep
+  deletes it, that folder holds the input and output documents, `result.json` (what the page
+  was sent), `extraction.json` (the model's structured answer, before normalising) and
+  `options.json`.
 - Footnote text, filenames and payment ids are not logged at info level. Errors are logged
   with tracebacks server-side; clients get a generic message.
 

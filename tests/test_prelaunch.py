@@ -4,6 +4,7 @@ smaller protections around them (aglc/guards.py, aglc/retention.py)."""
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 import time
@@ -18,9 +19,11 @@ from fastapi.testclient import TestClient
 
 from aglc import api, billing, docx_io, guards, retention
 from aglc.docx_io import UnsafeDocxError, read_footnotes
+from aglc.llm.base import get_provider
+from aglc.models import Extraction
 from aglc.store import get_store
 
-from test_billing import DOCX, ESSAY, _checkout, _process, _provider_order_id, _webhook, client, fake, paid  # noqa: F401
+from test_billing import DOCX, ESSAY, EXTRACTION, _checkout, _process, _provider_order_id, _webhook, client, fake, paid  # noqa: F401
 
 
 def _upload(client, data: bytes, name="essay.docx", **form):
@@ -353,6 +356,84 @@ def test_sweep_interval_follows_the_window(monkeypatch):
     assert retention.sweep_interval() == 3600
     monkeypatch.setenv("AGLC_RETENTION_HOURS", "1")
     assert retention.sweep_interval() == 900
+
+
+# ---- 4. a run can be looked into afterwards ----------------------------------------- #
+
+
+def _misread_extraction() -> str:
+    """The sample essay's model answer, but footnote 4 ('Mabo, above n 1, 60') pointed at the
+    wrong footnote: its warning quotes the student's text."""
+    data = json.loads(EXTRACTION)
+    fn4 = next(fn for fn in data["footnotes"] if fn["number"] == 4)
+    fn4["segments"][0]["refers_to_footnote"] = 7
+    return json.dumps(data)
+
+
+@pytest.fixture
+def free(monkeypatch, tmp_path):
+    """Payments off (the default), sessions in a temp dir, and the fake LLM."""
+    monkeypatch.setattr(api, "_TEMP_DIR", tmp_path)
+    answer = _misread_extraction()
+    with mock.patch("aglc.pipeline.get_provider",
+                    side_effect=lambda *a, **k: get_provider("fake:e2e", responses=[answer])):
+        yield tmp_path
+
+
+def test_free_mode_keeps_the_result_and_the_models_answer(free, client):
+    r = _upload(client, ESSAY.read_bytes(), name="My Essay.docx")
+    assert r.status_code == 200, r.text
+    d = free / r.json()["id"]
+    assert {"input.docx", "output.docx", "original_filename.txt", "result.json", "extraction.json",
+            "options.json"} <= {p.name for p in d.iterdir()}
+    saved = json.loads((d / "result.json").read_text())
+    assert saved["footnotes"] == r.json()["footnotes"] and saved["filename"] == "My Essay.docx"
+    assert "filename" not in r.json()
+    extraction = Extraction.model_validate_json((d / "extraction.json").read_text())
+    assert len(extraction.footnotes) == len(saved["footnotes"])
+
+    # ... and the retention sweep deletes them with the documents.
+    old = time.time() - 25 * 3600
+    os.utime(d, (old, old))
+    assert retention.sweep(free) == 1 and not d.exists()
+
+
+def test_each_run_logs_one_summary_without_student_text(free, client, caplog):
+    caplog.set_level(logging.INFO, logger="aglc")
+    r = _upload(client, ESSAY.read_bytes(), name="Smith v Jones assignment.docx")
+    assert r.status_code == 200, r.text
+    data, sid = r.json(), r.json()["id"]
+
+    lines = [rec.getMessage() for rec in caplog.records if rec.name.startswith("aglc")]
+    summary = [line for line in lines if line.startswith("formatted session")]
+    assert len(summary) == 1
+    line = summary[0]
+    changed = sum(f["changed"] for f in data["footnotes"])
+    assert line.startswith(f"formatted session {sid[:8]} with fake:e2e: {len(data['footnotes'])} footnotes,"
+                           f" {changed} changed, 0 extraction failures,")
+    assert f"{len(data['warnings'])} warnings (could not resolve 1" in line and line.endswith("s")
+    assert any("Mabo, above n 1" in w["message"] for w in data["warnings"])  # the test means something
+
+    # Nothing the student wrote, nor the file's name or the full session id, in any log line.
+    texts = [fn.original.text.strip() for fn in read_footnotes(ESSAY)]
+    texts += [w["message"] for w in data["warnings"]]
+    for logged in lines:
+        assert sid not in logged and "Smith v Jones" not in logged
+        for text in texts:
+            assert len(text) < 12 or text not in logged, (text, logged)
+
+
+def test_warning_kinds_name_only_fixed_phrases():
+    from aglc.pipeline import warning_kinds
+    kinds = warning_kinds([
+        "footnote 3: could not resolve reference to footnote 2 ('Smith (n 2) 4'); recorded as an unclassified source",
+        "footnote 4: could not resolve reference to footnote 9 ('Jones (n 9)'); recorded as an unclassified source",
+        "footnote 5: left unchanged for manual review; the extraction kept dropping 'my own words'",
+        "Unknown report series: 'XYZ'",
+        "something new the summary doesn't know about: 'student text'",
+    ])
+    assert kinds == {"could not resolve": 2, "left unchanged for manual review": 1, "unknown report series": 1,
+                     "other": 1}
 
 
 # ---- smaller protections ----------------------------------------------------------- #

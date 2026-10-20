@@ -93,6 +93,7 @@ app.add_middleware(guards.GuardMiddleware)  # 413 over $AGLC_MAX_UPLOAD_MB, secu
 app.include_router(billing.router)  # every route 404s unless AGLC_PAYMENTS is set
 app.mount("/assets", StaticFiles(directory=site.WEB_DIR / "assets", check_dir=False), name="assets")
 guards.install_log_redaction()
+guards.install_app_logging()
 
 
 def _sessions_dir() -> Path:
@@ -255,7 +256,7 @@ async def process_document(
         options = {"model": model, "bibliography": bibliography, "track_changes": track_changes, "fix_body": fix_body}
         process = lambda **again: run_in_threadpool(  # noqa: E731
             pipeline.process_docx, input_file, output_file, model,
-            bibliography=bibliography, track_changes=track_changes, fix_body=fix_body, **again,
+            bibliography=bibliography, track_changes=track_changes, fix_body=fix_body, session=session_id, **again,
         )
         if paid:
             await run_in_threadpool(billing.check_footnote_cap, input_file)  # 413, before any LLM call
@@ -273,7 +274,10 @@ async def process_document(
             full = _result_json(session_id, result)
             return billing.save_result(session_id, file.filename, full, extraction=result.extraction, options=options)
         result = await process()
-        return _result_json(session_id, result)
+        full = _result_json(session_id, result)
+        # Kept for the same 24 hours as the documents, so a complaint can be looked into.
+        billing.write_result(session_dir, file.filename, full, extraction=result.extraction, options=options)
+        return full
 
     except Exception as e:
         # Clean up on error

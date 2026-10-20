@@ -134,3 +134,15 @@ def install_log_redaction() -> None:
     access = logging.getLogger("uvicorn.access")
     if not any(isinstance(f, RedactSessionIds) for f in access.filters):
         access.addFilter(RedactSessionIds())
+
+
+def install_app_logging() -> None:
+    """uvicorn sets up only its own loggers, so without a handler here the "aglc" logger's
+    info lines (one summary per document, aglc/pipeline.py) never reach the journal."""
+    app_log = logging.getLogger("aglc")
+    if app_log.level == logging.NOTSET:
+        app_log.setLevel(logging.INFO)
+    if not app_log.handlers and not logging.getLogger().handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+        app_log.addHandler(handler)
