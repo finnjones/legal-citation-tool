@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 
 from . import validate
 from .llm.base import LLMError, LLMProvider
-from .progress import Progress, safe
+from .progress import Progress, found_in, safe
 from .models import (
     Citation,
     CitationSegment,
@@ -561,7 +561,8 @@ class Extractor:
                 results[fn.number].extraction_failed = "not_returned"  # kept as written, below
             results[fn.number].segments = self._convert_verified(fn, llm_fn, resolved, system_prompt)
             resolved[fn.number] = results[fn.number]
-            self._report("done", {"numbers": [fn.number], "failed": results[fn.number].extraction_failed is not None})
+            self._report("done", {"numbers": [fn.number], "failed": results[fn.number].extraction_failed is not None,
+                                  "found": {fn.number: found_in(results[fn.number])}})
 
     # ---- verification (see aglc/validate.py) ------------------------------------ #
 

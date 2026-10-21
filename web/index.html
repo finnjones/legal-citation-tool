@@ -78,70 +78,62 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .privacy-note a { color: var(--muted); }
         .sample { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); text-align: center; font-size: 0.875rem; color: var(--muted); }
 
-        /* Processing stages */
+        /* Processing: one meter and a plain status line for the whole job; while the AI model
+           reads, the footnote it's on, in the citation serif, with each citation it found marked,
+           and the footnotes just read underneath */
         .progress h2 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
         .progress > p { margin-top: 4px; color: var(--muted); font-size: 0.875rem; }
-        .stages { list-style: none; margin-top: 20px; display: grid; gap: 2px; }
-        .stage {
-            display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center;
-            padding: 10px 0; color: var(--muted); font-size: 0.9375rem;
+        .meter { margin-top: 20px; height: 4px; border-radius: 4px; background: var(--hairline); overflow: hidden; }
+        .meter span { display: block; height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(var(--p, 0)); }
+        .progress > .status-line {
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; margin-top: 10px;
+            color: var(--ink); font-size: 0.9375rem; font-weight: 500; font-variant-numeric: tabular-nums;
         }
-        .stage + .stage { border-top: 1px solid var(--hairline); }
-        .stage .mark { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--hairline-strong); display: grid; place-items: center; }
-        .stage .mark svg { width: 12px; height: 12px; opacity: 0; }
-        .stage .time { font-variant-numeric: tabular-nums; font-size: 0.8125rem; }
-        .stage.current { color: var(--ink); font-weight: 500; }
-        .stage.current .mark { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 3.5px, transparent 4px); }
-        .stage.done { color: var(--ink); }
-        .stage.done .mark { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
-        .stage.done .mark svg { opacity: 1; }
-        @media (prefers-reduced-motion: no-preference) {
-            .stage.current .mark { animation: pulse 1.6s var(--ease-out) infinite; }
+        .status-line .left { margin-left: auto; color: var(--muted); font-size: 0.875rem; font-weight: 400; white-space: nowrap; }
+        .desk { margin-top: 18px; border-top: 1px solid var(--hairline); }
+        .spot { padding: 14px 0 12px; border-bottom: 1px solid var(--hairline); }
+        .spot-head { display: flex; justify-content: space-between; gap: 12px; font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
+        .spot-state { display: inline-flex; align-items: center; gap: 5px; }
+        .spot-state svg { width: 12px; height: 12px; }
+        .spot.read .spot-state { color: var(--accent); }
+        .spot-text {
+            margin-top: 6px; font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.6; color: var(--ink);
+            min-height: calc(2 * 1.6em); overflow-wrap: anywhere;
+            display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
         }
-        @keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--accent-wash); } }
-
-        /* Live redline: a rolling column of footnote lines. Each one read is struck through in
-           red and rewritten in green, like the results; the ones the AI model is on are underlined */
-        .reading { margin-top: 20px; }
-        .reading-line { font-size: 0.9375rem; font-weight: 500; font-variant-numeric: tabular-nums; }
-        .reading-line .left { color: var(--muted); font-weight: 400; }
-        .redline-roll {
-            --row: 28px; margin-top: 12px; height: calc(5 * var(--row)); overflow: hidden;
-            mask-image: linear-gradient(transparent, var(--ink) 22%, var(--ink) 78%, transparent);
+        .spot-text mark {
+            color: inherit; background: var(--accent-wash); border-radius: 4px;
+            text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 4px;
         }
-        .rl-row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); align-items: center; height: var(--row); }
-        .rl-n {
-            padding-right: 12px; text-align: right; font-family: var(--font-serif); font-weight: 600;
-            font-size: 0.9375rem; color: var(--muted); font-variant-numeric: tabular-nums lining-nums;
+        .spot-found { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; margin-top: 8px; }
+        .kind {
+            font-size: 0.75rem; font-weight: 600; line-height: 1; letter-spacing: 0.01em; color: var(--accent);
+            border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 4px; padding: 5px 7px;
         }
-        .rl-line { position: relative; display: block; height: 6px; width: var(--w); border-radius: 4px; background: var(--hairline); }
-        .rl-row.writing .rl-line { background: var(--hairline-strong); }
-        .rl-row.writing .rl-line::after {
-            content: ""; position: absolute; left: 0; width: 28%; bottom: -5px; height: 1.5px;
-            background: var(--accent);
+        .spot-summary { margin-top: 6px; font-size: 0.9375rem; color: var(--muted); }
+        .feed { list-style: none; padding-top: 6px; min-height: calc(3 * 30px); }
+        .feed li {
+            display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: 10px; align-items: baseline;
+            min-height: 30px; padding: 4px 0; color: var(--muted);
         }
-        .rl-row.done .rl-n, .rl-row.fixing .rl-n { color: var(--ink); }
-        .rl-row.done .rl-line, .rl-row.fixing .rl-line { background: color-mix(in srgb, var(--insertion) 45%, transparent); }
-        .rl-row.fixing .rl-line::after {
-            content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: 1.5px; margin-top: -0.75px;
-            background: var(--deletion); opacity: 0; transform-origin: left;
-        }
-        .reading-note { margin-top: 14px; font-size: 0.875rem; color: var(--muted); }
+        .feed li:nth-child(2) { opacity: 0.75; }
+        .feed li:nth-child(3) { opacity: 0.45; }
+        .feed-no { text-align: right; font-family: var(--font-serif); font-weight: 600; font-size: 0.875rem; font-variant-numeric: tabular-nums lining-nums; }
+        .feed-text { font-family: var(--font-serif); font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .feed-kind { font-size: 0.75rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+        .reading-note { margin-top: 12px; font-size: 0.875rem; color: var(--muted); }
         .reading-note.problem { color: var(--check); }
         @media (prefers-reduced-motion: no-preference) {
-            .rl-row.writing .rl-line::after { animation: writing 1.1s ease-in-out var(--d, 0s) infinite; }
-            .rl-row.fixing .rl-line { animation: rewrite 0.9s var(--ease-out); }
-            .rl-row.fixing .rl-line::after { animation: strike 0.9s var(--ease-out); }
+            .meter span { transition: transform 0.6s var(--ease-out); }
+            .spot-text.reading .w { animation: read 0.5s var(--ease-out) var(--d) both; }
+            .spot-text mark { animation: found 0.5s var(--ease-out) var(--d, 0s) both; }
+            .kind { animation: enter 0.35s var(--ease-out) var(--d, 0s) both; }
+            .feed li.new { animation: enter 0.35s var(--ease-out) both; }
+            .spot.turn .spot-text, .spot.turn .spot-head { animation: enter 0.3s var(--ease-out); }
         }
-        @keyframes writing { from { left: 0; opacity: 0; } 25%, 75% { opacity: 1; } to { left: 72%; opacity: 0; } }
-        @keyframes rewrite {
-            0%, 45% { background: color-mix(in srgb, var(--deletion) 35%, transparent); width: calc(var(--w) + 10%); }
-        }
-        @keyframes strike {
-            0% { opacity: 1; transform: scaleX(0); }
-            35% { opacity: 1; transform: scaleX(1); }
-            55%, 100% { opacity: 0; transform: scaleX(1); }
-        }
+        @keyframes read { from { color: var(--muted); } }
+        @keyframes found { from { background-color: transparent; text-decoration-color: transparent; } }
+        @keyframes enter { from { opacity: 0.3; transform: translateY(-4px); } }
 
         /* ---- Banners --------------------------------------------------------- */
         .banner {
@@ -485,12 +477,17 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     <div class="progress" id="progress" hidden>
                         <h2 id="progressTitle">Checking your essay</h2>
                         <p id="progressHint">Usually under a minute. Keep this tab open.</p>
-                        <div class="reading" id="reading" hidden>
-                            <p class="reading-line" id="readingLine"></p>
-                            <div class="redline-roll" aria-hidden="true"><div id="rlRows"></div></div>
-                            <p class="reading-note" id="readingNote" aria-live="polite" hidden></p>
+                        <div class="meter" aria-hidden="true"><span id="meter"></span></div>
+                        <p class="status-line"><span id="statusText">Uploading your document</span><span class="left" id="statusLeft"></span></p>
+                        <div class="desk" id="desk" aria-hidden="true" hidden>
+                            <div class="spot" id="spot">
+                                <div class="spot-head"><span id="spotNo"></span><span class="spot-state" id="spotState"></span></div>
+                                <p class="spot-text" id="spotText"></p>
+                                <div class="spot-found" id="spotFound"></div>
+                            </div>
+                            <ol class="feed" id="feed"></ol>
                         </div>
-                        <ol class="stages" id="stages"></ol>
+                        <p class="reading-note" id="readingNote" aria-live="polite" hidden></p>
                     </div>
 
                     <div id="uploadError" hidden></div>
@@ -980,14 +977,69 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             }
         }
 
-        // Named stages, moved on by the server's own progress (GET /api/progress/{id}), with a live
-        // redline of the footnotes as the AI model reads them, a time-left estimate, and a plain line
-        // when it's slow. Re-asks, repairs and footnotes the model got wrong are handled quietly:
-        // they aren't shown here, and the results page flags any footnote still unread at the end.
+        // One meter and a status line for the whole job, moved on by the server's own progress
+        // (GET /api/progress/{id}). While the AI model reads, the page shows the footnote it's on
+        // (the one it started writing most recently, else the next one not read), marks each
+        // citation it found once it's read, and lists the footnotes just read underneath.
+        // Re-asks, repairs and footnotes the model got wrong are handled quietly: they aren't
+        // shown here, and the results page flags any footnote still unread at the end.
         const STAGE_INDEX = { reading: 1, formatting: 2, checking: 3, writing_doc: 4 };
-        const ROLL_ROWS = 5;
-        // A footnote's line length, fixed per footnote so it doesn't jump as the column rolls
-        const lineWidth = (n) => 52 + (n * 37) % 41;
+        // Where the meter stands at the start of each stage; reading fills most of it
+        const METER = [0.03, 0.05, 0.88, 0.93, 0.97];
+        // How long a footnote stays in view at least, so the text can be taken in
+        const SPOT_DWELL = 1100;
+        const KIND_PLURALS = {
+            Case: "cases", Legislation: "pieces of legislation", Article: "articles", Book: "books",
+            "Book chapter": "book chapters", Report: "reports", "Research paper": "research papers",
+            Hansard: "Hansard debates", Submission: "submissions", "Committee evidence": "committee hearings",
+            "Convention debates": "convention debates", "Explanatory memorandum": "explanatory memoranda",
+            Newspaper: "newspaper articles", Website: "websites", Treaty: "treaties",
+        };
+
+        // A footnote's text as HTML, with its italics: each citation found marked, or (while it's
+        // being read) each word in its own span, so the reading can sweep across it
+        function footnoteHtml(fn, { words = false, found = [] } = {}) {
+            const text = fn.text || "", italic = fn.italic || [];
+            const cuts = new Set([0, text.length]);
+            italic.forEach(([a, b]) => { cuts.add(a); cuts.add(b); });
+            const marks = [];
+            let from = 0;
+            for (const f of found) {
+                const at = f.text ? text.indexOf(f.text, from) : -1;  // in the order written
+                if (at < 0) continue;
+                marks.push([at, at + f.text.length]);
+                cuts.add(at); cuts.add(at + f.text.length);
+                from = at + f.text.length;
+            }
+            if (words) for (const m of text.matchAll(/\s+/g)) cuts.add(m.index + m[0].length);
+            const points = [...cuts].sort((a, b) => a - b);
+            let html = "", open = -1;
+            for (let i = 0; i < points.length - 1; i++) {
+                const a = points[i], b = points[i + 1];
+                let piece = escapeHtml(text.slice(a, b));
+                if (italic.some(([x, y]) => a >= x && b <= y)) piece = `<em>${piece}</em>`;
+                if (words) piece = `<span class="w" style="--d:${(a / text.length * 1.2).toFixed(2)}s">${piece}</span>`;
+                const mark = marks.findIndex(([x, y]) => a >= x && b <= y);
+                if (mark !== open) {
+                    if (open >= 0) html += "</mark>";
+                    if (mark >= 0) html += `<mark style="--d:${(0.12 * mark).toFixed(2)}s">`;
+                    open = mark;
+                }
+                html += piece;
+            }
+            return open >= 0 ? `${html}</mark>` : html;
+        }
+
+        function kindsOf(found) {
+            return [...new Set((found || []).map(f => f.kind))];
+        }
+
+        function foundSummary(kinds) {
+            const parts = Object.entries(kinds || {}).sort((a, b) => b[1] - a[1])
+                .map(([kind, n]) => n === 1 ? `1 ${kind.toLowerCase()}` : `${n} ${KIND_PLURALS[kind] || kind.toLowerCase()}`);
+            if (!parts.length) return "";
+            return `Found ${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]}.`;
+        }
 
         function startProgress(name) {
             document.getElementById("uploadForm").hidden = true;
@@ -996,91 +1048,119 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             document.getElementById("progressTitle").textContent = `Checking ${name}`;
             const hint = document.getElementById("progressHint");
             hint.textContent = "Usually under a minute. Keep this tab open.";
-            const reading = document.getElementById("reading");
-            const rows = document.getElementById("rlRows");
-            const line = document.getElementById("readingLine");
+            const meter = document.getElementById("meter");
+            const statusText = document.getElementById("statusText");
+            const statusLeft = document.getElementById("statusLeft");
+            const desk = document.getElementById("desk");
+            const spot = document.getElementById("spot");
+            const spotNo = document.getElementById("spotNo");
+            const spotState = document.getElementById("spotState");
+            const spotText = document.getElementById("spotText");
+            const spotFound = document.getElementById("spotFound");
+            const feed = document.getElementById("feed");
             const note = document.getElementById("readingNote");
             const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-            reading.hidden = true;
-            rows.innerHTML = "";
+            desk.hidden = true;
+            feed.innerHTML = "";
             note.hidden = true;
-            const list = document.getElementById("stages");
-            list.innerHTML = STAGES.map(s => `<li class="stage"><span class="mark">${ICON_CHECK}</span><span>${s}</span><span class="time"></span></li>`).join("");
-            const items = [...list.children];
             const started = Date.now();
-            let current = 0, stageSince = started, readingSince = null, total = 0, lastAnnounced = 0;
-            const set = (i) => {
-                if (i !== current) stageSince = Date.now();
-                current = i;
-                items.forEach((li, j) => li.className = `stage ${j < i ? "done" : j === i ? "current" : ""}`);
-                items.forEach((li, j) => li.setAttribute("aria-current", j === i ? "step" : "false"));
-            };
-            set(0);
+            let current = 0, readingSince = null, total = 0, lastAnnounced = 0;
+
+            const cache = new Map();  // footnote number -> {text, italic, found once read}
+            let done = new Set(), writing = [], kinds = {};
+            let spotN = null, spotSince = 0, spotKey = "";
+            let feedQueue = [], fed = new Set(), fedAt = 0;
+
+            function setStatus(stage, count = 0, left = "") {
+                current = stage;
+                const p = stage === 1 && total ? METER[1] + (METER[2] - METER[1]) * count / total : METER[stage] ?? 1;
+                meter.style.setProperty("--p", p.toFixed(3));
+                statusText.textContent = stage === 1 ? "Reading your footnotes" : STAGES[stage];
+                statusLeft.textContent = stage === 1 && total ? `${count} of ${total}${left ? ` · ${left}` : ""}` : "";
+            }
+            setStatus(0);
             const tick = setInterval(() => {
-                const secs = Math.round((Date.now() - stageSince) / 1000);
-                items.forEach((li, j) => li.querySelector(".time").textContent = j === current && secs >= 3 ? `${secs}s` : "");
                 if ((Date.now() - started) / 1000 > 90) hint.textContent = "Taking longer than usual. Keep this tab open: it's still working.";
             }, 1000);
 
-            // The server reports footnotes read in batches; they're queued and the column rolls
-            // through them one at a time, faster when it falls behind
-            let shown = [], queue = [], seen = new Set(), writing = [], fixing = null;
-            let readCount = 0, idle = 0, rendered = "", shownBefore = 0;
-
-            function upcoming(k) {
-                const out = queue.slice(0, k).map(n => [n, "writing"]);
-                for (const n of writing) if (out.length < k && !seen.has(n)) out.push([n, "writing"]);
-                for (let n = 1; out.length < k && n <= total; n++) {
-                    if (!seen.has(n) && !out.some(([m]) => m === n)) out.push([n, ""]);
-                }
-                return out;
+            // The footnote to show: the one the model started writing most recently, else the
+            // next one not read
+            function target() {
+                const under = writing.filter(n => !done.has(n) && cache.has(n));
+                if (under.length) return Math.max(...under);
+                const next = [...cache.keys()].filter(n => !done.has(n)).sort((a, b) => a - b);
+                return next.length ? next[0] : spotN;
             }
 
-            // The latest footnote read sits in the middle row (the next one, before any are read),
-            // with blank rows above it at the start
-            function renderRows() {
-                const above = shown.length ? 3 : 2;
-                const tail = shown.slice(-above).map(n => [n, n === fixing ? "fixing" : "done"]);
-                const list = [...Array(above - tail.length).fill([0, "blank"]), ...tail, ...upcoming(ROLL_ROWS - above)];
-                const key = list.map(r => r.join(":")).join(",");
-                if (key === rendered) return;
-                rendered = key;
-                rows.innerHTML = list.map(([n, state]) => state === "blank" ? `<div class="rl-row"></div>` :
-                    `<div class="rl-row ${state}"><span class="rl-n">${n}</span><span class="rl-line" style="--w:${lineWidth(n)}%; --d:${(n % 5) * -0.22}s"></span></div>`).join("");
-                if (shown.length > shownBefore && !still) {
-                    rows.animate([{ transform: "translateY(28px)" }, { transform: "none" }],
-                        { duration: 420, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
-                }
-                shownBefore = shown.length;
-            }
-
-            function writeLine() {
-                const count = shown.length;
-                if (count >= total && !queue.length) {
-                    line.innerHTML = `All ${total} footnotes read`;
-                } else {
-                    const left = idle < 10 ? timeLeft(readCount) : "";  // no estimate while it's stalled
-                    line.innerHTML = `Reading your footnotes · ${count} of ${total}` + (left ? ` <span class="left">· ${left}</span>` : "");
+            function showSpot(n, switched) {
+                const fn = cache.get(n);
+                const read = done.has(n);
+                spot.classList.toggle("read", read);
+                spotNo.textContent = `Footnote ${n}`;
+                spotState.innerHTML = read ? `${ICON_CHECK}Read` : "Reading…";
+                spotText.className = `spot-text${read ? "" : " reading"}`;
+                spotText.innerHTML = footnoteHtml(fn, read ? { found: fn.found } : { words: true });
+                spotFound.hidden = false;
+                spotFound.innerHTML = read ? kindsOf(fn.found).map((k, i) =>
+                    `<span class="kind" style="--d:${(0.12 * i + 0.1).toFixed(2)}s">${escapeHtml(k)}</span>`).join("") : "";
+                if (switched && !still) {
+                    spot.classList.remove("turn");
+                    void spot.offsetWidth;  // so the animation runs again
+                    spot.classList.add("turn");
                 }
             }
 
-            const roll = setInterval(() => {
-                fixing = null;
-                if (queue.length) {
-                    // Behind by more than a few: let the earlier ones through without the strike
-                    const skip = still ? queue.length - 1 : Math.max(0, Math.ceil((queue.length - 6) / 3));
-                    shown.push(...queue.splice(0, skip));
-                    fixing = queue.shift();
-                    shown.push(fixing);
-                }
-                if (total) { renderRows(); writeLine(); }
-            }, 320);
+            function showSummary() {
+                spot.classList.add("read");
+                spotNo.textContent = `All ${total} footnotes read`;
+                spotState.innerHTML = ICON_CHECK;
+                spotText.className = "spot-summary";
+                spotText.textContent = foundSummary(kinds);
+                spotFound.hidden = true;
+                spotKey = "summary";
+            }
 
-            function timeLeft(done) {
+            function addFeed(n) {
+                const fn = cache.get(n);
+                if (!fn) return;
+                const k = kindsOf(fn.found);
+                const li = document.createElement("li");
+                if (!still) li.className = "new";
+                li.innerHTML = `<span class="feed-no">${n}</span><span class="feed-text">${footnoteHtml(fn)}</span>`
+                    + `<span class="feed-kind">${escapeHtml(k.length > 1 ? `${k[0]} +${k.length - 1}` : k[0] || "")}</span>`;
+                feed.prepend(li);
+                while (feed.children.length > 3) feed.lastElementChild.remove();
+            }
+
+            const loop = setInterval(() => {
+                if (current !== 1 || !cache.size) return;
+                const now = Date.now(), next = target();
+                if (next != null && next !== spotN && (spotN === null || now - spotSince >= SPOT_DWELL)) {
+                    spotN = next;
+                    spotSince = now;
+                }
+                if (spotN != null) {
+                    const key = `${spotN}:${done.has(spotN)}`;
+                    if (key !== spotKey) {
+                        const switched = !spotKey.startsWith(`${spotN}:`);
+                        if (!switched) spotSince = now;  // just read: keep it in view a moment
+                        spotKey = key;
+                        showSpot(spotN, switched);
+                    }
+                }
+                // The footnotes just read, one at a time (a batch arrives all at once)
+                if (feedQueue.length > 8) feedQueue.splice(0, feedQueue.length - 3);
+                if (feedQueue.length && now - fedAt >= (feedQueue.length > 3 ? 140 : 280)) {
+                    fedAt = now;
+                    addFeed(feedQueue.shift());
+                }
+            }, 100);
+
+            function timeLeft(count) {
                 // Too early to say until a few footnotes (and a tenth of them) are done
-                if (!readingSince || done < Math.max(3, Math.ceil(total / 10)) || done >= total) return "";
+                if (!readingSince || count < Math.max(3, Math.ceil(total / 10)) || count >= total) return "";
                 const spent = (Date.now() - readingSince) / 1000;
-                const left = (total - done) * spent / done;
+                const left = (total - count) * spent / count;
                 if (left < 10) return "nearly done";
                 if (left < 60) return `about ${Math.ceil(left / 5) * 5}s left`;
                 const mins = Math.floor(left / 60), secs = Math.round((left % 60) / 10) * 10;
@@ -1103,7 +1183,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
             const stop = () => {
                 clearInterval(tick);
-                clearInterval(roll);
+                clearInterval(loop);
                 panel.hidden = true;
                 document.getElementById("uploadForm").hidden = false;
             };
@@ -1112,24 +1192,20 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 update(snap) {
                     const stage = STAGE_INDEX[snap.stage] ?? 1;
                     if (stage >= 1 && readingSince === null) readingSince = Date.now();
-                    if (stage > current) set(stage);
-                    if (snap.total && snap.total !== total) {
-                        total = snap.total;
-                        reading.hidden = false;
-                    }
-                    if (!total) return;
+                    if (snap.total) total = snap.total;
                     // A footnote the model couldn't read counts as read here (it may be read on a
                     // retry); the results page says which, if any, are still unread
-                    const done = stage > 1 ? Array.from({ length: total }, (_, i) => i + 1) : [...snap.done].sort((a, b) => a - b);
-                    for (const n of done) if (!seen.has(n)) { seen.add(n); queue.push(n); }
-                    writing = [...snap.writing].sort((a, b) => a - b);
-                    readCount = seen.size;
-                    idle = snap.idle;
-                    renderRows();
-                    writeLine();
-                    const count = readCount;
+                    for (const [n, fn] of Object.entries(snap.showing || {})) cache.set(Number(n), fn);
+                    done = new Set(snap.done);
+                    writing = snap.writing || [];
+                    kinds = snap.kinds || kinds;
+                    for (const n of snap.read || []) if (!fed.has(n)) { fed.add(n); feedQueue.push(n); }
+                    const count = stage > 1 ? total : done.size;
+                    setStatus(stage, count, stage === 1 && snap.idle < 10 ? timeLeft(count) : "");  // no estimate while it's stalled
+                    desk.hidden = !total || !cache.size;
+                    if (stage > 1 && spotKey !== "summary" && cache.size) showSummary();
                     // Announce every quarter or so, not every poll
-                    if (count - lastAnnounced >= Math.max(1, Math.ceil(total / 4))) {
+                    if (total && count - lastAnnounced >= Math.max(1, Math.ceil(total / 4))) {
                         lastAnnounced = count;
                         announce(`${count} of ${total} footnotes read.`);
                     }
@@ -1139,13 +1215,14 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 },
                 async finish() {
                     clearInterval(tick);
-                    // Let the column catch up with the last batch (for a second and a half at most)
-                    for (let waited = 0; queue.length && waited < 1500; waited += 100) await new Promise(r => setTimeout(r, 100));
-                    const step = still ? 0 : 140;
-                    for (let i = Math.max(current, 1); i <= STAGES.length; i++) {
-                        set(i);
+                    if (cache.size && spotKey !== "summary") showSummary();
+                    const step = still ? 0 : 160;
+                    for (let i = Math.max(current, 2); i < STAGES.length; i++) {
+                        setStatus(i);
                         if (step) await new Promise(r => setTimeout(r, step));
                     }
+                    meter.style.setProperty("--p", 1);
+                    if (step) await new Promise(r => setTimeout(r, 450));
                     stop();
                 },
             };
