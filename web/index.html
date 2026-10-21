@@ -100,22 +100,47 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         }
         @keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--accent-wash); } }
 
-        /* Footnote grid: one tile per footnote, filled as the AI model reads it */
-        .reading { margin-top: 18px; }
+        /* Live redline: a rolling column of footnote lines. Each one read is struck through in
+           red and rewritten in green, like the results; the ones the AI model is on are underlined */
+        .reading { margin-top: 20px; }
         .reading-line { font-size: 0.9375rem; font-weight: 500; font-variant-numeric: tabular-nums; }
         .reading-line .left { color: var(--muted); font-weight: 400; }
-        .tiles { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; }
-        .tile-group { display: grid; gap: 5px; justify-items: center; }
-        .tile-row { display: flex; gap: 3px; }
-        .tile { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--hairline-strong); }
-        .tile.writing { background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-        .tile.done { background: var(--accent); border-color: var(--accent); }
-        .tile.failed { background: var(--check-wash); border-color: var(--check); }
-        .tile-label { font-size: 0.6875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-        .reading-note { margin-top: 12px; font-size: 0.875rem; color: var(--muted); }
+        .redline-roll {
+            --row: 28px; margin-top: 12px; height: calc(5 * var(--row)); overflow: hidden;
+            mask-image: linear-gradient(transparent, var(--ink) 22%, var(--ink) 78%, transparent);
+        }
+        .rl-row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); align-items: center; height: var(--row); }
+        .rl-n {
+            padding-right: 12px; text-align: right; font-family: var(--font-serif); font-weight: 600;
+            font-size: 0.9375rem; color: var(--muted); font-variant-numeric: tabular-nums lining-nums;
+        }
+        .rl-line { position: relative; display: block; height: 6px; width: var(--w); border-radius: 4px; background: var(--hairline); }
+        .rl-row.writing .rl-line { background: var(--hairline-strong); }
+        .rl-row.writing .rl-line::after {
+            content: ""; position: absolute; left: 0; width: 28%; bottom: -5px; height: 1.5px;
+            background: var(--accent);
+        }
+        .rl-row.done .rl-n, .rl-row.fixing .rl-n { color: var(--ink); }
+        .rl-row.done .rl-line, .rl-row.fixing .rl-line { background: color-mix(in srgb, var(--insertion) 45%, transparent); }
+        .rl-row.fixing .rl-line::after {
+            content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: 1.5px; margin-top: -0.75px;
+            background: var(--deletion); opacity: 0; transform-origin: left;
+        }
+        .reading-note { margin-top: 14px; font-size: 0.875rem; color: var(--muted); }
         .reading-note.problem { color: var(--check); }
         @media (prefers-reduced-motion: no-preference) {
-            .tile { transition: background-color 0.35s var(--ease-out), border-color 0.35s var(--ease-out); }
+            .rl-row.writing .rl-line::after { animation: writing 1.1s ease-in-out var(--d, 0s) infinite; }
+            .rl-row.fixing .rl-line { animation: rewrite 0.9s var(--ease-out); }
+            .rl-row.fixing .rl-line::after { animation: strike 0.9s var(--ease-out); }
+        }
+        @keyframes writing { from { left: 0; opacity: 0; } 25%, 75% { opacity: 1; } to { left: 72%; opacity: 0; } }
+        @keyframes rewrite {
+            0%, 45% { background: color-mix(in srgb, var(--deletion) 35%, transparent); width: calc(var(--w) + 10%); }
+        }
+        @keyframes strike {
+            0% { opacity: 1; transform: scaleX(0); }
+            35% { opacity: 1; transform: scaleX(1); }
+            55%, 100% { opacity: 0; transform: scaleX(1); }
         }
 
         /* ---- Banners --------------------------------------------------------- */
@@ -462,7 +487,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                         <p id="progressHint">Usually under a minute. Keep this tab open.</p>
                         <div class="reading" id="reading" hidden>
                             <p class="reading-line" id="readingLine"></p>
-                            <div class="tiles" id="tiles" aria-hidden="true"></div>
+                            <div class="redline-roll" aria-hidden="true"><div id="rlRows"></div></div>
                             <p class="reading-note" id="readingNote" aria-live="polite" hidden></p>
                         </div>
                         <ol class="stages" id="stages"></ol>
@@ -667,7 +692,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                         <button type="button" class="filter" data-filter="check" aria-pressed="false">Check <span class="count" id="countCheck">0</span></button>
                         <button type="button" class="filter" data-filter="unchanged" aria-pressed="false">Unchanged <span class="count" id="countUnchanged">0</span></button>
                     </div>
-                    <label class="switch"><input type="checkbox" id="markupToggle" role="switch"> Show changes</label>
+                    <label class="switch"><input type="checkbox" id="markupToggle" role="switch" checked> Show changes</label>
                     <button type="button" class="btn btn-secondary" id="nextCheck">Next Check</button>
                     <span class="spacer"></span>
                     <button type="button" class="btn btn-secondary" id="copyBib" hidden>Copy bibliography</button>
@@ -955,11 +980,14 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             }
         }
 
-        // Named stages, moved on by the server's own progress (GET /api/progress/{id}), with a tile
-        // per footnote that fills as the AI model reads it, a time-left estimate, and a plain line
-        // for anything the tool is doing about a problem.
+        // Named stages, moved on by the server's own progress (GET /api/progress/{id}), with a live
+        // redline of the footnotes as the AI model reads them, a time-left estimate, and a plain line
+        // when it's slow. Re-asks, repairs and footnotes the model got wrong are handled quietly:
+        // they aren't shown here, and the results page flags any footnote still unread at the end.
         const STAGE_INDEX = { reading: 1, formatting: 2, checking: 3, writing_doc: 4 };
-        const TILE_STATES = { failed: "couldn't be read, kept as written", done: "read", writing: "being read" };
+        const ROLL_ROWS = 5;
+        // A footnote's line length, fixed per footnote so it doesn't jump as the column rolls
+        const lineWidth = (n) => 52 + (n * 37) % 41;
 
         function startProgress(name) {
             document.getElementById("uploadForm").hidden = true;
@@ -969,11 +997,12 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             const hint = document.getElementById("progressHint");
             hint.textContent = "Usually under a minute. Keep this tab open.";
             const reading = document.getElementById("reading");
-            const tiles = document.getElementById("tiles");
+            const rows = document.getElementById("rlRows");
             const line = document.getElementById("readingLine");
             const note = document.getElementById("readingNote");
+            const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
             reading.hidden = true;
-            tiles.innerHTML = "";
+            rows.innerHTML = "";
             note.hidden = true;
             const list = document.getElementById("stages");
             list.innerHTML = STAGES.map(s => `<li class="stage"><span class="mark">${ICON_CHECK}</span><span>${s}</span><span class="time"></span></li>`).join("");
@@ -993,18 +1022,59 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 if ((Date.now() - started) / 1000 > 90) hint.textContent = "Taking longer than usual. Keep this tab open: it's still working.";
             }, 1000);
 
-            function buildTiles(n) {
-                total = n;
-                const groups = [];
-                for (let first = 1; first <= n; first += 5) {
-                    const last = Math.min(first + 4, n);
-                    const row = [];
-                    for (let k = first; k <= last; k++) row.push(`<span class="tile" data-n="${k}" title="Footnote ${k}: waiting"></span>`);
-                    groups.push(`<div class="tile-group"><div class="tile-row">${row.join("")}</div><span class="tile-label">${first === last ? first : `${first}–${last}`}</span></div>`);
+            // The server reports footnotes read in batches; they're queued and the column rolls
+            // through them one at a time, faster when it falls behind
+            let shown = [], queue = [], seen = new Set(), writing = [], fixing = null;
+            let readCount = 0, idle = 0, rendered = "", shownBefore = 0;
+
+            function upcoming(k) {
+                const out = queue.slice(0, k).map(n => [n, "writing"]);
+                for (const n of writing) if (out.length < k && !seen.has(n)) out.push([n, "writing"]);
+                for (let n = 1; out.length < k && n <= total; n++) {
+                    if (!seen.has(n) && !out.some(([m]) => m === n)) out.push([n, ""]);
                 }
-                tiles.innerHTML = groups.join("");
-                reading.hidden = n === 0;
+                return out;
             }
+
+            // The latest footnote read sits in the middle row (the next one, before any are read),
+            // with blank rows above it at the start
+            function renderRows() {
+                const above = shown.length ? 3 : 2;
+                const tail = shown.slice(-above).map(n => [n, n === fixing ? "fixing" : "done"]);
+                const list = [...Array(above - tail.length).fill([0, "blank"]), ...tail, ...upcoming(ROLL_ROWS - above)];
+                const key = list.map(r => r.join(":")).join(",");
+                if (key === rendered) return;
+                rendered = key;
+                rows.innerHTML = list.map(([n, state]) => state === "blank" ? `<div class="rl-row"></div>` :
+                    `<div class="rl-row ${state}"><span class="rl-n">${n}</span><span class="rl-line" style="--w:${lineWidth(n)}%; --d:${(n % 5) * -0.22}s"></span></div>`).join("");
+                if (shown.length > shownBefore && !still) {
+                    rows.animate([{ transform: "translateY(28px)" }, { transform: "none" }],
+                        { duration: 420, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
+                }
+                shownBefore = shown.length;
+            }
+
+            function writeLine() {
+                const count = shown.length;
+                if (count >= total && !queue.length) {
+                    line.innerHTML = `All ${total} footnotes read`;
+                } else {
+                    const left = idle < 10 ? timeLeft(readCount) : "";  // no estimate while it's stalled
+                    line.innerHTML = `Reading your footnotes · ${count} of ${total}` + (left ? ` <span class="left">· ${left}</span>` : "");
+                }
+            }
+
+            const roll = setInterval(() => {
+                fixing = null;
+                if (queue.length) {
+                    // Behind by more than a few: let the earlier ones through without the strike
+                    const skip = still ? queue.length - 1 : Math.max(0, Math.ceil((queue.length - 6) / 3));
+                    shown.push(...queue.splice(0, skip));
+                    fixing = queue.shift();
+                    shown.push(fixing);
+                }
+                if (total) { renderRows(); writeLine(); }
+            }, 320);
 
             function timeLeft(done) {
                 // Too early to say until a few footnotes (and a tenth of them) are done
@@ -1019,30 +1089,21 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
             function noteText(snap) {
                 const latest = snap.notes[snap.notes.length - 1];
-                // Shown until something moves on after it (or for 20s at most)
-                if (latest && latest.ago < 20 && snap.idle >= latest.ago - 0.5) {
+                // Only the deadline is worth saying (it changes the result); shown until something
+                // moves on after it, or for 20s at most
+                if (latest?.kind === "deadline" && latest.ago < 20 && snap.idle >= latest.ago - 0.5) {
                     const n = latest.count, s = n === 1 ? "" : "s";
-                    const text = {
-                        reask: "The AI model skipped some footnotes in this batch, so they're being asked about again.",
-                        split: `The AI model didn't answer, so these ${n} footnotes are being asked about in smaller groups.`,
-                        single: `Asking about footnote ${latest.number} on its own.`,
-                        repair: `Footnote ${latest.number} came back incomplete; asking again.`,
-                        retry: "The AI model didn't answer properly; trying again.",
-                        slow: "The AI model didn't answer in time; trying again.",
-                        fallback: "Trying a backup AI model.",
-                        deadline: `This is taking too long, so ${n} footnote${s} will be left as you wrote ${n === 1 ? "it" : "them"}. The results will show which.`,
-                        retry_failed: `Trying the ${n} footnote${s} the AI model couldn't read once more.`,
-                    }[latest.kind];
-                    if (text) return { text, problem: latest.kind !== "single" };
+                    return { text: `This is taking too long, so ${n} footnote${s} will be left as you wrote ${n === 1 ? "it" : "them"}. The results will show which.`, problem: true };
                 }
                 if (snap.stage === "reading" && snap.idle >= 25) {
-                    return { text: `The AI model is slow right now; still waiting (${Math.round(snap.idle)}s).`, problem: true };
+                    return { text: `The AI model is slow right now; still working (${Math.round(snap.idle)}s).`, problem: false };
                 }
                 return null;
             }
 
             const stop = () => {
                 clearInterval(tick);
+                clearInterval(roll);
                 panel.hidden = true;
                 document.getElementById("uploadForm").hidden = false;
             };
@@ -1052,24 +1113,21 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     const stage = STAGE_INDEX[snap.stage] ?? 1;
                     if (stage >= 1 && readingSince === null) readingSince = Date.now();
                     if (stage > current) set(stage);
-                    if (snap.total && snap.total !== total) buildTiles(snap.total);
-                    if (!total) return;
-                    const done = new Set(snap.done), failed = new Set(snap.failed), writing = new Set(snap.writing);
-                    tiles.querySelectorAll(".tile").forEach(t => {
-                        const n = Number(t.dataset.n);
-                        const state = failed.has(n) ? "failed" : done.has(n) ? "done" : writing.has(n) ? "writing" : "";
-                        if (t.dataset.state === state) return;
-                        t.dataset.state = state;
-                        t.className = `tile ${state}`;
-                        t.title = `Footnote ${n}: ${TILE_STATES[state] || "waiting"}`;
-                    });
-                    const count = done.size;
-                    if (stage > 1 || count >= total) {
-                        line.innerHTML = `All ${total} footnotes read` + (failed.size ? ` <span class="left">· ${failed.size} couldn't be read</span>` : "");
-                    } else {
-                        const left = snap.idle < 10 ? timeLeft(count) : "";  // no estimate while it's stalled
-                        line.innerHTML = `Reading your footnotes · ${count} of ${total}` + (left ? ` <span class="left">· ${left}</span>` : "");
+                    if (snap.total && snap.total !== total) {
+                        total = snap.total;
+                        reading.hidden = false;
                     }
+                    if (!total) return;
+                    // A footnote the model couldn't read counts as read here (it may be read on a
+                    // retry); the results page says which, if any, are still unread
+                    const done = stage > 1 ? Array.from({ length: total }, (_, i) => i + 1) : [...snap.done].sort((a, b) => a - b);
+                    for (const n of done) if (!seen.has(n)) { seen.add(n); queue.push(n); }
+                    writing = [...snap.writing].sort((a, b) => a - b);
+                    readCount = seen.size;
+                    idle = snap.idle;
+                    renderRows();
+                    writeLine();
+                    const count = readCount;
                     // Announce every quarter or so, not every poll
                     if (count - lastAnnounced >= Math.max(1, Math.ceil(total / 4))) {
                         lastAnnounced = count;
@@ -1081,7 +1139,9 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 },
                 async finish() {
                     clearInterval(tick);
-                    const step = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 140;
+                    // Let the column catch up with the last batch (for a second and a half at most)
+                    for (let waited = 0; queue.length && waited < 1500; waited += 100) await new Promise(r => setTimeout(r, 100));
+                    const step = still ? 0 : 140;
                     for (let i = Math.max(current, 1); i <= STAGES.length; i++) {
                         set(i);
                         if (step) await new Promise(r => setTimeout(r, step));
