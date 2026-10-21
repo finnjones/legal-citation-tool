@@ -21,7 +21,7 @@ AGLC_DATA_DIR=/var/lib/aglc
 AGLC_PAYMENTS=square
 AGLC_PUBLIC_URL=https://<your domain>
 AGLC_CLIENT_IP_HEADER=CF-Connecting-IP
-AGLC_LLM=openrouter:@preset/aglc
+# AGLC_LLM is not needed: the model is the code default (OpenRouter preset `aglc`)
 # AGLC_LLM_FALLBACK=openrouter:<model>   # once the reliability branch is merged
 OPENROUTER_API_KEY=sk-or-...
 SQUARE_ENVIRONMENT=production

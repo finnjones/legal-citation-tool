@@ -42,7 +42,7 @@ cp .env.example .env    # then edit it
 
 ```bash
 # .env: recommended, cheap and fast via OpenRouter (https://openrouter.ai/keys)
-AGLC_LLM=openrouter:deepseek/deepseek-v4.1-flash-1017
+# AGLC_LLM is optional: the default is the OpenRouter preset "aglc" (openrouter:@preset/aglc)
 OPENROUTER_API_KEY=sk-or-...
 ```
 
@@ -188,7 +188,7 @@ The demo essay (`examples/test_essay.docx`), used by "Try a sample essay".
 
 #### `GET /api/providers`
 ```json
-{"providers": ["anthropic", "fake", "gemini", "openai", "openai-compatible", "openrouter"], "default": "openrouter:deepseek/deepseek-v4.1-flash-1017"}
+{"providers": ["anthropic", "fake", "gemini", "openai", "openai-compatible", "openrouter"], "default": "openrouter:@preset/aglc"}
 ```
 
 #### `POST /api/process`

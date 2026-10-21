@@ -57,7 +57,7 @@ def test_get_provider_default():
     """Test default provider when nothing specified."""
     provider = get_provider()
     assert provider.name == "openrouter"
-    assert provider.model == "deepseek/deepseek-v4.1-flash-1017"
+    assert provider.model == "@preset/aglc"
 
 
 def test_available_providers():
