@@ -21,7 +21,7 @@ AGLC_DATA_DIR=/var/lib/aglc
 AGLC_PAYMENTS=square
 AGLC_PUBLIC_URL=https://<your domain>
 AGLC_CLIENT_IP_HEADER=CF-Connecting-IP
-AGLC_LLM=openrouter:<model>
+AGLC_LLM=openrouter:@preset/aglc
 # AGLC_LLM_FALLBACK=openrouter:<model>   # once the reliability branch is merged
 OPENROUTER_API_KEY=sk-or-...
 SQUARE_ENVIRONMENT=production
@@ -32,6 +32,9 @@ SQUARE_WEBHOOK_URL=https://<your domain>/api/webhooks/square
 # AGLC_RETENTION_HOURS=24   # quoted by /api/config for the privacy page
 # AGLC_MAX_UPLOAD_MB=10
 ```
+
+OpenRouter chooses the model from **Settings > Presets**, preset slug `aglc`. Change the model
+there to switch models; no code change or redeploy is needed.
 
 If the data directory is lost, paid documents are gone (their payments are refunded when
 someone asks for them) and the webhook replay log is lost, so back it up (next section).
