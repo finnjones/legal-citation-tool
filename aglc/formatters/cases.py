@@ -1,7 +1,8 @@
 """Cases (AGLC4 ch 2).
 
 Covers reported decisions (r 2.2), decisions with a medium neutral citation but no
-report (r 2.3.1), and unreported decisions with no medium neutral citation (r 2.3.2).
+report (r 2.3.1), unreported decisions with no medium neutral citation (r 2.3.2), and
+reported United States decisions (r 25.1).
 Arbitral awards, transcripts, submissions, court orders and proceedings (rr 2.6-2.8)
 are out of scope: `CaseSource` has no fields for them.
 """
@@ -11,6 +12,7 @@ from __future__ import annotations
 import re
 
 from ..models import CaseSource, Citation, RichText
+from ..normalise import us_reporter
 from .base import BIB_CASES, Formatter, missing, register
 
 # Crown-as-first-party names (r 2.1.4): short title uses the *second* party instead.
@@ -36,6 +38,9 @@ class CaseFormatter(Formatter):
     def full(self, citation: Citation) -> RichText:
         src = citation.source
         assert isinstance(src, CaseSource)
+
+        if us_reporter(src.report):
+            return self._us_case(citation)
 
         out = RichText.italic(src.name)
         unreported_no_mnc = False
@@ -69,6 +74,23 @@ class CaseFormatter(Formatter):
             # date and any pinpoint" for unreported cases without an MNC. Reported
             # and medium-neutral cases use a comma (rr 2.2.5, 2.3.1).
             out.append((" " if unreported_no_mnc else ", ") + pin)
+        if citation.pinpoint_judges:
+            out.append(f" ({citation.pinpoint_judges})")
+        return out
+
+    def _us_case(self, citation: Citation) -> RichText:
+        """r 25.1: 'Name, Volume Report Starting page, Pinpoint (Court, Year)', eg 'Brown v
+        Board of Education, 347 US 483, 495 (1954)'; the US Supreme Court's own reporters
+        take no court (r 25.1.5)."""
+        src = citation.source
+        out = RichText.italic(src.name)
+        out.append(", " + " ".join(p for p in (src.volume, src.report, src.starting_page or missing("starting_page")) if p))
+        pin = self.pinpoints(citation.pinpoints)
+        if pin:
+            out.append(", " + pin)
+        year = src.year or missing("year")
+        court = None if us_reporter(src.report) == "supreme_court" else (src.court_name or missing("court"))
+        out.append(f" ({court}, {year})" if court else f" ({year})")
         if citation.pinpoint_judges:
             out.append(f" ({citation.pinpoint_judges})")
         return out

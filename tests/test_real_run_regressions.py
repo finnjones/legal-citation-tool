@@ -728,3 +728,35 @@ def test_ibid_subsections_given_as_one_value_are_put_back_together():
                                              pinpoints=[_sec("214A"), {"kind": "other", "value": "1, b"}]), _DOT]},
         ])
         assert result.footnotes[1].formatted.text == "Ibid s 214A(1)(b).", original
+
+
+def test_a_reference_managers_document_label_is_removed_not_a_reason_to_give_up():
+    # Footnote 37 of a real essay was left as written: dropping '(Journal Report, ...)' is the
+    # fix, but the check counted 'report' as a word the extraction had lost
+    title = ("A Danger to Protest: The Freedom of Peaceful Assembly and Disruptive Protest under the "
+             "Summary Offences and Other Legislation Amendment Act 2019 (Qld)")
+    written = (f"Toby Hemmings and Azadeh Dastyari, ‘{title}’ (Journal Report, 2021) 27(2) "
+               "*Australian Journal of Human Rights* 1.")
+    result = _process([_rich(37, written)], [
+        {"number": 37, "segments": [_cite(written.replace("*", "")[:-1], {
+            "type": "journal_article", "authors": ["Toby Hemmings", "Azadeh Dastyari"], "title": title,
+            "year": "2021", "volume": "27", "issue": "2", "journal": "Australian Journal of Human Rights",
+            "starting_page": "1"}), _DOT]},
+    ])
+    fn = result.footnotes[0]
+    assert fn.extraction_failed is None and not any("left unchanged" in w.message for w in result.warnings)
+    assert fn.formatted.text == (f"Toby Hemmings and Azadeh Dastyari, ‘{title}’ (2021) 27(2) "
+                                 "Australian Journal of Human Rights 1.")
+    assert ("type_label", "ch 5") in [(c.kind, c.rule) for c in fn.changes]
+
+
+def test_a_us_case_is_set_out_under_r_25_1():
+    written = "*Bowers v. Hardwick*, 760 F.2d 1202, 1211 (11th Cir. 1985)."
+    result = _process([_rich(1, written)], [
+        {"number": 1, "segments": [_cite(written.replace("*", "")[:-1], {
+            "type": "case", "name": "Bowers v Hardwick", "volume": "760", "report": "F.2d", "starting_page": "1202",
+            "court_name": "11th Cir.", "year": "1985"}, pinpoints=[{"value": "1211"}]), _DOT]},
+    ])
+    fn = result.footnotes[0]
+    assert fn.formatted.to_markup() == "*Bowers v Hardwick*, 760 F 2d 1202, 1211 (11th Cir, 1985)."
+    assert {c.rule for c in fn.changes} <= {"r 25.1", "r 25.1.1", "r 25.1.4", "r 1.6.1"}

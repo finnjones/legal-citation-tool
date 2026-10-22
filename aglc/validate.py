@@ -50,6 +50,14 @@ _IMPLIED_BY_TYPE = {
     "convention_debates": _SPEAKER_TITLES,
 }
 
+# A reference manager's label for the kind of document ('(Journal Article, 2010)', '(Book
+# Section, 2015)', '(Journal Report, 2021)'), which AGLC4 never prints for these kinds of
+# source, so leaving it out drops nothing
+UNLABELLED_TYPES = {"journal_article", "book", "book_chapter", "newspaper", "case", "legislation", "treaty"}
+TYPE_LABEL = re.compile(
+    r"\(\s*((?:[A-Z][a-z]+\s+){0,2}(?:Article|Report|Section|Chapter|Paper|Page|Case|Statute|Legislation|Bill|Book|Entry))"
+    r"\s*,\s*(?=\d{4})")
+
 _ABBREV_DOTS = re.compile(r"(?<=\b[A-Za-z])\.")          # N.S.W. -> NSW, U.N.T.S. -> UNTS
 _TOKEN = re.compile(r"\d+|[^\W\d_]+(?:['’][^\W\d_]+)?")   # numbers, words (incl. accents, O'Donovan)
 _SPAN = re.compile(r"(\d+)\s*[–—-]\s*(\d+)")
@@ -119,6 +127,8 @@ def _with_joined_pairs(captured: set[str], text: str) -> set[str]:
 def missing_from_extraction(original: str, segments: list, extra: Iterable[str] = ()) -> list[str]:
     """Meaningful tokens of `original` that appear nowhere in the extraction, in the
     order they occur in the footnote. Empty means nothing was dropped."""
+    if any(isinstance(s, CitationSegment) and s.citation.source.type in UNLABELLED_TYPES for s in segments):
+        extra = [*extra, *(m.group(1) for m in TYPE_LABEL.finditer(original))]
     text = extracted_text(segments, extra)
     captured = _with_joined_pairs(meaningful(text) | numbers(text), text)
     seen: set[str] = set()
