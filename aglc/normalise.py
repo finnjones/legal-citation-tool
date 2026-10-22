@@ -270,8 +270,11 @@ def _case_name_key(name: str) -> str:
 _PINPOINT_PREFIXES = ("at ", "pp ", "p ", "paras ", "para ")
 
 
-def _clean_pinpoint(p: Pinpoint) -> Pinpoint:
+def _clean_pinpoint(p: Pinpoint, last: bool = True) -> Pinpoint:
+    """Tidy a pinpoint's value. A verbatim (`other`) pinpoint followed by another keeps the
+    comma written after it ('69, [202]' after a medium neutral citation, see extract.py)."""
     value = p.value.strip()
+    keep_comma = p.kind == PinpointKind.other and not last and value.endswith(",")
     kind = p.kind
 
     lowered = value.lower()
@@ -286,7 +289,7 @@ def _clean_pinpoint(p: Pinpoint) -> Pinpoint:
     elif kind == PinpointKind.paragraph:
         value = value.strip("[]").strip()
 
-    value = _strip_trailing_punct(value)
+    value = _strip_trailing_punct(value) + ("," if keep_comma else "")
     return Pinpoint(kind=kind, value=value, plural=p.plural)
 
 
@@ -751,7 +754,8 @@ def normalise_citation(citation: Citation) -> tuple[Citation, list[str]]:
     citation.source = new_source
     warnings.extend(source_warnings)
 
-    citation.pinpoints = [_clean_pinpoint(p) for p in citation.pinpoints]
+    citation.pinpoints = [_clean_pinpoint(p, last=i == len(citation.pinpoints) - 1)
+                          for i, p in enumerate(citation.pinpoints)]
     src = citation.source
     if (
         isinstance(src, BookChapterSource)
@@ -765,12 +769,6 @@ def normalise_citation(citation: Citation) -> tuple[Citation, list[str]]:
         citation.source = src = src.model_copy(update={"starting_page": citation.pinpoints[0].value})
         citation.pinpoints = []
         warnings.append(f"Assumed page {src.starting_page} is the chapter's starting page")
-    if isinstance(src, CaseSource) and src.court_id and not src.report:
-        # r 2.3.1: a medium neutral citation has no pages, so pinpoints are paragraphs
-        citation.pinpoints = [
-            p.model_copy(update={"kind": PinpointKind.paragraph}) if p.kind == PinpointKind.page else p
-            for p in citation.pinpoints
-        ]
     if citation.pinpoint_judges:
         citation.pinpoint_judges = _strip_trailing_punct(citation.pinpoint_judges.strip()) or None
     if isinstance(src, _SPOKEN) and citation.pinpoint_judges and not src.speaker:
