@@ -7,6 +7,8 @@ as a full worked example (eg default short titles built from r 1.4.1's
 general description).
 """
 
+import pytest
+
 from aglc.formatters.secondary import (
     BookChapterFormatter,
     BookFormatter,
@@ -68,6 +70,32 @@ def test_surname_corporate_author_not_inverted():
     name = "Australian Law Reform Commission"
     assert surname(name) == name
     assert invert_name(name) == name
+
+
+@pytest.mark.parametrize(
+    "name, last, inverted",
+    [
+        ("Paul de Jersey", "de Jersey", "de Jersey, Paul"),
+        ("Ursula von der Leyen", "von der Leyen", "von der Leyen, Ursula"),
+        ("Ursula Le Guin", "Le Guin", "Le Guin, Ursula"),
+        ("Van Morrison", "Morrison", "Morrison, Van"),  # a first word is a given name
+    ],
+)
+def test_surname_particles_belong_to_the_surname(name, last, inverted):
+    assert surname(name) == last
+    assert invert_name(name) == inverted
+
+
+def test_authors_are_bodies_flag_decides_for_author_lists():
+    body = JournalArticleSource(authors=["Human Rights Watch"], authors_are_bodies=True, title="World Report",
+                                year="2020", volume="1", journal="J", starting_page="1")
+    c = Citation(source=body, pinpoints=[pp(PinpointKind.page, "4")])
+    assert journal.subsequent(c, journal.short_title(c), first_footnote=2).to_markup() == "Human Rights Watch (n 2) 4"
+    assert journal.bibliography(c).to_markup().startswith("Human Rights Watch, ")
+    person = body.model_copy(update={"authors": ["Sarah Bank"], "authors_are_bodies": False})
+    c = Citation(source=person)
+    assert journal.short_title(c) == "Bank"
+    assert journal.bibliography(c).to_markup().startswith("Bank, Sarah, ")
 
 
 def test_invert_name_individual():

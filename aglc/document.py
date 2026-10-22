@@ -32,6 +32,7 @@ from typing import Literal
 
 from .explain import explain
 from .formatters import BIB_CASES, BIB_ORDER, BIB_SECONDARY, Formatter, formatter_for
+from .formatters.secondary import full_names
 from .models import (
     BibliographySection,
     Citation,
@@ -189,7 +190,9 @@ def _short_titles(
     for sources that use the author-surname style (`defines_short_title` is
     False), a subsequent reference normally repeats just the surname; if two
     different sources land on the *same* surname, both need the title added
-    to disambiguate them (see `_disambiguation_title`).
+    to disambiguate them (see `_disambiguation_title`). When the surname is
+    shared by different authors, their full names replace it instead, and the
+    title is added only where one of them has several works.
     """
     short_title_text: dict[str, str] = {}
     append_definition: dict[str, bool] = {}
@@ -205,16 +208,21 @@ def _short_titles(
         )
         append_definition[key] = bool(wants_definition and st)
 
-    surname_groups: dict[str, list[str]] = {}
-    for key, citation in first_citation.items():
-        formatter = formatter_for(citation)
-        if formatter.defines_short_title:
-            continue  # cases/legislation/treaties: not the "author surname" style
-        st = short_title_text.get(key, "")
-        if not st:
-            continue
-        surname_groups.setdefault(st, []).append(key)
-    disambiguate = {key: True for keys in surname_groups.values() if len(keys) > 1 for key in keys}
+    def surname_groups() -> list[list[str]]:
+        groups: dict[str, list[str]] = {}
+        for key, citation in first_citation.items():
+            if formatter_for(citation).defines_short_title:
+                continue  # cases/legislation/treaties: not the "author surname" style
+            st = short_title_text.get(key, "")
+            if st:
+                groups.setdefault(st, []).append(key)
+        return [keys for keys in groups.values() if len(keys) > 1]
+
+    for keys in surname_groups():
+        names = {key: full_names(first_citation[key]) for key in keys}
+        if len({n for n in names.values() if n}) > 1:
+            short_title_text.update({key: name for key, name in names.items() if name})
+    disambiguate = {key: True for keys in surname_groups() for key in keys}
 
     return short_title_text, append_definition, disambiguate
 

@@ -134,6 +134,42 @@ def _clean_authors(authors: list[str]) -> list[str]:
     return out
 
 
+# r 4.1.1: honorific titles ('the Hon', 'Dr', 'Professor', 'Ms') and post-nominals ('AM',
+# 'LLB') are left out of author names. 'Sir', 'Dame', peerage titles and judicial titles
+# (r 4.1.5) stay: 'Justice KM Hayne' [Not: 'The Hon Justice KM Hayne AC'].
+_HONORIFIC = re.compile(
+    r"^(?:the\s+hon(?:ourable)?\.?|hon\.|honourable|dr\.?|a/prof\.?|"
+    r"(?:(?:associate|assoc\.?|adjunct|emeritus|distinguished)\s+)?prof(?:essor)?\.?|"
+    r"mrs?\.?|ms\.?|miss|mx\.?|rev(?:erend)?\.?)\s+",
+    re.I,
+)
+_POST_NOMINALS = frozenset(
+    """
+    AC AK AO AM OAM KC QC SC CMG KCMG GCMG GBE KBE DBE CBE OBE MBE CH CB KCB CVO KCVO PC
+    FRS FBA FAAL FASSA FAHA FAA FTSE FRSN FRSA FAICD GAICD MP MLA MLC
+    BA BSc BEc BCom BCL BJuris LLB LLM LLD MA MPhil DPhil PhD JD SJD DLitt
+    """.split()
+)
+
+
+def _strip_titles(name: str) -> str:
+    """'Professor George Williams AO' -> 'George Williams'. Only strips while two words are
+    left, so a bare 'Professor Smith' or a body's name is never cut to one word."""
+    while (m := _HONORIFIC.match(name)) and len(name[m.end():].split()) >= 2:
+        name = name[m.end():]
+    words = name.split()
+    while len(words) > 2 and words[-1].replace(".", "").strip(",") in _POST_NOMINALS:
+        words.pop()
+    return " ".join(words).rstrip(",")
+
+
+def _clean_names(names: list[str], is_body: bool | None = None) -> list[str]:
+    """Personal names cleaned for a citation: whitespace, trailing punctuation and, unless
+    the extraction marked them as bodies, honorifics and post-nominals (r 4.1.1)."""
+    names = _clean_authors(names)
+    return names if is_body else [_strip_titles(n) for n in names]
+
+
 _ET_AL = re.compile(r"(?i)[\s,]*\bet\.?\s+al\b\.?$")
 
 
@@ -147,7 +183,7 @@ def _authors_and_et_al(source) -> tuple[list[str], bool]:
         trimmed = _ET_AL.sub("", a)
         et_al = et_al or trimmed != a
         authors.append(trimmed)
-    return _clean_authors(authors), et_al
+    return _clean_names(authors, source.authors_are_bodies), et_al
 
 
 def _surname(author: str) -> str:
@@ -396,7 +432,7 @@ def _normalise_book(source: BookSource) -> tuple[BookSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
     data["authors"], data["et_al"] = _authors_and_et_al(source)
-    data["editors"] = _clean_authors(source.editors)
+    data["editors"] = _clean_names(source.editors)
     data["title"] = (source.title or "").strip()
     for field in ("publisher", "edition", "year", "volume"):
         if data.get(field):
@@ -412,7 +448,7 @@ def _normalise_book_chapter(source: BookChapterSource) -> tuple[BookChapterSourc
     warnings: list[str] = []
     data = source.model_dump()
     data["authors"], data["et_al"] = _authors_and_et_al(source)
-    data["editors"] = _clean_authors(source.editors)
+    data["editors"] = _clean_names(source.editors)
     data["chapter_title"] = (source.chapter_title or "").strip()
     data["book_title"] = (source.book_title or "").strip()
     for field in ("publisher", "edition", "year", "starting_page"):
@@ -432,6 +468,8 @@ def _normalise_report(source: ReportSource) -> tuple[ReportSource, list[str]]:
     for field in ("author", "document_type", "document_number", "date"):
         if data.get(field):
             data[field] = _clean_field(data[field])
+    if data.get("author") and not source.author_is_body:
+        data["author"] = _strip_titles(data["author"])
     m = re.match(r"^(.*\S)\s*[:—–-]\s*((?:Final|Interim|Annual|Draft)?\s*Report)$", data["title"], re.I)
     if m and (data.get("document_type") or "Report").lower() == "report" and not data.get("document_number"):
         # r 7.1.1: '*Review of the Law of Negligence* (Final Report, September 2002)'
@@ -442,7 +480,7 @@ def _normalise_report(source: ReportSource) -> tuple[ReportSource, list[str]]:
 
 def _normalise_research_paper(source: ResearchPaperSource) -> tuple[ResearchPaperSource, list[str]]:
     data = source.model_dump()
-    data["authors"] = _clean_authors(source.authors)
+    data["authors"] = _clean_names(source.authors, source.authors_are_bodies)
     data["title"] = (source.title or "").strip()
     for field in ("document_type", "document_number", "institution", "date"):
         if data.get(field):
@@ -553,6 +591,8 @@ def _normalise_submission(source: SubmissionSource) -> tuple[SubmissionSource, l
     data = {k: v if isinstance(v, bool) else _clean_field(v) for k, v in source.model_dump().items() if k != "type"}
     if data["author"] and _ANONYMOUS.fullmatch(data["author"]):
         data["author"] = None
+    if data["author"] and not data["author_is_body"]:
+        data["author"] = _strip_titles(data["author"])
     if data["submission_number"]:
         # 'Submission No. 119' / 'No 119' -> '119'
         data["submission_number"] = re.sub(r"^(?:submission\s*)?(?:no\b\.?\s*)?", "", data["submission_number"], flags=re.I) or None
@@ -628,7 +668,10 @@ def _normalise_website(source: WebsiteSource) -> tuple[WebsiteSource, list[str]]
         data["date"] = _clean_field(data["date"])
     if source.url:
         data["url"] = source.url.strip()
-    if not data.get("website_name") and len(data["authors"]) == 1 and _looks_like_body(data["authors"][0]):
+    is_body = source.authors_are_bodies
+    if is_body is None and len(data["authors"]) == 1:
+        is_body = _looks_like_body(data["authors"][0])
+    if not data.get("website_name") and len(data["authors"]) == 1 and is_body:
         # A body that publishes its own site is cited as the website name, not the author
         # (r 7.15: "'James Edelman', *High Court of Australia* (Web Page) <...>").
         data["website_name"] = data["authors"][0]

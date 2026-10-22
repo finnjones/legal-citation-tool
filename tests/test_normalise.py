@@ -14,7 +14,10 @@ from aglc.models import (
     OtherSource,
     Pinpoint,
     PinpointKind,
+    ReportSource,
+    SubmissionSource,
     TreatySource,
+    WebsiteSource,
 )
 from aglc.normalise import normalise_citation, source_key
 
@@ -355,3 +358,52 @@ def test_pinpoint_judges_trimmed():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+# --------------------------------------------------------------------------- #
+# Author names (AGLC4 r 4.1.1)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "written, cited",
+    [
+        ("Professor George Williams AO", "George Williams"),
+        ("The Hon Michael Kirby AC CMG", "Michael Kirby"),
+        ("Dr Jane Smith", "Jane Smith"),
+        ("Associate Professor Katy Barnett", "Katy Barnett"),
+        ("Ms Sharon Rodrick", "Sharon Rodrick"),
+        ("Bret Walker SC", "Bret Walker"),
+        ("Jane Smith, PhD", "Jane Smith"),
+        # r 4.1.1-4.1.5: 'Sir', 'Dame', peerage and judicial titles stay
+        ("The Hon Justice KM Hayne AC", "Justice KM Hayne"),
+        ("Sir Anthony Mason", "Sir Anthony Mason"),
+        ("Lord Nicholls", "Lord Nicholls"),
+        # never cut to one word
+        ("Professor Smith", "Professor Smith"),
+        ("Yo-Yo Ma", "Yo-Yo Ma"),
+    ],
+)
+def test_honorifics_and_post_nominals_are_left_out_of_author_names(written, cited):
+    c, _ = normalise_citation(make_citation(JournalArticleSource(authors=[written], title="T", journal="J")))
+    assert c.source.authors == [cited]
+
+
+def test_honorifics_are_left_out_of_single_authors_but_not_bodies():
+    c, _ = normalise_citation(make_citation(ReportSource(author="Professor Ron McCallum AO", title="T")))
+    assert c.source.author == "Ron McCallum"
+    c, _ = normalise_citation(make_citation(SubmissionSource(author="Dr Jane Smith", body="Committee")))
+    assert c.source.author == "Jane Smith"
+    c, _ = normalise_citation(make_citation(SubmissionSource(author="Mrs Mac's Pty Ltd", author_is_body=True,
+                                                             body="Committee")))
+    assert c.source.author == "Mrs Mac's Pty Ltd"
+
+
+def test_website_author_flag_decides_whether_it_becomes_the_website_name():
+    # r 7.15: a body publishing its own site is cited as the website name.
+    c, _ = normalise_citation(make_citation(WebsiteSource(authors=["Amnesty International"], authors_are_bodies=True,
+                                                          title="Annual Report")))
+    assert (c.source.authors, c.source.website_name) == ([], "Amnesty International")
+    c, _ = normalise_citation(make_citation(WebsiteSource(authors=["Jane Service"], authors_are_bodies=False,
+                                                          title="My Blog")))
+    assert (c.source.authors, c.source.website_name) == (["Jane Service"], None)
