@@ -1,8 +1,11 @@
-"""Checks that a case cited by medium neutral citation exists, against an offline index of
-published decisions (aglc/data/case_index.json.gz, built by scripts/build_case_index.py
-from the Open Australian Legal Corpus). Nothing is sent anywhere.
+"""Checks that a cited case exists, against an offline index of published decisions
+(aglc/data/case_index.json.gz, built by scripts/build_case_index.py from the Open
+Australian Legal Corpus). Nothing is sent anywhere.
 
-A citation is only flagged where the index can answer for it. Two flags:
+A case cited only by a report (CLR, FCR, NSWLR) is looked for by name, and counts as
+checked if it is found; it is never flagged (see _check_reported).
+
+A medium neutral citation is only flagged where the index can answer for it. Two flags:
   - name mismatch:  [1956] HCA 14 is in the index, but is a different case
   - not found:      [2015] NSWSC 9999 is well past the court's last decision that year, in
                     a year the index has (nearly) every decision of
@@ -68,13 +71,14 @@ class CaseCheck(NamedTuple):
 
 
 def check_citation(citation: Citation) -> CaseCheck | None:
-    """None if `citation` isn't a case. Otherwise whether the index could check it (only a
-    medium neutral citation can be) and, if it's wrong, a warning saying why."""
+    """None if `citation` isn't a case. Otherwise whether the index could check it (a
+    medium neutral citation, or a case found by name for a report in _REPORTS) and, if
+    it's wrong, a warning saying why."""
     source = citation.source
     if not isinstance(source, CaseSource):
         return None
     if not (source.court_id and source.year and source.judgment_number):
-        return CaseCheck(False)
+        return _check_reported(source)
     court, year = source.court_id, source.year.strip()
     number = source.judgment_number.strip().lstrip("0")
     numbers = _index()["courts"].get(court, {}).get("years", {}).get(year)
@@ -91,6 +95,49 @@ def check_citation(citation: Citation) -> CaseCheck | None:
     if index_covers(court, year) and int(number) > last + max(3, last // 20):
         return CaseCheck(True, f"Case not found: {mnc} is past the court's last decision that year, [{year}] {court} {last}")
     return CaseCheck(False)
+
+
+# --------------------------------------------------------------------------- #
+# Reported cases
+# --------------------------------------------------------------------------- #
+# A case cited only by its report ('(2006) 229 CLR 1') has no number to look up, but the
+# authorised reports each report one court's decisions, so the case can be looked for by
+# name among that court's decisions of the report's year or the year before (a decision
+# of December 2005 is reported in 2006). Finding it confirms the case exists; not finding
+# it proves nothing, so it is never flagged: the Corpus lacks some of the most cited
+# decisions of all ('Pape v Federal Commissioner of Taxation' (2009) 238 CLR 1,
+# 'Momcilovic v The Queen' (2011) 245 CLR 1), under any title.
+#
+# report -> the courts whose decisions it reports
+_REPORTS = {
+    "CLR": ("HCA", "UKPCHCA"),
+    "FCR": ("FCA", "FCAFC"),
+    "NSWLR": ("NSWCA", "NSWSC", "NSWCCA", "NSWLEC", "NSWDC"),
+}
+# The site a court's decisions come from, for the decisions whose titles have no number
+_SITE = {"HCA": "HCA", "UKPCHCA": "HCA", "FCA": "FCA", "FCAFC": "FCA"}
+
+
+def _check_reported(source: CaseSource) -> CaseCheck:
+    courts = _REPORTS.get((source.report or "").strip())
+    year = (source.year or "").strip()
+    if not courts or not year.isdigit() or not _parties(source.name):
+        return CaseCheck(False)
+    years = [str(int(year) - 1), year]
+    return CaseCheck(any(plausible_name(source.name, title) for title in _titles(courts, years)))
+
+
+def _titles(courts: tuple[str, ...], years: list[str]):
+    """Every title the index has for `courts` in `years`, including those without a number."""
+    index = _index()
+    for court in courts:
+        for y in years:
+            for names in index["courts"].get(court, {}).get("years", {}).get(y, {}).values():
+                yield from names if isinstance(names, list) else [names]
+    for site in {_SITE.get(c, "NSW") for c in courts}:
+        unnumbered = index.get("unnumbered", {}).get(site, {})
+        for y in [*years, "?"]:
+            yield from unnumbered.get(y, [])
 
 
 # --------------------------------------------------------------------------- #
@@ -137,3 +184,62 @@ def same_case(cited: str, indexed: str) -> bool:
     if not mine or not theirs:
         return True
     return any(_match(a, b) for a in mine for b in theirs)
+
+
+# Searching a year's decisions for a reported case needs a closer match than comparing two
+# names for one citation: one shared word would match something among the Federal Court's
+# 1,500 decisions a year. So every party named must match, though one word of each will do
+# ('Kvelde v The State of New South Wales' ~ 'Kvelde v New South Wales'). Words that
+# identify no party ('Pty Ltd', 'R', 'Re') are left out; place names count here.
+_FILLER = frozenset(
+    """
+    v and the of for in on by a an as to at ex parte re matter application appeal appeals
+    pty ltd limited co company inc incorporated corp corporation plc llc nl
+    anor ors another others no t trading r rex regina queen king
+    plaintiff plaintiffs applicant applicants respondent respondents appellant appellants
+    """.split()
+)
+
+
+#: Abbreviations in case names (r 2.1.10 and common usage) and the words they stand for.
+#: Words are matched whole: by prefix, 'Johnson' would match 'John Holland'.
+_ABBREVIATIONS = {
+    "aust": "australia", "commr": "commissioner", "dept": "department", "govt": "government",
+    "intl": "international", "assn": "association", "bros": "brothers", "natl": "national",
+    "cth": "commonwealth", "fed": "federal",
+}
+
+
+def _tokens(name: str) -> list[str]:
+    name = re.sub(r"\[No\s*\d+\]|\(No\s*\d+\)", " ", name, flags=re.I).replace("&", " and ")
+    words = re.findall(r"[a-z0-9]+", name.lower().replace("’", "'").replace("'", ""))
+    return [_ABBREVIATIONS.get(w, w) for w in words]
+
+
+def _parties(name: str) -> list[list[str]]:
+    """'Re Colina; Ex parte Torney' -> [['colina'], ['torney']]; parties with no words dropped."""
+    parts = re.split(r"\s+v\s+|;|\bex parte\b", name, flags=re.I)
+    return [words for part in parts if (words := [w for w in _tokens(part) if w not in _FILLER])]
+
+
+def _initials(words: list[str]) -> str:
+    """'Australian Competition and Consumer Commission' -> 'accc'."""
+    return "".join(w[0] for w in words if w not in ("and", "of", "the", "for"))
+
+
+def plausible_name(cited: str, title: str) -> bool:
+    """Whether the decision titled `title` could be the case cited as `cited`: every party
+    has a word in the title, or initials of it ('ACCC', 'NSW'), or the other way round."""
+    words = _tokens(title)
+    title_words, title_initials = set(words), _initials(words)
+
+    def matches(party: list[str]) -> bool:
+        return any(
+            w in title_words
+            or (w == "australia" and "australian" in title_words)
+            or (len(w) >= 3 and w in title_initials)
+            or any(len(t) >= 3 and t in _initials(party) for t in title_words if t not in _FILLER)
+            for w in party
+        )
+
+    return all(matches(party) for party in _parties(cited))

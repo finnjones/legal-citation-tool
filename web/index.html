@@ -1345,7 +1345,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             if (el.hidden) return;
             const { total, checked, flagged } = check;
             const others = total - checked;
-            const limit = "only High Court, Federal Court and NSW cases with a medium neutral citation can be checked.";
+            const limit = "only High Court, Federal Court and NSW cases can be checked, and a few of their decisions aren't in our list.";
             el.textContent = checked
                 ? `Checked ${checked} of ${plural(total, "case")} against the courts' published decisions`
                     + (flagged ? `; ${flagged} ${flagged === 1 ? "looks" : "look"} wrong (marked Check).` : ".")

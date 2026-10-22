@@ -123,6 +123,12 @@ lacks is not flagged: the Corpus is missing some real decisions (about 8% of the
 Court's), so a gap proves nothing. Other courts, recent decisions and years the court's own
 site barely has are never flagged.
 
+A case cited only by its CLR, FCR or NSWLR report is looked for by name among that court's
+decisions of the report's year and the year before. Every party must match, by a word or
+its initials ('ACCC'). Finding it counts the case as checked; not finding it doesn't flag
+it, since the Corpus lacks some of the most cited decisions (*Pape*, *Momcilovic*).
+The results page says how many of the document's cases were checked.
+
 ### Try it
 
 `examples/test_essay.docx` is a short essay with 24 deliberately messy footnotes
