@@ -550,7 +550,7 @@ _ROYAL_COMMISSION = re.compile(r"^(?:the\s+)?royal commission\b", re.I)
 
 def _normalise_submission(source: SubmissionSource) -> tuple[SubmissionSource, list[str]]:
     warnings: list[str] = []
-    data = {k: _clean_field(v) for k, v in source.model_dump().items() if k != "type"}
+    data = {k: v if isinstance(v, bool) else _clean_field(v) for k, v in source.model_dump().items() if k != "type"}
     if data["author"] and _ANONYMOUS.fullmatch(data["author"]):
         data["author"] = None
     if data["submission_number"]:

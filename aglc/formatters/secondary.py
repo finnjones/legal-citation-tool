@@ -69,7 +69,9 @@ def _quoted(title: str, rich: RichText | None) -> RichText:
 # Heuristic used to tell a personal name (invert/take-last-word-as-surname)
 # from a corporate/institutional author (r 4.1.4) - "Australian Law Reform
 # Commission" should never be inverted or have its last word treated as a
-# surname.
+# surname. Only a fallback: a source with a single `author` usually carries the
+# extraction model's own `author_is_body` answer, which knows bodies no word list
+# does ("Mobil Oil Australia", "Ambulance Victoria").
 _ORG_WORDS = {
     "commission", "committee", "department", "authority", "institute",
     "bureau", "council", "government", "court", "corporation", "board",
@@ -82,29 +84,33 @@ _ORG_WORDS = {
 }
 
 
-def is_corporate_author(name: str) -> bool:
-    """r 4.1.4: publications authored by a body use the body's name as-is."""
+def is_corporate_author(name: str, is_body: bool | None = None) -> bool:
+    """r 4.1.4: publications authored by a body use the body's name as-is.
+    `is_body` is the source's `author_is_body` flag; the word list decides only
+    when it is None."""
+    if is_body is not None:
+        return is_body
     words = {w.strip(",.") .lower() for w in name.split()}
     return bool(words & _ORG_WORDS)
 
 
-def surname(name: str) -> str:
+def surname(name: str, is_body: bool | None = None) -> str:
     """The default short title for an individual author (r 1.4.1): their
     surname. Copes with multi-word given names ('Ian M Ramsay' -> 'Ramsay'),
     'Sir'/'Dame'/peerage prefixes ('Sir Anthony Mason' -> 'Mason'), and
     corporate authors (returned unchanged, per r 4.1.4)."""
     name = name.strip()
-    if not name or is_corporate_author(name):
+    if not name or is_corporate_author(name, is_body):
         return name
     parts = name.split()
     return parts[-1] if parts else name
 
 
-def invert_name(name: str) -> str:
+def invert_name(name: str, is_body: bool | None = None) -> str:
     """r 1.13: 'an author's first name and surname should be inverted and
     separated by a comma'. Corporate authors are never inverted."""
     name = name.strip()
-    if not name or is_corporate_author(name):
+    if not name or is_corporate_author(name, is_body):
         return name
     parts = name.split()
     if len(parts) < 2:
@@ -151,8 +157,10 @@ def _title_based(citation: Citation) -> bool:
     is a body and a short title was introduced ('*Traditional Rights and Freedoms* (n 52)').
     A personal author's work keeps the surname even with a short title; the title is then
     only added to tell apart several works by that author (the document pass does that)."""
-    names = _names(citation.source)
-    return not names or (bool(citation.short_title) and all(is_corporate_author(n) for n in names))
+    source = citation.source
+    names = _names(source)
+    is_body = getattr(source, "author_is_body", None) if getattr(source, "author", None) else None
+    return not names or (bool(citation.short_title) and all(is_corporate_author(n, is_body) for n in names))
 
 
 
@@ -468,7 +476,7 @@ class ReportFormatter(Formatter):
         # prominently indicated author; the citation then starts with the
         # italic title.
         if src.author:
-            author = invert_name(src.author) if invert_author else src.author
+            author = invert_name(src.author, src.author_is_body) if invert_author else src.author
             out.append(f"{author}, ")
         out.append(src.title, italic=True)
         doc_type = src.document_type or missing("document_type")
@@ -484,7 +492,7 @@ class ReportFormatter(Formatter):
             return citation.short_title
         src = citation.source
         assert isinstance(src, ReportSource)
-        return surname(src.author) if src.author else src.title
+        return surname(src.author, src.author_is_body) if src.author else src.title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         src = citation.source

@@ -236,6 +236,11 @@ class ReportSource(_SourceBase):
 
     type: Literal["report"] = "report"
     author: str | None = Field(default=None, description="Person or body, eg 'Australian Law Reform Commission'")
+    author_is_body: bool | None = Field(
+        default=None,
+        description="True if the author is a body (organisation, company, government, committee, code name), "
+        "false if a person; decides whether repeat references shorten it to a surname",
+    )
     title: str
     document_type: str | None = Field(default=None, description="eg 'Report', 'Discussion Paper'")
     document_number: str | None = None
@@ -287,6 +292,11 @@ class SubmissionSource(_SourceBase):
     type: Literal["submission"] = "submission"
     author: str | None = Field(
         default=None, description="Person or body that made the submission; none if anonymous (a code name counts)"
+    )
+    author_is_body: bool | None = Field(
+        default=None,
+        description="True if the author is a body (organisation, company, government, committee, code name), "
+        "false if a person; decides whether repeat references shorten it to a surname",
     )
     submission_number: str | None = Field(default=None, description="Only if the body allocated one, eg '119'")
     body: str | None = Field(

@@ -99,15 +99,23 @@ carries, alongside the source:
     `authors: ["Jane Smith"]`, `chapter_title: "Native Title"`, `editors: ["John Doe"]`,
     `book_title: "Land Law"`, `publisher: "Federation Press"`, `year: "2015"`, `starting_page: "55"`.
 - **`report`** (r 7.1) — `author` (person or body, eg `"Australian Law Reform Commission"`),
-  `title`, `document_type` (eg `"Report"`, `"Discussion Paper"`), `document_number`, `date`.
+  `author_is_body`, `title`, `document_type` (eg `"Report"`, `"Discussion Paper"`),
+  `document_number`, `date`.
+  - **`author_is_body`** (`report` and `submission`): `true` when the `author` is a body — an
+    organisation, company, government, agency, committee, or a code name like `"Anonymous 489"` —
+    and `false` when it is a person. Repeat references cut a person's name to the surname and the
+    bibliography inverts it, but use a body's name whole, so a wrong answer turns
+    `"Ambulance Victoria"` into "Victoria". Decide from what the name is, not its words: `"Mobil
+    Oil Australia"` is a body, `"Jonathan Law"` a person. Leave it out when there is no `author`
+    or you can't tell.
   - Example: `Australian Law Reform Commission, Traditional Rights and Freedoms (Report No 129,
-    December 2015)` → `author: "Australian Law Reform Commission"`,
+    December 2015)` → `author: "Australian Law Reform Commission"`, `author_is_body: true`,
     `title: "Traditional Rights and Freedoms"`, `document_type: "Report"`, `document_number: "129"`,
     `date: "December 2015"`.
   - A parliamentary committee's report (r 7.1.2) is a `report` whose `author` is the committee
     and the parliament, eg `Law Reform Committee, Parliament of Victoria, Inquiry into Alternative
     Dispute Resolution and Restorative Justice (Final Report, May 2009) 26` →
-    `author: "Law Reform Committee, Parliament of Victoria"`, `title: "Inquiry into Alternative
+    `author: "Law Reform Committee, Parliament of Victoria"`, `author_is_body: true`, `title: "Inquiry into Alternative
     Dispute Resolution and Restorative Justice"`, `document_type: "Final Report"`,
     `date: "May 2009"`, pinpoint page `26`.
 - **`research_paper`** (r 7.2) — research papers, working papers, parliamentary library research
@@ -135,15 +143,20 @@ carries, alongside the source:
 - **`submission`** (r 7.5.2) — a written submission to a parliamentary committee, inquiry,
   government agency or royal commission. The word "Submission" is implied by the type and goes in
   no field. `author` (the person or body that made it; leave it out for an anonymous submission,
-  but keep a code name like `"Anonymous 489"`), `submission_number` (the number only, if there is
+  but keep a code name like `"Anonymous 489"`), `author_is_body` (see `report`), `submission_number` (the number only, if there is
   one), `body` (the committee, agency or royal commission it was made to, without "to"),
   `legislature` (for a parliamentary committee, eg `"Parliament of Victoria"`), `inquiry` (the
   name of the inquiry, if given), `date`.
   - Example: `Ambulance Victoria, Submission No 208 to Law Reform, Road and Community Safety
     Committee, Parliament of Victoria, Inquiry into Drug Law Reform (24 March 2017) 3` →
-    `author: "Ambulance Victoria"`, `submission_number: "208"`,
+    `author: "Ambulance Victoria"`, `author_is_body: true`, `submission_number: "208"`,
     `body: "Law Reform, Road and Community Safety Committee"`, `legislature: "Parliament of
     Victoria"`, `inquiry: "Inquiry into Drug Law Reform"`, `date: "24 March 2017"`, pinpoint page `3`.
+  - Example (a person): `George Williams, Submission No 7 to Senate Legal and Constitutional
+    Affairs Committee, Parliament of Australia, Inquiry into a Bill of Rights (2009) 3` →
+    `author: "George Williams"`, `author_is_body: false`, `submission_number: "7"`,
+    `body: "Senate Legal and Constitutional Affairs Committee"`, `legislature: "Parliament of
+    Australia"`, `inquiry: "Inquiry into a Bill of Rights"`, `date: "2009"`, pinpoint page `3`.
 - **`committee_evidence`** (r 7.5.3) — evidence given at a parliamentary committee hearing
   (Committee Hansard). The words "Evidence to" are implied by the type and go in no field.
   `committee`, `legislature` (eg `"Parliament of Australia"`), `location` (where the hearing was
