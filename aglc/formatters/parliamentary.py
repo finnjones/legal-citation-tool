@@ -20,6 +20,7 @@ from ..models import (
     SubmissionSource,
 )
 from .base import BIB_LEGISLATION, BIB_OTHER, Formatter, missing, register
+from .secondary import invert_name, surname
 
 
 def _speaker(name: str | None, position: str | None = None) -> str:
@@ -67,11 +68,13 @@ class SubmissionFormatter(Formatter):
     commission (or when the submission doesn't name one), and no date when the source
     has none (r 7.5.2 example 53).
 
-    Repeat references use the author's name (r 1.4.1): 'Mobil Oil Australia (n 50) 7'.
-    The name is kept whole, here and in the bibliography: most submissions are made by
-    bodies, which no word list reliably tells apart from people ('Ambulance Victoria'
-    would become 'Victoria', 'Anonymous 489' would become '489'), and a full name is only
-    longer where a wrong surname hides who wrote it. An anonymous submission has nothing
+    Repeat references use the author's surname (r 1.4.1): 'Williams (n 1) 4', and the
+    bibliography inverts it ('Williams, George, Submission ...'). A body's name is kept
+    whole: 'Mobil Oil Australia (n 50) 7', or a short title the author introduced. Only
+    a name the extraction marked as a person (`author_is_body` false) is shortened: most
+    submissions are made by bodies, which the corporate-author word list doesn't
+    recognise ('Ambulance Victoria' would become 'Victoria', 'Anonymous 489' would become
+    '489'), so an unmarked name is treated as a body. An anonymous submission has nothing
     to shorten, so it uses the author's own short title, else is repeated in full."""
 
     source_type = "submission"
@@ -99,9 +102,20 @@ class SubmissionFormatter(Formatter):
             out.append(f" {pin}")
         return out
 
+    def bibliography(self, citation: Citation) -> RichText:
+        src = citation.source
+        assert isinstance(src, SubmissionSource)
+        update: dict = {"pinpoints": [], "pinpoint_judges": None}
+        if src.author and src.author_is_body is False:
+            update["source"] = src.model_copy(update={"author": invert_name(src.author, False)})  # r 1.13
+        return self.full(citation.model_copy(update=update))
+
     def short_title(self, citation: Citation) -> str:
         src = citation.source
         assert isinstance(src, SubmissionSource)
+        if src.author and src.author_is_body is False:
+            # A person keeps their surname even with a short title, as for reports (r 1.4.1).
+            return surname(src.author, False)
         # A short title the author introduced is used, as for any body (r 1.4.1, 1.4.4).
         return citation.short_title or src.author or ""
 

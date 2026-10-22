@@ -261,8 +261,50 @@ def test_submission_missing_its_body_is_flagged():
     assert warnings == ["Submission missing the body it was made to"]
 
 
-def test_submission_author_is_never_cut_to_a_surname():
-    # Most submissions are by bodies the corporate-author word list doesn't know.
+WILLIAMS = SubmissionSource(
+    author="George Williams", author_is_body=False, submission_number="7", body="Senate Legal and Constitutional "
+    "Affairs Committee", legislature="Parliament of Australia", inquiry="Inquiry into a Bill of Rights", date="2009",
+)
+WILLIAMS_FULL = ("George Williams, Submission No 7 to Senate Legal and Constitutional Affairs Committee, "
+                 "Parliament of Australia, *Inquiry into a Bill of Rights* (2009)")
+
+
+def test_submission_by_a_person_uses_the_surname():
+    # r 1.4.1: 'Williams (n 1)', even where a short title was introduced.
+    out = _render([_cite(WILLIAMS, "3")], [_cite(OTHER)], [_cite(WILLIAMS, "4")])
+    assert out[0] == WILLIAMS_FULL + " 3."
+    assert out[2] == "Williams (n 1) 4."
+    out = _render([_cite(WILLIAMS, "3", short_title="Williams Submission")], [_cite(OTHER)], [_cite(WILLIAMS, "4")])
+    assert out[2] == "Williams (n 1) 4."
+
+
+def test_submission_by_a_person_is_inverted_in_the_bibliography():
+    # r 1.13: the author's name is inverted.
+    c = _cite(WILLIAMS, "3")
+    assert formatter_for(c).bibliography(c).to_markup() == WILLIAMS_FULL.replace("George Williams,", "Williams, George,")
+
+
+def test_two_submissions_by_one_person_add_the_inquiry():
+    second = WILLIAMS.model_copy(update={"submission_number": "2", "inquiry": "Inquiry into Human Rights"})
+    out = _render([_cite(WILLIAMS, "3")], [_cite(second, "2")], [_cite(WILLIAMS, "5")])
+    assert out[2] == "Williams, *Inquiry into a Bill of Rights* (n 1) 5."
+
+
+def test_submission_by_a_body_keeps_its_whole_name():
+    # 'Mobil Oil Australia (n 50) 7', not 'Australia'; nor is it inverted.
+    body = MOBIL.model_copy(update={"author_is_body": True})
+    out = _render([_cite(body, "6")], [_cite(OTHER)], [_cite(body, "7")])
+    assert out[2] == "Mobil Oil Australia (n 1) 7."
+    c = _cite(body, "6")
+    assert formatter_for(c).bibliography(c).to_markup() == MOBIL_FULL
+    code = ANON.model_copy(update={"author": "Anonymous 489", "author_is_body": True})
+    out = _render([_cite(code, "3")], [_cite(OTHER)], [_cite(code, "4")])
+    assert out[2] == "Anonymous 489 (n 1) 4."
+
+
+def test_unmarked_submission_author_is_never_cut_to_a_surname():
+    # Without the extraction's flag the name is treated as a body's: most submissions are
+    # by bodies the corporate-author word list doesn't know.
     out = _render([_cite(ANON.model_copy(update={"author": "Anonymous 489"}), "3")], [_cite(OTHER)],
                   [_cite(ANON.model_copy(update={"author": "Anonymous 489"}), "4")])
     assert out[2] == "Anonymous 489 (n 1) 4."

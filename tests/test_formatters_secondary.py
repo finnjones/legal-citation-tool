@@ -607,6 +607,36 @@ def test_report_explicit_short_title_subsequent():
     assert out.to_markup() == "*Traditional Rights and Freedoms* (n 85) 209 [7.111]"
 
 
+def test_author_is_body_overrides_the_word_list():
+    # The extraction's flag wins: a body no word list knows, and a person whose
+    # surname is one of its words.
+    assert surname("Mobil Oil Australia", True) == "Mobil Oil Australia"
+    assert invert_name("Mobil Oil Australia", True) == "Mobil Oil Australia"
+    assert surname("Jonathan Law", False) == "Law"
+    assert invert_name("Jonathan Law", False) == "Law, Jonathan"
+    assert surname("Jonathan Law") == "Jonathan Law"  # unflagged: word list
+
+
+def test_report_by_a_person_uses_the_surname_and_inverts_in_the_bibliography():
+    # r 1.4.1, 1.13 (derived).
+    src = ReportSource(author="Jonathan Law", author_is_body=False, title="Review of Access to Justice",
+                       document_type="Report", date="2019")
+    citation = Citation(source=src, short_title="Access Review", pinpoints=[pp(PinpointKind.page, "4")])
+    assert report.subsequent(citation, report.short_title(citation), first_footnote=3).to_markup() == "Law (n 3) 4"
+    assert report.bibliography(citation).to_markup() == "Law, Jonathan, *Review of Access to Justice* (Report, 2019)"
+
+
+def test_report_by_a_body_the_word_list_misses_keeps_its_name():
+    # r 4.1.4 (derived): a body's name is never cut to its last word or inverted.
+    src = ReportSource(author="Ambulance Victoria", author_is_body=True, title="Annual Report 2020",
+                       document_type="Report", date="2020")
+    citation = Citation(source=src, pinpoints=[pp(PinpointKind.page, "4")])
+    assert report.subsequent(citation, report.short_title(citation), first_footnote=3).to_markup() == "Ambulance Victoria (n 3) 4"
+    assert report.bibliography(citation).to_markup() == "Ambulance Victoria, *Annual Report 2020* (Report, 2020)"
+    titled = citation.model_copy(update={"short_title": "Annual Report"})
+    assert report.subsequent(titled, report.short_title(titled), first_footnote=3).to_markup() == "*Annual Report* (n 3) 4"
+
+
 def test_report_volume_pinpoint():
     # r 7.1.1 note (multi-volume reports, PDF PAGE 131-2) + PinpointKind.volume:
     # "(Report No 108, May 2008) vol 1, 339 [7.7]".

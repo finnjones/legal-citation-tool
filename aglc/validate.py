@@ -78,7 +78,7 @@ def _strings(value: Any) -> Iterable[str]:
     """Every string inside a pydantic model / list / scalar (enum-like fields excluded)."""
     if isinstance(value, BaseModel):
         for name, field_value in value:
-            if name in {"type", "kind", "year_style", "source_key", "plural"}:
+            if name in {"type", "kind", "year_style", "source_key", "plural", "author_is_body"}:
                 continue
             yield from _strings(field_value)
     elif isinstance(value, (list, tuple)):
