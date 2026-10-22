@@ -33,6 +33,7 @@ from typing import Literal
 from .explain import explain
 from .formatters import BIB_CASES, BIB_ORDER, BIB_SECONDARY, Formatter, formatter_for
 from .formatters.secondary import full_names
+from .normalise import us_reporter
 from .models import (
     BibliographySection,
     Citation,
@@ -482,6 +483,15 @@ def _pinpoint_warnings(fn: Footnote, plans: dict[int, _Plan]) -> list[Warning_]:
 # --------------------------------------------------------------------------- #
 
 
+def _explained_type(citation: Citation) -> str:
+    """The kind of source a footnote's changes are explained for: its formatter's, except
+    that a United States case follows r 25.1, not ch 2."""
+    source_type = formatter_for(citation).source_type
+    if source_type == "case" and us_reporter(getattr(citation.source, "report", None)):
+        return "us_case"
+    return source_type
+
+
 def render_document(footnotes: list[Footnote], *, bibliography: bool = True) -> ProcessResult:
     """`footnotes` must already be extracted and normalised (every Citation has
     source_key set). Returns formatted text for every footnote, bibliography
@@ -495,7 +505,7 @@ def render_document(footnotes: list[Footnote], *, bibliography: bool = True) -> 
         formatted = _render_footnote(
             fn, plans, first_footnote, short_title_text, append_definition, disambiguate
         )
-        source_types = [formatter_for(seg.citation).source_type for seg in _citation_segments(fn)]
+        source_types = [_explained_type(seg.citation) for seg in _citation_segments(fn)]
         results.append(FootnoteResult(
             number=fn.number, original=fn.original, formatted=formatted, extraction_failed=fn.extraction_failed,
             changes=explain(fn.original, formatted, source_types),

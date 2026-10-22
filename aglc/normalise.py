@@ -306,6 +306,15 @@ def _canon_report(report: str) -> tuple[str | None, str | None, bool]:
     return None, None, False
 
 
+def us_reporter(report: str | None) -> str | None:
+    """'supreme_court' for the US Supreme Court's reporters (US, S Ct, L Ed), 'other' for the
+    other US reporters (F 3d, F Supp 2d, NE 2d...), None for a series from anywhere else."""
+    entry = _report_series_index().get(_norm_key(report)) if report else None
+    if not entry or entry.get("country") != "US":
+        return None
+    return "supreme_court" if entry.get("us_supreme_court") else "other"
+
+
 def _canon_court(court: str) -> tuple[str | None, bool]:
     entry = _courts_index().get(_norm_key(court))
     if entry:
@@ -344,6 +353,14 @@ def _normalise_case(source: CaseSource) -> tuple[CaseSource, list[str]]:
         if data.get(field):
             data[field] = _clean_field(data[field])
 
+    us = us_reporter(source.report)
+    if us:
+        # r 25.1.5: a US case names its court in the parentheses with the year ('9th Cir',
+        # 'SD NY', wherever the model put it), and none for the Supreme Court's own reporters
+        court = _clean_field(source.court_name or source.court_id)
+        # r 1.6.1: no full stops in abbreviations ('E.D. Pa.' -> 'ED Pa', '11th Cir.' -> '11th Cir')
+        data["court_name"] = None if us == "supreme_court" or not court else re.sub(r"(?<=[A-Za-z])\.", "", court)
+        data["court_id"] = None
     if source.report:
         abbrev, year_style, matched = _canon_report(source.report)
         if matched:
@@ -356,7 +373,7 @@ def _normalise_case(source: CaseSource) -> tuple[CaseSource, list[str]]:
         # Medium-neutral citation (AGLC4 r 2.3.1): year is the volume identifier -> square.
         data["year_style"] = "square"
 
-    if source.court_id:
+    if source.court_id and not us:
         abbrev, matched = _canon_court(source.court_id)
         if matched:
             data["court_id"] = abbrev

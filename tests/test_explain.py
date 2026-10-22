@@ -182,3 +182,11 @@ def test_every_kind_of_source_has_a_rule():
     from aglc.formatters import _load_all  # noqa: F401  (populates the registry)
 
     assert set(_REGISTRY) - {"other"} <= set(_CHAPTERS)
+
+
+def test_a_hansard_change_names_its_rule():
+    # Footnote 4 of a real essay: the comma moved out of the italics, with no rule shown
+    before = ("New South Wales, *Parliamentary Debates,* Legislative Assembly, 30 March 2022, 8938 "
+              "(Mark Speakman, Attorney-General) (‘*Parliamentary Debates*’).")
+    after = before.replace("*Parliamentary Debates,*", "*Parliamentary Debates*,")
+    assert _explain(before, after, "parliamentary_debates") == [("roman", "r 7.5.1")]

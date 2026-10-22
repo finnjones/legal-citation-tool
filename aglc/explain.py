@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
+from . import validate
 from .models import Change, RichText
 
 # One token per word, number, punctuation mark or run of whitespace (as in web/index.html)
@@ -26,6 +27,7 @@ _TOKEN = re.compile(r"\s+|[^\W_]+|[^\s\w]|_")
 # AGLC4 chapter for each formatter's source_type: (noun phrase, rule)
 _CHAPTERS = {
     "case": ("a case", "ch 2"),
+    "us_case": ("a United States case", "r 25.1"),
     "legislation": ("legislation", "ch 3"),
     "journal_article": ("a journal article", "ch 5"),
     "book": ("a book", "ch 6"),
@@ -52,6 +54,17 @@ _TYPE_LABELS = {
     "case": ("cases", "ch 2"),
     "statute": ("Acts", "ch 3"),
     "legislation": ("Acts", "ch 3"),
+}
+# The kinds of source AGLC4 never labels (validate.UNLABELLED_TYPES), for any other label
+_UNLABELLED = {
+    "journal_article": ("journal articles", "ch 5"),
+    "book": ("books", "ch 6"),
+    "book_chapter": ("book chapters", "r 6.6.1"),
+    "newspaper": ("newspaper articles", "r 7.11"),
+    "case": ("cases", "ch 2"),
+    "us_case": ("United States cases", "r 25.1"),
+    "legislation": ("Acts", "ch 3"),
+    "treaty": ("treaties", "ch 8"),
 }
 _TYPE_LABEL = re.compile(
     r"\(\s*(" + "|".join(re.escape(k) for k in _TYPE_LABELS) + r")\b\s*,?\s*", re.I)
@@ -252,10 +265,10 @@ def _made_italic(ctx: _Context, text: str, prev: _Token | None) -> tuple[str, st
         return "act_year_italic", "The year is part of an Act’s title, so it’s italic too", "r 3.1.2"
     if "legislation" in ctx.types and re.search(r"\b\d{4}$", text):
         return "title_italic", "An Act’s title and year are italic", "rr 3.1.1–3.1.2"
-    if text == "v" and "case" in ctx.types:
-        return "title_italic", "The ‘v’ is part of the case name, so it’s italic", "r 2.1.11"
-    if "case" in ctx.types and not re.search(r"\d", text):
-        return "title_italic", "Case names are italic", "r 2.1.1"
+    if text == "v" and ctx.types & _CASES:
+        return "title_italic", "The ‘v’ is part of the case name, so it’s italic", _case_rule(ctx, "r 2.1.11", "r 25.1.1")
+    if ctx.types & _CASES and not re.search(r"\d", text):
+        return "title_italic", "Case names are italic", _case_rule(ctx, "r 2.1.1", "r 25.1.1")
     if "legislation" in ctx.types and re.search(r"\b(Act|Regulations?|Rules|Code|Constitution)\b", text):
         return "title_italic", "An Act’s title is italic", "r 3.1.1"
     if ctx.types & {"book", "book_chapter"}:
@@ -275,9 +288,19 @@ def _made_roman(ctx: _Context, text: str, j0: int) -> tuple[str, str, str | None
     quoted = ctx.after.rfind("‘", 0, ctx.b[j0].start) > ctx.after.rfind("’", 0, ctx.b[j0].start)
     if quoted and ctx.types & {"journal_article", "book_chapter"}:
         return "roman", "Article and chapter titles go in single quotes, not italics", "r 5.2"
-    if "case" in ctx.types and re.search(r"[\d\[\]()]", text):
-        return "roman", "Only the case name is italic, not the year or report details", "ch 2"
+    if ctx.types & _CASES and re.search(r"[\d\[\]()]", text):
+        return "roman", "Only the case name is italic, not the year or report details", _case_rule(ctx, "ch 2", "r 25.1")
     return "roman", "Set upright: only titles are italic", _source_rule(ctx)
+
+
+_CASES = {"case", "us_case"}
+
+
+def _case_rule(ctx: _Context, australian: str, us: str) -> str | None:
+    """The rule for a case-citation change: AGLC4 ch 2's for Australian (and similar) cases,
+    r 25.1's for United States cases, none when the footnote cites both."""
+    kinds = ctx.types & _CASES
+    return None if len(kinds) != 1 else australian if "case" in kinds else us
 
 
 def _source_rule(ctx: _Context) -> str | None:
@@ -311,6 +334,17 @@ def _type_label(ctx: _Context) -> None:
         what, rule = _TYPE_LABELS[label.lower()]
         ctx.add("type_label", f"AGLC4 doesn’t label {what}, so ‘{label}’ is removed", rule,
                 before=[(m.start() + 1, m.end())])
+    # Any other label on a kind of source AGLC4 never labels ('(Journal Report, 2021)')
+    kinds = [_UNLABELLED[t] for t in sorted(ctx.types) if t in _UNLABELLED]
+    if len(kinds) != 1:
+        return
+    what, rule = kinds[0]
+    for m in validate.TYPE_LABEL.finditer(ctx.before):
+        label = m.group(1)
+        if label.lower() in _TYPE_LABELS or re.search(re.escape(label), ctx.after, re.I):
+            continue
+        ctx.add("type_label", f"AGLC4 doesn’t label {what}, so ‘{label}’ is removed", rule,
+                before=[(m.start() + 1, m.end())])
 
 
 def _pinpoint_punctuation(ctx: _Context) -> None:
@@ -319,7 +353,7 @@ def _pinpoint_punctuation(ctx: _Context) -> None:
         dels = "".join(t.text for t in e.deleted if t.text.lower() not in _PIN_MARKERS and t.text != ".").strip()
         pin_follows = e.next_after is not None and (e.next_after.text == "[" or e.next_after.text[0].isdigit())
         if ins == "," and not dels and pin_follows and e.prev_after is not None and e.prev_after.text[-1].isdigit():
-            rule = "r 2.2.5" if "case" in ctx.types else "r 5.7" if "journal_article" in ctx.types else None
+            rule = _case_rule(ctx, "r 2.2.5", "r 25.1.4") or ("r 5.7" if "journal_article" in ctx.types else None)
             ctx.add("pinpoint_comma", "A comma and a space go before a pinpoint", rule, after=[e.after_span])
         elif dels == "," and not ins and "legislation" in ctx.types and e.next_before is not None \
                 and re.match(r"(ss?|sections?|secs?|pts?|divs?|schs?|regs?|rr?|cls?)$", e.next_before.text, re.I):

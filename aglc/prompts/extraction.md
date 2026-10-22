@@ -74,6 +74,10 @@ carries, alongside the source:
   - Example: `(1992) 175 CLR 1` → `year: "1992"`, `volume: "175"`, `report: "CLR"`,
     `starting_page: "1"`.
   - Example: `[2010] HCA 1` → `year: "2010"`, `court_id: "HCA"`, `judgment_number: "1"`.
+  - A United States case puts its court in the parentheses with the year: copy that court,
+    as written, into `court_name`. Example: `Bowers v. Hardwick, 760 F.2d 1202 (11th Cir. 1985)` →
+    `volume: "760"`, `report: "F.2d"`, `starting_page: "1202"`, `court_name: "11th Cir."`,
+    `year: "1985"`.
 - **`legislation`** (ch 3) — `kind` (`"act"`, `"delegated"`, `"bill"`, or `"constitution"`),
   `title` (short title without the year), `year`, `jurisdiction` (AGLC abbreviation, eg `"Cth"`,
   `"NSW"`, `"Vic"`).

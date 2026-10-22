@@ -215,3 +215,41 @@ def test_bibliography_strips_pinpoints():
     src = CaseSource(name="Lane v Morrison", year="2009", volume="239", report="CLR", starting_page="230")
     citation = Citation(source=src, pinpoints=[pp(PinpointKind.page, "235")], pinpoint_judges="French CJ")
     assert fmt.bibliography(citation).to_markup() == "*Lane v Morrison* (2009) 239 CLR 230"
+
+
+# --------------------------------------------------------------------------- #
+# United States cases (r 25.1): 'Name, Volume Report Page, Pinpoint (Court, Year)'
+# --------------------------------------------------------------------------- #
+
+from aglc.normalise import normalise_citation  # noqa: E402
+
+
+def _us(pins=(), **source) -> str:
+    c, _ = normalise_citation(Citation(source=CaseSource(**source), pinpoints=[Pinpoint(value=p) for p in pins]))
+    return CaseFormatter().full(c).to_markup()
+
+
+def test_us_supreme_court_case_takes_no_court():
+    assert _us(["495"], name="Brown v Board of Education", report="U.S.", volume="347", starting_page="483",
+               year="1954") == "*Brown v Board of Education*, 347 US 483, 495 (1954)"
+    # the Supreme Court Reporter is the Court's too, whatever court the model wrote down
+    assert _us(name="Roe v Wade", report="S. Ct.", volume="93", starting_page="705", year="1973",
+               court_name="Supreme Court") == "*Roe v Wade*, 93 S Ct 705 (1973)"
+
+
+def test_us_federal_case_names_its_court_without_full_stops():
+    assert _us(name="Bowers v Hardwick", report="F.2d", volume="760", starting_page="1202", year="1985",
+               court_name="11th Cir.") == "*Bowers v Hardwick*, 760 F 2d 1202 (11th Cir, 1985)"
+    # read as a medium neutral court identifier by the model
+    assert _us(name="Cyber Promotions Inc v America Online Inc", report="F. Supp.", volume="948",
+               starting_page="436", year="1996", court_id="E.D. Pa.") == \
+        "*Cyber Promotions Inc v America Online Inc*, 948 F Supp 436 (ED Pa, 1996)"
+
+
+def test_us_federal_case_without_its_court_says_so():
+    assert "[MISSING: court]" in _us(name="X v Y", report="F.3d", volume="1", starting_page="2", year="2000")
+
+
+def test_english_cases_are_unaffected():
+    assert _us(name="Donoghue v Stevenson", report="AC", starting_page="562", year="1932") == \
+        "*Donoghue v Stevenson* [1932] AC 562"

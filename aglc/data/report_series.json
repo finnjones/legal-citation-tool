@@ -145,7 +145,9 @@
       "full_name": "United States Reports",
       "year_style": "round",
       "authorised": true,
-      "variants": ["U.S.", "US.", "United States Reports"]
+      "variants": ["U.S.", "US.", "United States Reports"],
+      "country": "US",
+      "us_supreme_court": true
     },
     {
       "abbrev": "SCR",
@@ -195,6 +197,281 @@
       "year_style": "round",
       "authorised": true,
       "variants": ["E.R.", "English Reports"]
+    },
+    {
+      "abbrev": "S Ct",
+      "full_name": "Supreme Court Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["S. Ct.", "S.Ct."],
+      "country": "US",
+      "us_supreme_court": true
+    },
+    {
+      "abbrev": "L Ed",
+      "full_name": "Lawyers' Edition",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["L. Ed.", "L.Ed."],
+      "country": "US",
+      "us_supreme_court": true
+    },
+    {
+      "abbrev": "L Ed 2d",
+      "full_name": "Lawyers' Edition, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["L. Ed. 2d", "L.Ed.2d"],
+      "country": "US",
+      "us_supreme_court": true
+    },
+    {
+      "abbrev": "F",
+      "full_name": "Federal Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F."],
+      "country": "US"
+    },
+    {
+      "abbrev": "F 2d",
+      "full_name": "Federal Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F. 2d", "F.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "F 3d",
+      "full_name": "Federal Reporter, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F. 3d", "F.3d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "F 4th",
+      "full_name": "Federal Reporter, Fourth Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F. 4th", "F.4th"],
+      "country": "US"
+    },
+    {
+      "abbrev": "F Supp",
+      "full_name": "Federal Supplement",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F. Supp.", "F.Supp."],
+      "country": "US"
+    },
+    {
+      "abbrev": "F Supp 2d",
+      "full_name": "Federal Supplement, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F. Supp. 2d", "F.Supp.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "F Supp 3d",
+      "full_name": "Federal Supplement, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F. Supp. 3d", "F.Supp.3d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "F Appx",
+      "full_name": "Federal Appendix",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["F. Appx.", "F.Appx."],
+      "country": "US"
+    },
+    {
+      "abbrev": "BR",
+      "full_name": "Bankruptcy Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["BR."],
+      "country": "US"
+    },
+    {
+      "abbrev": "A 2d",
+      "full_name": "Atlantic Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["A. 2d", "A.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "A 3d",
+      "full_name": "Atlantic Reporter, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["A. 3d", "A.3d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "NE",
+      "full_name": "North Eastern Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["NE."],
+      "country": "US"
+    },
+    {
+      "abbrev": "NE 2d",
+      "full_name": "North Eastern Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["NE. 2d", "NE.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "NE 3d",
+      "full_name": "North Eastern Reporter, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["NE. 3d", "NE.3d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "NW",
+      "full_name": "North Western Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["NW."],
+      "country": "US"
+    },
+    {
+      "abbrev": "NW 2d",
+      "full_name": "North Western Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["NW. 2d", "NW.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "P 2d",
+      "full_name": "Pacific Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["P. 2d", "P.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "P 3d",
+      "full_name": "Pacific Reporter, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["P. 3d", "P.3d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "SE",
+      "full_name": "South Eastern Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["SE."],
+      "country": "US"
+    },
+    {
+      "abbrev": "SE 2d",
+      "full_name": "South Eastern Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["SE. 2d", "SE.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "So",
+      "full_name": "Southern Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["So."],
+      "country": "US"
+    },
+    {
+      "abbrev": "So 2d",
+      "full_name": "Southern Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["So. 2d", "So.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "So 3d",
+      "full_name": "Southern Reporter, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["So. 3d", "So.3d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "SW",
+      "full_name": "South Western Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["SW."],
+      "country": "US"
+    },
+    {
+      "abbrev": "SW 2d",
+      "full_name": "South Western Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["SW. 2d", "SW.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "SW 3d",
+      "full_name": "South Western Reporter, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["SW. 3d", "SW.3d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "Cal Rptr",
+      "full_name": "California Reporter",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["Cal. Rptr.", "Cal.Rptr."],
+      "country": "US"
+    },
+    {
+      "abbrev": "Cal Rptr 2d",
+      "full_name": "California Reporter, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["Cal. Rptr. 2d", "Cal.Rptr.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "Cal Rptr 3d",
+      "full_name": "California Reporter, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["Cal. Rptr. 3d", "Cal.Rptr.3d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "NYS 2d",
+      "full_name": "New York Supplement, Second Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["NYS. 2d", "NYS.2d"],
+      "country": "US"
+    },
+    {
+      "abbrev": "NYS 3d",
+      "full_name": "New York Supplement, Third Series",
+      "year_style": "round",
+      "authorised": false,
+      "variants": ["NYS. 3d", "NYS.3d"],
+      "country": "US"
     }
   ]
 }
