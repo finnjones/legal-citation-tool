@@ -287,6 +287,147 @@ class ResearchPaperSource(_SourceBase):
     url: str | None = None
 
 
+class SpeechSource(_SourceBase):
+    """AGLC4 r 7.3: speeches and named lectures. One published in a journal or book is cited
+    as that (ch 5, 6) instead."""
+
+    type: Literal["speech"] = "speech"
+    authors: list[str] = Field(default_factory=list, description="The speaker(s), as written (judicial titles included)")
+    authors_are_bodies: bool | None = Field(
+        default=None,
+        description="True if the authors are bodies (organisations, governments, committees), false if "
+        "people; leave out if mixed or unsure. Decides whether repeat references shorten them to surnames",
+    )
+    title: str
+    #: `title` with the italics it had in the footnote, for a case or Act name inside the
+    #: quoted title. Filled in by extraction, never by the model.
+    title_rich: SkipJsonSchema[RichText | None] = None
+    lecture: str | None = Field(
+        default=None,
+        description="The name of a named lecture or oration, eg 'Lucinda Lecture', 'Sir Ninian Stephen Oration'; "
+        "leave out for an ordinary speech or address ('Speech' is printed)",
+    )
+    forum: str | None = Field(
+        default=None,
+        description="Institution or event it was given at, eg 'Inner Temple', 'Monash University'; "
+        "the city or town only when no forum is given",
+    )
+    date: str | None = Field(default=None, description="Full date, eg '24 October 2013'")
+    url: str | None = None
+
+
+class MediaReleaseSource(_SourceBase):
+    """AGLC4 r 7.4: press and media releases."""
+
+    type: Literal["media_release"] = "media_release"
+    authors: list[str] = Field(default_factory=list, description="Person or body that made the release, as written")
+    authors_are_bodies: bool | None = Field(
+        default=None,
+        description="True if the authors are bodies (organisations, governments, committees), false if "
+        "people; leave out if mixed or unsure. Decides whether repeat references shorten them to surnames",
+    )
+    title: str
+    #: `title` with the italics it had in the footnote, for a case or Act name inside the
+    #: quoted title. Filled in by extraction, never by the model.
+    title_rich: SkipJsonSchema[RichText | None] = None
+    release_type: str | None = Field(
+        default=None, description="As it appears on the source, eg 'Media Release', 'Press Release', 'Press Statement'"
+    )
+    document_number: str | None = Field(default=None, description="Only if the release has one, eg 'MSPA 172/09'")
+    body: str | None = Field(
+        default=None,
+        description="Body or office that issued it, when not the author, eg 'Attorney-General', "
+        "'Prime Minister of Australia', 'Department of Health'",
+    )
+    date: str | None = Field(default=None, description="Full date, eg '22 May 2009'")
+    url: str | None = None
+
+
+class DictionarySource(_SourceBase):
+    """AGLC4 r 7.6: an entry in a dictionary, in print or online. The entry is part of the
+    source: two entries in one dictionary are two sources."""
+
+    type: Literal["dictionary"] = "dictionary"
+    title: str = Field(description="The dictionary, eg 'Macquarie Dictionary', 'Oxford English Dictionary'")
+    edition: str | None = Field(default=None, description="Edition number only, eg '5' for '5th ed' (print)")
+    year: str | None = Field(default=None, description="Year of publication (print)")
+    online: bool = Field(default=False, description="True for an online dictionary ('online at <date>')")
+    retrieved: str | None = Field(default=None, description="Online: the date the entry was retrieved, eg '20 February 2018'")
+    entry: str = Field(description="The headword, eg 'demise'")
+    entry_designation: str | None = Field(
+        default=None, description="Which of several entries for the word, as the dictionary labels it, eg 'adj', 'n1', 'v2'"
+    )
+    definition: str | None = Field(default=None, description="The definition number only, eg '4', '2b'")
+
+
+class LegalEncyclopediaSource(_SourceBase):
+    """AGLC4 r 7.7: legal encyclopedias such as *Halsbury's Laws of Australia* and *The
+    Laws of Australia*, in print or online. Pinpoints are to paragraphs."""
+
+    type: Literal["legal_encyclopedia"] = "legal_encyclopedia"
+    publisher: str | None = Field(default=None, description="eg 'LexisNexis', 'Westlaw AU', 'Thomson Reuters'")
+    title: str = Field(description="The encyclopedia, eg \"Halsbury's Laws of Australia\", 'The Laws of Australia'")
+    volume: str | None = Field(default=None, description="Print: the volume number")
+    date: str | None = Field(default=None, description="Print: the date of last update ('at 25 May 2009')")
+    online: bool = Field(default=False, description="True for an online encyclopedia ('online at <date>')")
+    retrieved: str | None = Field(default=None, description="Online: the date the entry was retrieved")
+    title_number: str | None = Field(default=None, description="Number of the subject title, eg '235', '2'")
+    title_name: str | None = Field(default=None, description="Name of the subject title, eg 'Insurance', 'Administrative Law'")
+    chapter: str | None = Field(
+        default=None, description="Chapter number and name together, eg '2 General Principles', '2.3 Access to Information'"
+    )
+
+
+class SocialMediaSource(_SourceBase):
+    """AGLC4 r 7.16: social media posts, forum posts and online videos (YouTube). A profile
+    page is a web page (r 7.15)."""
+
+    type: Literal["social_media"] = "social_media"
+    username: str = Field(description="As it appears on the platform, capitalisation unchanged, with '@' for Twitter")
+    author_name: str | None = Field(
+        default=None, description="The poster's name, given in brackets after the username, eg 'Scott Stephenson'"
+    )
+    title: str | None = Field(default=None, description="Title of the post or video; leave out if it has none")
+    #: `title` with the italics it had in the footnote. Filled in by extraction, never by the model.
+    title_rich: SkipJsonSchema[RichText | None] = None
+    platform: str | None = Field(default=None, description="eg 'Twitter', 'Instagram', 'Facebook', 'YouTube'")
+    date: str | None = Field(default=None, description="Full date, eg '17 July 2017'")
+    time: str | None = Field(default=None, description="Time of the post, eg '9:37pm'")
+    time_zone: str | None = Field(default=None, description="eg 'AEST', 'AEDT'")
+    url: str | None = None
+    archived_url: str | None = Field(default=None, description="r 4.5: ', archived at <url>'")
+
+
+class UNDocumentSource(_SourceBase):
+    """AGLC4 r 9.2: official documents of the United Nations: resolutions and decisions,
+    reports, general comments, committee decisions and meeting records (r 9.6). Each
+    element is included only when the document has it."""
+
+    type: Literal["un_document"] = "un_document"
+    author: str | None = Field(
+        default=None,
+        description="An individual or body other than a principal organ, with any position after a comma, "
+        "eg 'Human Rights Committee', 'Giorgio Gaja, Special Rapporteur'",
+    )
+    title: str | None = Field(default=None, description="Title, if the document has one (most Security Council resolutions don't)")
+    resolution: str | None = Field(
+        default=None, description="Organ, type and number of a resolution or decision, eg 'GA Res 61/295', 'SC Res 1441', 'ESC Dec 2001/203'"
+    )
+    official_records: str | None = Field(default=None, description="'UN GAOR', 'UN SCOR', 'UN ESCOR' or 'UN TCOR'")
+    committee: str | None = Field(default=None, description="Number of the General Assembly main committee, eg '3' for '3rd Comm'")
+    session: str | None = Field(default=None, description="Session number, eg '54' for '54th sess'")
+    session_part: str | None = Field(default=None, description="Part of the session, eg '1' for '1st pt'")
+    meeting: str | None = Field(default=None, description="Meeting number, eg '93' for '93rd plen mtg'")
+    plenary: bool = Field(default=False, description="True for a plenary meeting ('plen mtg')")
+    agenda_items: list[str] = Field(default_factory=list, description="Agenda item numbers, eg ['49(b)'] or ['46', '120']")
+    supplement: str | None = Field(default=None, description="Supplement number, eg '49' for 'Supp No 49'")
+    document_number: str | None = Field(
+        default=None, description="As on the document, without 'UN Doc', eg 'A/RES/61/295', 'A/63/804 and Corr.1'"
+    )
+    date: str | None = Field(default=None, description="Full date of the document, eg '2 October 2007'")
+    adopted: str | None = Field(default=None, description="Date of adoption, when given as well, eg '13 September 2007'")
+
+
 class ParliamentaryDebatesSource(_SourceBase):
     """AGLC4 r 7.5.1 (and r 24.4.1 for the UK): parliamentary debates ('Hansard'),
     including second reading speeches (r 3.7 note). Pinpoints are pages (UK: vol and col)."""
@@ -453,6 +594,10 @@ Source = Annotated[
         BookChapterSource,
         ReportSource,
         ResearchPaperSource,
+        SpeechSource,
+        MediaReleaseSource,
+        DictionarySource,
+        LegalEncyclopediaSource,
         ParliamentaryDebatesSource,
         SubmissionSource,
         CommitteeEvidenceSource,
@@ -460,7 +605,9 @@ Source = Annotated[
         ExplanatoryMemorandumSource,
         NewspaperSource,
         WebsiteSource,
+        SocialMediaSource,
         TreatySource,
+        UNDocumentSource,
         OtherSource,
     ],
     Field(discriminator="type"),
@@ -468,9 +615,10 @@ Source = Annotated[
 
 SOURCE_TYPES = [
     CaseSource, LegislationSource, JournalArticleSource, BookSource, BookChapterSource,
-    ReportSource, ResearchPaperSource, ParliamentaryDebatesSource, SubmissionSource, CommitteeEvidenceSource,
+    ReportSource, ResearchPaperSource, SpeechSource, MediaReleaseSource, DictionarySource,
+    LegalEncyclopediaSource, ParliamentaryDebatesSource, SubmissionSource, CommitteeEvidenceSource,
     ConventionDebatesSource, ExplanatoryMemorandumSource,
-    NewspaperSource, WebsiteSource, TreatySource, OtherSource,
+    NewspaperSource, WebsiteSource, SocialMediaSource, TreatySource, UNDocumentSource, OtherSource,
 ]
 
 

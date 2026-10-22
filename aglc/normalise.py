@@ -8,6 +8,9 @@ Implements AGLC4 (4th ed) rules:
   - r 3.1.3: jurisdiction abbreviations, r 15.3/17-20.2.3 style Constitution handling
   - r 3.7, 7.5.1-7.5.4: explanatory memoranda, parliamentary debates (Hansard), submissions
     to inquiries, evidence to committees and the federal convention debates
+  - r 7.3, 7.4, 7.6, 7.7, 7.16: speeches, media releases, dictionaries, legal encyclopedias
+    and social media posts
+  - r 9.2: UN documents (resolution numbers, Official Records, sessions and meetings)
 
 Data tables live in aglc/data/*.json and are cached with functools.lru_cache.
 """
@@ -27,9 +30,12 @@ from .models import (
     Citation,
     CommitteeEvidenceSource,
     ConventionDebatesSource,
+    DictionarySource,
     ExplanatoryMemorandumSource,
     JournalArticleSource,
+    LegalEncyclopediaSource,
     LegislationSource,
+    MediaReleaseSource,
     NewspaperSource,
     OtherSource,
     ParliamentaryDebatesSource,
@@ -37,9 +43,12 @@ from .models import (
     PinpointKind,
     ReportSource,
     ResearchPaperSource,
+    SocialMediaSource,
     Source,
+    SpeechSource,
     SubmissionSource,
     TreatySource,
+    UNDocumentSource,
     WebsiteSource,
 )
 
@@ -653,6 +662,123 @@ def _normalise_convention_debates(
     return ConventionDebatesSource(**data), []
 
 
+def _unquote(value: str | None) -> str | None:
+    """'‘demise’' -> 'demise': a quoted title or entry, without the quotation marks the
+    formatter adds back."""
+    value = _clean_field(value)
+    return value.strip(_WRAP_CHARS).strip() or value if value else value
+
+
+# r 7.3: 'Speech' is printed for any speech that isn't a named lecture.
+_GENERIC_SPEECH = re.compile(
+    r"(?:(?:keynote|opening|closing|plenary|public|conference)\s+)?(?:speech|address|keynote|lecture|talk|"
+    r"presentation|remarks|oration)(?:\s+delivered(?:\s+at)?)?",
+    re.I,
+)
+
+
+def _normalise_speech(source: SpeechSource) -> tuple[SpeechSource, list[str]]:
+    warnings: list[str] = []
+    data = source.model_dump()
+    data["authors"] = _clean_names(source.authors, source.authors_are_bodies)
+    data["title"] = _unquote(source.title) or ""
+    lecture = _clean_field(source.lecture)
+    if lecture:
+        # r 7.3: no leading 'The', and no ordinal number in a lecture series
+        # ('the 27th Sultan Azlan Shah Lecture' -> 'Sultan Azlan Shah Lecture')
+        lecture = re.sub(r"^(?:the\s+)?(?:\d+(?:st|nd|rd|th)\s+)?(?:annual\s+)?", "", lecture, flags=re.I) or lecture
+        if _GENERIC_SPEECH.fullmatch(lecture):
+            lecture = None
+    data["lecture"] = lecture
+    data["forum"] = _clean_field(source.forum)
+    data["date"] = _clean_date(_clean_field(source.date))
+    data["url"] = source.url.strip() if source.url else None
+    if not data["authors"]:
+        warnings.append("Speech missing the speaker")
+    return SpeechSource(**data), warnings
+
+
+def _normalise_media_release(source: MediaReleaseSource) -> tuple[MediaReleaseSource, list[str]]:
+    data = source.model_dump()
+    data["authors"] = _clean_names(source.authors, source.authors_are_bodies)
+    data["title"] = _unquote(source.title) or ""
+    data["release_type"] = _clean_field(source.release_type)
+    if source.document_number:
+        data["document_number"] = re.sub(r"^no\b\.?\s*", "", _clean_field(source.document_number) or "", flags=re.I) or None
+    body = _clean_field(source.body)
+    # r 7.4: the body is left out when it is the author
+    data["body"] = None if body and _norm_key(body) in {_norm_key(a) for a in data["authors"]} else body
+    data["date"] = _clean_date(_clean_field(source.date))
+    data["url"] = source.url.strip() if source.url else None
+    return MediaReleaseSource(**data), []
+
+
+_ONLINE_AT = re.compile(r"^(?:online\s*(?:at|,)?|(?:last\s+)?(?:accessed|retrieved|viewed|updated)(?:\s+on)?|at)\s+", re.I)
+
+
+def _normalise_dictionary(source: DictionarySource) -> tuple[DictionarySource, list[str]]:
+    warnings: list[str] = []
+    data = source.model_dump()
+    data["title"] = _unquote(source.title) or ""
+    edition = _clean_field(source.edition)
+    if edition:
+        # '5th ed' / '5th edn' -> '5'
+        edition = re.sub(r"^(\d+)(?:st|nd|rd|th)?\s*(?:ed|edn|edition)?$", r"\1", edition, flags=re.I)
+    data["edition"] = edition
+    data["year"] = _clean_field(source.year)
+    retrieved = _clean_field(source.retrieved)
+    data["retrieved"] = _clean_date(_ONLINE_AT.sub("", retrieved)) if retrieved else None
+    data["online"] = source.online or bool(data["retrieved"])
+    data["entry"] = _unquote(source.entry) or ""
+    data["entry_designation"] = _clean_field(source.entry_designation)
+    if source.definition:
+        data["definition"] = re.sub(r"^(?:def(?:inition)?|sense)\b\.?\s*", "", _clean_field(source.definition) or "", flags=re.I) or None
+    if data["online"] and not data["retrieved"]:
+        warnings.append("Online dictionary missing the date the entry was retrieved")
+    return DictionarySource(**data), warnings
+
+
+def _normalise_legal_encyclopedia(source: LegalEncyclopediaSource) -> tuple[LegalEncyclopediaSource, list[str]]:
+    warnings: list[str] = []
+    data = source.model_dump()
+    data["publisher"] = _clean_publisher(_clean_field(source.publisher)) if source.publisher else None
+    data["title"] = _unquote(source.title) or ""
+    if source.volume:
+        data["volume"] = re.sub(r"^vol(?:ume)?\b\.?\s*", "", _clean_field(source.volume) or "", flags=re.I) or None
+    for field in ("date", "retrieved"):
+        value = _clean_field(getattr(source, field))
+        data[field] = _clean_date(_ONLINE_AT.sub("", value)) if value else None
+    data["online"] = source.online or bool(data["retrieved"])
+    data["title_number"] = _clean_field(source.title_number)
+    data["title_name"] = _clean_field(source.title_name)
+    data["chapter"] = _unquote(source.chapter)
+    if not data["publisher"]:
+        warnings.append("Legal encyclopedia missing the publisher")
+    return LegalEncyclopediaSource(**data), warnings
+
+
+_PLATFORMS = {
+    _norm_key(name): name
+    for name in ("Twitter", "X", "Instagram", "Facebook", "YouTube", "LinkedIn", "TikTok", "Reddit", "Threads", "Bluesky")
+}
+
+
+def _normalise_social_media(source: SocialMediaSource) -> tuple[SocialMediaSource, list[str]]:
+    data = {k: v if isinstance(v, bool) or k == "title_rich" else _clean_field(v) for k, v in source.model_dump().items()
+            if k != "type"}
+    data["username"] = (source.username or "").strip()
+    data["title"] = _unquote(source.title)
+    if data["platform"]:
+        data["platform"] = _PLATFORMS.get(_norm_key(data["platform"]), data["platform"])
+    if data["platform"] == "Twitter" and data["username"] and " " not in data["username"] and not data["username"].startswith("@"):
+        data["username"] = "@" + data["username"]  # r 7.16: '@' is part of a Twitter username
+    data["date"] = _clean_date(data["date"])
+    for field in ("url", "archived_url"):
+        data[field] = getattr(source, field).strip() if getattr(source, field) else None
+    data["title_rich"] = source.title_rich
+    return SocialMediaSource(**data), []
+
+
 def _normalise_newspaper(source: NewspaperSource) -> tuple[NewspaperSource, list[str]]:
     warnings: list[str] = []
     data = source.model_dump()
@@ -716,6 +842,83 @@ def _normalise_treaty(source: TreatySource) -> tuple[TreatySource, list[str]]:
     return TreatySource(**data), warnings
 
 
+# r 9.2.3: 'General Assembly Resolution 61/295' -> 'GA Res 61/295'
+_UN_ORGANS = {
+    "GA": r"general\s+assembly|unga|ga",
+    "SC": r"security\s+council|unsc|sc",
+    "ESC": r"economic\s+and\s+social\s+council|ecosoc|esc",
+}
+_RESOLUTION = re.compile(
+    r"^(?:(?:united\s+nations|un)\s+)?(?P<organ>" + "|".join(_UN_ORGANS.values()) + r")\s+"
+    r"(?P<kind>res(?:olution)?|dec(?:ision)?)\s*(?:no\s*)?(?P<number>\S.*)$",
+    re.I,
+)
+# r 9.2.4
+_OFFICIAL_RECORDS = {
+    "gaor": "UN GAOR", "generalassemblyofficialrecords": "UN GAOR",
+    "scor": "UN SCOR", "securitycouncilofficialrecords": "UN SCOR",
+    "escor": "UN ESCOR", "economicandsocialcouncilofficialrecords": "UN ESCOR",
+    "tcor": "UN TCOR", "trusteeshipcouncilofficialrecords": "UN TCOR",
+}
+_ORDINAL_WORDS = {w: str(i) for i, w in enumerate(
+    "first second third fourth fifth sixth seventh eighth ninth tenth".split(), start=1)}
+
+
+def _canon_resolution(value: str) -> str:
+    # full stops go from the organ's abbreviation ('G.A. Res.'), never from the number
+    m = _RESOLUTION.match(re.sub(r"(?<=\b[A-Za-z])\.|(?<=\bRes)\.|(?<=\bDec)\.|(?<=\bNo)\.", "", value))
+    if not m:
+        return value
+    organ = next(k for k, pattern in _UN_ORGANS.items() if re.fullmatch(pattern, m.group("organ"), re.I))
+    kind = "Res" if m.group("kind").lower().startswith("res") else "Dec"
+    return f"{organ} {kind} {m.group('number').strip()}"
+
+
+def _un_number(value: str | None, label: str) -> str | None:
+    """'54th sess' -> '54', 'Third Committee' -> '3', '93rd plen mtg' -> '93' (r 9.2.5-9.2.7)."""
+    value = _clean_field(value)
+    if not value:
+        return value
+    value = re.sub(label, "", value, flags=re.I).strip(" ,")
+    m = re.fullmatch(r"(\d+)\s*(?:st|nd|rd|th)?", value, re.I)
+    return m.group(1) if m else _ORDINAL_WORDS.get(value.lower(), value) or None
+
+
+def _normalise_un_document(source: UNDocumentSource) -> tuple[UNDocumentSource, list[str]]:
+    warnings: list[str] = []
+    data = source.model_dump()
+    data["author"] = _clean_field(source.author)
+    data["title"] = _unquote(source.title)
+    data["resolution"] = _canon_resolution(_clean_field(source.resolution)) if source.resolution else None
+    if source.official_records:
+        records = _clean_field(source.official_records) or ""
+        key = re.sub(r"^(?:un|unitednations)", "", _norm_key(records))
+        data["official_records"] = _OFFICIAL_RECORDS.get(key, records)
+    data["committee"] = _un_number(source.committee, r"\b(?:main\s+)?comm(?:ittee)?\b\.?")
+    data["session"] = _un_number(source.session, r"\bsess(?:ion)?\b\.?")
+    data["session_part"] = _un_number(source.session_part, r"\b(?:pt|part)\b\.?")
+    data["plenary"] = source.plenary or bool(source.meeting and re.search(r"\bplen", source.meeting, re.I))
+    data["meeting"] = _un_number(source.meeting, r"\b(?:plen(?:ary)?\.?\s+)?(?:mtg|meeting)\b\.?")
+    items = []
+    for item in source.agenda_items:
+        item = re.sub(r"^agenda\s+items?\s*", "", _clean_field(item) or "", flags=re.I)
+        items.extend(i for i in re.split(r"\s*,\s*|\s+and\s+", item) if i)
+    data["agenda_items"] = items
+    if source.supplement:
+        data["supplement"] = re.sub(r"^supp(?:lement)?\b\.?\s*(?:no\b\.?\s*)?", "", _clean_field(source.supplement) or "",
+                                    flags=re.I) or None
+    if source.document_number:
+        # r 9.2.10: the number exactly as on the document (its own full stops kept), after 'UN Doc'
+        number = re.sub(r"^(?:U\.?N\.?\s+)?Docs?\.?\s+", "", _clean_field(source.document_number) or "", flags=re.I)
+        data["document_number"] = number or None
+    else:
+        warnings.append("UN document missing its document number")
+    data["date"] = _clean_date(_clean_field(source.date))
+    adopted = _clean_field(source.adopted)
+    data["adopted"] = _clean_date(re.sub(r"^adopted\s+(?:on\s+)?", "", adopted, flags=re.I)) if adopted else None
+    return UNDocumentSource(**data), warnings
+
+
 def _normalise_other(source: OtherSource) -> tuple[OtherSource, list[str]]:
     data = source.model_dump()
     text = source.text or ""
@@ -735,6 +938,10 @@ _DISPATCH = {
     "book_chapter": _normalise_book_chapter,
     "report": _normalise_report,
     "research_paper": _normalise_research_paper,
+    "speech": _normalise_speech,
+    "media_release": _normalise_media_release,
+    "dictionary": _normalise_dictionary,
+    "legal_encyclopedia": _normalise_legal_encyclopedia,
     "parliamentary_debates": _normalise_parliamentary_debates,
     "submission": _normalise_submission,
     "committee_evidence": _normalise_committee_evidence,
@@ -742,7 +949,9 @@ _DISPATCH = {
     "explanatory_memorandum": _normalise_explanatory_memorandum,
     "newspaper": _normalise_newspaper,
     "website": _normalise_website,
+    "social_media": _normalise_social_media,
     "treaty": _normalise_treaty,
+    "un_document": _normalise_un_document,
     "other": _normalise_other,
 }
 
@@ -805,6 +1014,22 @@ def normalise_citation(citation: Citation) -> tuple[Citation, list[str]]:
             p.model_copy(update={"value": _COMMITTEE_PAGE_PREFIX.sub("", p.value)}) if p.kind == PinpointKind.page else p
             for p in citation.pinpoints
         ]
+    if isinstance(src, DictionarySource) and not src.definition:
+        # r 7.6: '(def 4)' is part of the entry, not a pinpoint
+        for p in citation.pinpoints:
+            m = re.fullmatch(r"(?:def(?:inition)?|sense)\b\.?\s*(\S+)", p.value.strip("()"), re.I)
+            if m:
+                citation.source = src = src.model_copy(update={"definition": m.group(1)})
+                citation.pinpoints = [q for q in citation.pinpoints if q is not p]
+                break
+    if isinstance(src, LegalEncyclopediaSource):
+        pins = citation.pinpoints
+        if pins and pins[0].kind == PinpointKind.volume and not src.volume and not src.online:
+            citation.source = src = src.model_copy(update={"volume": pins[0].value})
+            pins = pins[1:]
+        # r 7.7: pinpoints are to paragraphs ('[235-270]'), whatever the footnote called them
+        citation.pinpoints = [p.model_copy(update={"kind": PinpointKind.paragraph}) if p.kind == PinpointKind.page else p
+                              for p in pins]
     if citation.short_title:
         citation.short_title = citation.short_title.strip() or None
 
@@ -880,6 +1105,36 @@ def source_key(source: Source) -> str:
         title, year = _split_title_year((source.title or "").strip(), source.year)
         juris = _canon_jurisdiction(source.jurisdiction or "")[0] or source.jurisdiction
         return f"em:{_norm_key(source.document_type)}:{_norm_key(title)}:{_norm_key(year)}:{_norm_key(juris)}"
+
+    if isinstance(source, (SpeechSource, MediaReleaseSource)):
+        src = _DISPATCH[source.type](source)[0]
+        surname = _norm_key(_surname(src.authors[0])) if src.authors else ""
+        number = getattr(src, "document_number", None)
+        return f"{source.type}:{surname}:{_norm_key(src.title)}" + _details(number, src.date)
+
+    if isinstance(source, DictionarySource):
+        # each entry (and definition) is a source of its own, so 'Ibid' never hides a change
+        d = _normalise_dictionary(source)[0]
+        parts = (d.title, d.entry, d.entry_designation, d.definition)
+        return "dictionary:" + ":".join(_norm_key(p) for p in parts) + _details(d.edition, d.year, d.retrieved)
+
+    if isinstance(source, LegalEncyclopediaSource):
+        e = _normalise_legal_encyclopedia(source)[0]
+        parts = (e.title, e.title_number, e.title_name, e.chapter)
+        return "encyclopedia:" + ":".join(_norm_key(p) for p in parts) + _details(e.volume, e.date, e.retrieved)
+
+    if isinstance(source, SocialMediaSource):
+        sm = _normalise_social_media(source)[0]
+        return f"social_media:{_norm_key(sm.username)}:{_norm_key(sm.title)}" + _details(
+            sm.platform, sm.date, sm.time, sm.url)
+
+    if isinstance(source, UNDocumentSource):
+        # r 9.2.10: the document number identifies a UN document
+        un = _normalise_un_document(source)[0]
+        if un.document_number:
+            return f"un:{_norm_key(un.document_number)}"
+        parts = (un.resolution, un.title, un.official_records, un.session, un.meeting, un.date)
+        return "un:" + ":".join(_norm_key(p) for p in parts)
 
     if isinstance(source, OtherSource):
         return f"other:{_norm_key(source.text)}"

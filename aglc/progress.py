@@ -35,6 +35,8 @@ SOURCE_LABELS = {
     "parliamentary_debates": "Hansard", "submission": "Submission", "committee_evidence": "Committee evidence",
     "convention_debates": "Convention debates", "explanatory_memorandum": "Explanatory memorandum",
     "newspaper": "Newspaper", "website": "Website", "treaty": "Treaty",
+    "speech": "Speech", "media_release": "Media release", "dictionary": "Dictionary",
+    "legal_encyclopedia": "Legal encyclopedia", "social_media": "Social media", "un_document": "UN document",
 }
 #: a footnote's text is cut to this many characters for the page
 MAX_TEXT = 400

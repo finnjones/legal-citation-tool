@@ -1,0 +1,323 @@
+[
+ {
+  "id": "7.3-41",
+  "rule": "7.3",
+  "page": 113,
+  "citation": {
+   "source": {
+    "type": "speech",
+    "authors": [
+     "Justice Dyson Heydon"
+    ],
+    "title": "Threats to Judicial Independence: The Enemy Within",
+    "forum": "Inner Temple",
+    "date": "23 January 2012"
+   }
+  },
+  "expected_full": "Justice Dyson Heydon, ‘Threats to Judicial Independence: The Enemy Within’ (Speech, Inner Temple, 23 January 2012)"
+ },
+ {
+  "id": "7.3-42",
+  "rule": "7.3",
+  "page": 113,
+  "citation": {
+   "source": {
+    "type": "speech",
+    "authors": [
+     "Virginia Bell"
+    ],
+    "title": "Section 80: The Great Constitutional Tautology",
+    "lecture": "Lucinda Lecture",
+    "forum": "Monash University",
+    "date": "24 October 2013"
+   }
+  },
+  "expected_full": "Virginia Bell, ‘Section 80: The Great Constitutional Tautology’ (Lucinda Lecture, Monash University, 24 October 2013)"
+ },
+ {
+  "id": "7.3-43",
+  "rule": "7.3",
+  "page": 113,
+  "citation": {
+   "source": {
+    "type": "speech",
+    "authors": [
+     "Lord Sumption"
+    ],
+    "title": "The Limits of Law",
+    "lecture": "Sultan Azlan Shah Lecture",
+    "forum": "Kuala Lumpur",
+    "date": "20 November 2013"
+   }
+  },
+  "expected_full": "Lord Sumption, ‘The Limits of Law’ (Sultan Azlan Shah Lecture, Kuala Lumpur, 20 November 2013)"
+ },
+ {
+  "id": "7.3-44",
+  "rule": "7.3",
+  "page": 114,
+  "citation": {
+   "source": {
+    "type": "speech",
+    "authors": [
+     "Chief Justice Robert French"
+    ],
+    "title": "Native Title: A Constitutional Shift?",
+    "lecture": "JD Lecture Series",
+    "forum": "Melbourne Law School",
+    "date": "24 March 2009",
+    "url": "http://www.hcourt.gov.au/publications/speeches/current/speeches-by-chief-justice-french-ac"
+   }
+  },
+  "expected_full": "Chief Justice Robert French, ‘Native Title: A Constitutional Shift?’ (JD Lecture Series, Melbourne Law School, 24 March 2009) <http://www.hcourt.gov.au/publications/speeches/current/speeches-by-chief-justice-french-ac>"
+ },
+ {
+  "id": "7.4-45",
+  "rule": "7.4",
+  "page": 114,
+  "citation": {
+   "source": {
+    "type": "media_release",
+    "authors": [
+     "Department of Defence (Cth)"
+    ],
+    "authors_are_bodies": true,
+    "title": "Highest East Timorese Honour for Army Officers",
+    "release_type": "Media Release",
+    "document_number": "MSPA 172/09",
+    "date": "22 May 2009"
+   }
+  },
+  "expected_full": "Department of Defence (Cth), ‘Highest East Timorese Honour for Army Officers’ (Media Release MSPA 172/09, 22 May 2009)"
+ },
+ {
+  "id": "7.4-46",
+  "rule": "7.4",
+  "page": 114,
+  "citation": {
+   "source": {
+    "type": "media_release",
+    "authors": [
+     "ASX"
+    ],
+    "authors_are_bodies": true,
+    "title": "ASX Selects Distributed Ledger Technology to Replace CHESS",
+    "date": "7 December 2017"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "1"
+    }
+   ]
+  },
+  "expected_full": "ASX, ‘ASX Selects Distributed Ledger Technology to Replace CHESS’ (Media Release, 7 December 2017) 1"
+ },
+ {
+  "id": "7.6-59",
+  "rule": "7.6",
+  "page": 118,
+  "citation": {
+   "source": {
+    "type": "dictionary",
+    "title": "Macquarie Dictionary",
+    "edition": "5",
+    "year": "2009",
+    "entry": "demise",
+    "definition": "4"
+   }
+  },
+  "expected_full": "*Macquarie Dictionary* (5th ed, 2009) ‘demise’ (def 4)"
+ },
+ {
+  "id": "7.6-60",
+  "rule": "7.6",
+  "page": 118,
+  "citation": {
+   "source": {
+    "type": "dictionary",
+    "title": "Chambers Dictionary",
+    "edition": "13",
+    "year": "2014",
+    "entry": "éclair"
+   }
+  },
+  "expected_full": "*Chambers Dictionary* (13th ed, 2014) ‘éclair’"
+ },
+ {
+  "id": "7.6-61",
+  "rule": "7.6",
+  "page": 118,
+  "citation": {
+   "source": {
+    "type": "dictionary",
+    "title": "Oxford English Dictionary",
+    "edition": "2",
+    "year": "1989",
+    "entry": "school",
+    "entry_designation": "v2",
+    "definition": "2b"
+   }
+  },
+  "expected_full": "*Oxford English Dictionary* (2nd ed, 1989) ‘school’ (v2, def 2b)"
+ },
+ {
+  "id": "7.6-62",
+  "rule": "7.6",
+  "page": 118,
+  "citation": {
+   "source": {
+    "type": "dictionary",
+    "title": "Macquarie Dictionary",
+    "online": true,
+    "retrieved": "20 February 2018",
+    "entry": "punctilious"
+   }
+  },
+  "expected_full": "*Macquarie Dictionary* (online at 20 February 2018) ‘punctilious’"
+ },
+ {
+  "id": "7.6-63",
+  "rule": "7.6",
+  "page": 119,
+  "citation": {
+   "source": {
+    "type": "dictionary",
+    "title": "Encyclopaedic Australian Legal Dictionary",
+    "online": true,
+    "retrieved": "20 February 2018",
+    "entry": "default judgment",
+    "definition": "1"
+   }
+  },
+  "expected_full": "*Encyclopaedic Australian Legal Dictionary* (online at 20 February 2018) ‘default judgment’ (def 1)"
+ },
+ {
+  "id": "7.7-64",
+  "rule": "7.7",
+  "page": 119,
+  "citation": {
+   "source": {
+    "type": "legal_encyclopedia",
+    "publisher": "LexisNexis",
+    "title": "Halsbury’s Laws of Australia",
+    "volume": "15",
+    "date": "25 May 2009",
+    "title_number": "235",
+    "title_name": "Insurance",
+    "chapter": "2 General Principles"
+   },
+   "pinpoints": [
+    {
+     "kind": "paragraph",
+     "value": "235-270"
+    }
+   ]
+  },
+  "expected_full": "LexisNexis, *Halsbury’s Laws of Australia*, vol 15 (at 25 May 2009) 235 Insurance, ‘2 General Principles’ [235-270]"
+ },
+ {
+  "id": "7.7-65",
+  "rule": "7.7",
+  "page": 119,
+  "citation": {
+   "source": {
+    "type": "legal_encyclopedia",
+    "publisher": "Westlaw AU",
+    "title": "The Laws of Australia",
+    "online": true,
+    "retrieved": "15 February 2018",
+    "title_number": "2",
+    "title_name": "Administrative Law",
+    "chapter": "2.3 Access to Information"
+   },
+   "pinpoints": [
+    {
+     "kind": "paragraph",
+     "value": "2.3.10"
+    }
+   ]
+  },
+  "expected_full": "Westlaw AU, *The Laws of Australia* (online at 15 February 2018) 2 Administrative Law, ‘2.3 Access to Information’ [2.3.10]"
+ },
+ {
+  "id": "7.7-66",
+  "rule": "7.7",
+  "page": 119,
+  "citation": {
+   "source": {
+    "type": "legal_encyclopedia",
+    "publisher": "LexisNexis",
+    "title": "Halsbury’s Law of England",
+    "online": true,
+    "retrieved": "20 February 2018",
+    "title_name": "Equitable Jurisdiction",
+    "chapter": "4 Principles of Equitable Jurisdiction"
+   },
+   "pinpoints": [
+    {
+     "kind": "paragraph",
+     "value": "101"
+    }
+   ]
+  },
+  "expected_full": "LexisNexis, *Halsbury’s Law of England* (online at 20 February 2018) Equitable Jurisdiction, ‘4 Principles of Equitable Jurisdiction’ [101]"
+ },
+ {
+  "id": "7.16-114",
+  "rule": "7.16",
+  "page": 131,
+  "citation": {
+   "source": {
+    "type": "social_media",
+    "username": "Brooking Creative Labs",
+    "title": "Is America Dreaming?: Understanding Social Mobility",
+    "platform": "YouTube",
+    "date": "20 July 2015",
+    "url": "https://www.youtube.com/watch?v=vG6-UaBECN4"
+   },
+   "pinpoints": [
+    {
+     "kind": "other",
+     "value": "00:00:00–00:01:00"
+    }
+   ]
+  },
+  "expected_full": "Brooking Creative Labs, ‘Is America Dreaming?: Understanding Social Mobility’ (YouTube, 20 July 2015) 00:00:00–00:01:00 <https://www.youtube.com/watch?v=vG6-UaBECN4>"
+ },
+ {
+  "id": "7.16-115",
+  "rule": "7.16",
+  "page": 131,
+  "citation": {
+   "source": {
+    "type": "social_media",
+    "username": "chapteriiibestbits",
+    "platform": "Instagram",
+    "date": "21 July 2016",
+    "time_zone": "AEST",
+    "url": "https://www.instagram.com/p/BIICBevgk31"
+   }
+  },
+  "expected_full": "chapteriiibestbits (Instagram, 21 July 2016 AEST) <https://www.instagram.com/p/BIICBevgk31>"
+ },
+ {
+  "id": "7.16-116",
+  "rule": "7.16",
+  "page": 131,
+  "citation": {
+   "source": {
+    "type": "social_media",
+    "username": "@s_m_stephenson",
+    "author_name": "Scott Stephenson",
+    "platform": "Twitter",
+    "date": "17 July 2017",
+    "time": "9:37pm",
+    "time_zone": "AEST",
+    "url": "https://twitter.com/s_m_stephenson/status/887169425551441921",
+    "archived_url": "https://perma.cc/7A63-G2RT"
+   }
+  },
+  "expected_full": "@s_m_stephenson (Scott Stephenson) (Twitter, 17 July 2017, 9:37pm AEST) <https://twitter.com/s_m_stephenson/status/887169425551441921>, archived at <https://perma.cc/7A63-G2RT>"
+ }
+]
