@@ -30,7 +30,8 @@ INDEX = {
                    "10": ["AGV20 v Minister for Immigration", "AGV20 v Minister for Immigration (No 2)"]},
             },
         },
-    }
+    },
+    "unnumbered": {"HCA": {"?": ["Commissioner of Taxation (Cth) v Westfield Ltd"]}},
 }
 
 
@@ -112,11 +113,45 @@ def test_citations_the_index_cant_answer_for_are_not_flagged(year, court, number
     assert _warning(_case("Smith v Jones", year, court, number)) is None
 
 
-def test_reported_case_and_other_sources_are_not_checked():
-    reported = Citation(source=CaseSource(name="Smith v Jones", year="1956", volume="95", report="CLR", starting_page="1"))
+def _reported(name: str, year: str, report: str = "CLR") -> Citation:
+    return Citation(source=CaseSource(name=name, year=year, volume="95", report=report, starting_page="1"))
+
+
+@pytest.mark.parametrize("name, year", [
+    ("Muir v Open Brethren", "1956"),
+    ("Muir v Open Brethren", "1957"),  # decided the year before it was reported
+    ("Federal Commissioner of Taxation v Westfield Ltd", "1991"),  # a title without a number
+])
+def test_reported_case_found_by_name_is_checked(name, year):
+    assert V.check_citation(_reported(name, year)) == V.CaseCheck(True)
+
+
+@pytest.mark.parametrize("citation", [
+    _reported("Smith v Jones", "1956"),           # no such decision: the index may just lack it
+    _reported("Muir v Open Brethren", "1958"),    # not that year or the year before
+    _reported("Muir v Open Brethren", "1956", "VR"),  # a report the index can't search
+    _reported("R v R", "1956"),                   # nothing to search for
+])
+def test_reported_case_not_found_is_unchecked_not_flagged(citation):
+    assert V.check_citation(citation) == V.CaseCheck(False)
+
+
+def test_other_sources_are_not_cases():
     act = Citation(source=LegislationSource(title="Evidence Act", year="1995", jurisdiction="Cth"))
-    assert V.check_citation(reported) == V.CaseCheck(False)
-    assert V.check_citation(act) is None  # not a case, so not counted either
+    assert V.check_citation(act) is None  # so not counted either
+
+
+@pytest.mark.parametrize("cited, title, plausible", [
+    ("Kvelde v The State of New South Wales", "Kvelde v State of New South Wales", True),
+    ("ACCC v CG Berbatis Holdings Pty Ltd", "Australian Competition and Consumer Commission v CG Berbatis Holdings Pty Ltd", True),
+    ("Kable v DPP (NSW)", "Kable v Director of Public Prosecutions (NSW)", True),
+    ("Aust Broadcasting Corp v Lenah Game Meats", "Australian Broadcasting Corporation v Lenah Game Meats Pty Ltd", True),
+    ("Re Colina; Ex parte Torney", "Re Colina; Ex parte Torney", True),
+    ("Commissioner of Taxation v Johnson", "John Holland Group Pty Ltd v Commissioner of Taxation", False),
+    ("Smith v Jones", "Smith v Commonwealth", False),  # every party must match
+])
+def test_plausible_name(cited, title, plausible):
+    assert V.plausible_name(cited, title) is plausible
 
 
 @pytest.mark.parametrize("year, number, checked", [

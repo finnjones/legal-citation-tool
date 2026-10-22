@@ -52,14 +52,25 @@ def records(lines):
             continue
 
 
+#: Where a decision without a medium neutral citation came from, for matching a reported
+#: case by name (aglc/verify.py): its court isn't known, only the site's.
+_SITES = {"high_court_of_australia": "HCA", "federal_court_of_australia": "FCA", "nsw_caselaw": "NSW"}
+
+
 def build(lines) -> dict:
     cases: dict[str, dict[str, dict[str, str | list[str]]]] = defaultdict(lambda: defaultdict(dict))
+    unnumbered: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     scraped: dict[str, str] = {}
     seen = 0
     for rec in records(lines):
         seen += 1
         m = _MNC.search(rec.get("citation") or "")
         if not m:
+            # eg 'Commissioner of Taxation (Cth) v Westfield Ltd': findable by name and year,
+            # or by name alone ('?') when the site gives no date, as the High Court's doesn't
+            site, year = _SITES.get(rec.get("source")), (rec.get("date") or "")[:4] or "?"
+            if site and rec.get("citation"):
+                unnumbered[site][year].append(rec["citation"].strip())
             continue
         year, court, number = m[1], m[2], str(int(m[3]))
         name = rec["citation"][: m.start()].strip()
@@ -84,6 +95,8 @@ def build(lines) -> dict:
         "source": f"Open Australian Legal Corpus by Isaacus, CC BY 4.0 ({CORPUS_PAGE})",
         "built": date.today().isoformat(),
         "courts": courts,
+        # decisions whose title has no medium neutral citation: site -> year decided -> titles
+        "unnumbered": {site: {y: sorted(t) for y, t in sorted(years.items())} for site, years in sorted(unnumbered.items())},
     }
 
 
