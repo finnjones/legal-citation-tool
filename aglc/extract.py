@@ -30,6 +30,7 @@ from . import validate
 from .llm.base import LLMError, LLMProvider
 from .progress import Progress, found_in, safe
 from .models import (
+    CaseSource,
     Citation,
     CitationSegment,
     Footnote,
@@ -186,13 +187,43 @@ _SUBDIVISION = re.compile(r"[0-9]{1,4}[A-Z]{0,2}|[a-z]{1,2}|[ivxlc]{1,6}|[A-Z]")
 
 
 def _as_subdivisions(value: str) -> str | None:
-    """'1' -> '(1)', '(1)(b)' -> '(1)(b)'; None for anything that isn't a subdivision."""
-    value = value.strip()
-    if _SUBDIVISION.fullmatch(value):
-        return f"({value})"
-    if re.fullmatch(r"(?:\((?:" + _SUBDIVISION.pattern + r")\))+", value):
-        return value
-    return None
+    """'1' -> '(1)'; '(1)(b)', '1, b' and '(1), (b)' -> '(1)(b)'; None for anything that
+    isn't a run of subdivisions."""
+    parts = [p for p in re.split(r"[\s,()]+", value) if p]
+    if not parts or re.search(r"[^\w\s,()]", value) or not all(_SUBDIVISION.fullmatch(p) for p in parts):
+        return None
+    return "".join(f"({p})" for p in parts)
+
+
+def _bracketed_paragraphs(citation: Citation, original: str) -> Citation:
+    """A pinpoint the citation's own text writes in square brackets ('[202]') is a paragraph,
+    whatever kind the model gave it; one written without them is left as written."""
+    text = re.sub(r"\s+", "", original)
+    pins = [p.model_copy(update={"kind": PinpointKind.paragraph})
+            if p.kind == PinpointKind.page and "[" + re.sub(r"\s+", "", p.value) + "]" in text else p
+            for p in citation.pinpoints]
+    return citation if pins == citation.pinpoints else citation.model_copy(update={"pinpoints": pins})
+
+
+def _bare_numbers_as_written(citation: Citation, original: str) -> tuple[Citation, list[str]]:
+    """r 2.3.1: a case cited by its medium neutral citation has no pages, so a number written
+    after it without square brackets ('Kvelde (n 8) 69, [202]') can't be read as a page or
+    a paragraph. Keep it exactly as written, with the comma after it, and say so."""
+    src = citation.source
+    if not (isinstance(src, CaseSource) and src.court_id and not src.report):
+        return citation, []
+    pins, notes = [], []
+    for k, p in enumerate(citation.pinpoints):
+        if p.kind != PinpointKind.page:
+            pins.append(p)
+            continue
+        m = re.search(rf"(?<![\w\[]){re.escape(p.value.strip())}(?![\w\]])\s*(,?)", original)
+        comma = m.group(1) if m and k + 1 < len(citation.pinpoints) else ""
+        pins.append(Pinpoint(kind=PinpointKind.other, value=p.value.strip() + comma))
+        notes.append(f"pinpoint {p.value.strip()} has no square brackets, but a case cited by its medium "
+                     f"neutral citation has no page numbers (AGLC4 r 2.3.1): if it is a paragraph, write "
+                     f"[{p.value.strip()}]")
+    return citation.model_copy(update={"pinpoints": pins}), notes
 
 
 def _join_subdivisions(citation: Citation, original: str) -> Citation:
@@ -220,6 +251,15 @@ def _join_subdivisions(citation: Citation, original: str) -> Citation:
     if len(out) == len(pins):
         return citation
     return citation.model_copy(update={"pinpoints": out})
+
+
+def _continues_citation(text: str, out: list[Segment]) -> bool:
+    """Whether text the model left out of every segment, right after a citation, is the rest
+    of that citation (its pinpoint, say), already captured in its fields, rather than
+    something to keep as written."""
+    if not out or not isinstance(out[-1], CitationSegment) or not any(ch.isalnum() for ch in text):
+        return False
+    return not validate.missing_from_extraction(text, [out[-1]])
 
 
 def _dedupe_signal(citation: Citation, out: list[Segment]) -> Citation:
@@ -783,7 +823,7 @@ class Extractor:
         out: list[Segment] = []
         unlocated: list[str] = []
         starts: list[int] = []  # where each segment the model gave starts in the original
-        to_ground: list[tuple[int, int | None]] = []  # (index in out, start) of each new citation
+        citations: list[tuple[int, int | None, bool]] = []  # (index in out, start, check its numbers)
         for seg in llm_fn.segments:
             if isinstance(seg, LLMTextSegment):
                 span = mapper.slice(seg.text)
@@ -794,7 +834,8 @@ class Extractor:
                         )
                     continue
                 starts.append(mapper.start)
-                self._keep_skipped(footnote.number, mapper.skipped, out)
+                if not _continues_citation(mapper.skipped.text, out):
+                    self._keep_skipped(footnote.number, mapper.skipped, out)
                 out.append(TextSegment(text=span))
             else:
                 earlier = [s.citation for s in out if isinstance(s, CitationSegment)]
@@ -803,7 +844,8 @@ class Extractor:
                 start = mapper.start if span is not None else None
                 if span is not None:
                     starts.append(start)
-                    citation = self._recover_skipped(footnote.number, mapper.skipped, citation, out)
+                    if not _continues_citation(mapper.skipped.text, out):
+                        citation = self._recover_skipped(footnote.number, mapper.skipped, citation, out)
                     _split_leading_commentary(span, citation, out)
                     if seg.refers_to_footnote is None:
                         citation = _keep_original_text(citation, span)
@@ -817,28 +859,32 @@ class Extractor:
                 citation = _keep_title_italics(citation, span)
                 citation = _dedupe_signal(citation, out)
                 citation = _drop_repeated_start_page(citation, span.text if seg.original else "")
-                citation = _join_subdivisions(citation, span.text if seg.original else "")
-                if self.verify and seg.refers_to_footnote is None:  # references carry earlier footnotes' data
-                    to_ground.append((len(out), start))
+                # references carry earlier footnotes' data, so only new sources' numbers are checked
+                citations.append((len(out), start, self.verify and seg.refers_to_footnote is None))
                 out.append(CitationSegment(citation=citation, original=span.text if seg.original else ""))
 
-        # A citation's numbers must be in its own text: from where it starts to where the next
-        # segment does (so a pinpoint the model left out of `original` still counts), never a
-        # number belonging to another citation in the footnote
-        for i, start in to_ground:
-            if start is None:
-                own = mapper.plain  # nowhere to anchor it (reported as not in the footnote)
+        # A citation's own text runs from where it starts to where the next segment does, so
+        # a pinpoint the model left out of `original` ('Ibid' for 'Ibid s 214A(1)(b)') is still
+        # its own, and no other citation's is
+        for i, start, ground in citations:
+            if start is None:  # nowhere to anchor it (reported as not in the footnote)
+                own = out[i].original or mapper.plain
             else:
                 own = mapper.plain[start: min((s for s in starts if s > start), default=len(mapper.plain))]
-            citation, notes = validate.remove_invented_numbers(out[i].citation, own)
-            out[i] = out[i].model_copy(update={"citation": citation})
+            citation = _bracketed_paragraphs(_join_subdivisions(out[i].citation, own), own)
+            citation, notes = _bare_numbers_as_written(citation, own)
             self.warnings += [f"footnote {footnote.number}: {n}" for n in notes]
+            if ground:
+                citation, notes = validate.remove_invented_numbers(citation, own)
+                self.warnings += [f"footnote {footnote.number}: {n}" for n in notes]
+            out[i] = out[i].model_copy(update={"citation": citation})
 
         if mapper.cursor < len(mapper.plain):
             leftover = mapper.remainder()
             # Closing punctuation is re-applied by the document pass, so a leftover that is
-            # only punctuation/whitespace (the footnote's final full stop) is not content.
-            if leftover.text.strip(" \t\n.;,"):
+            # only punctuation/whitespace (the footnote's final full stop) is not content;
+            # nor is the rest of the last citation ('s 214A(1)(b)' after an 'Ibid' original)
+            if leftover.text.strip(" \t\n.;,") and not _continues_citation(leftover.text, out):
                 self.warnings.append(
                     f"footnote {footnote.number}: trailing text not covered by extraction; appended verbatim"
                 )

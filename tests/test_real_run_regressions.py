@@ -71,12 +71,15 @@ def test_treaty_series_abbreviation_loses_full_stops():
     )
 
 
-def test_medium_neutral_citation_pinpoints_are_paragraphs():
-    c = Citation(
-        source=CaseSource(name="Kuhl v Zurich Financial Services Australia Ltd", year="2011", court_id="HCA", judgment_number="11"),
-        pinpoints=[Pinpoint(kind="page", value="20")],
-    )
-    assert _full(c) == "*Kuhl v Zurich Financial Services Australia Ltd* [2011] HCA 11, [20]"
+def test_a_pinpoint_written_in_square_brackets_stays_a_paragraph():
+    # the model labelled the author's '[20]' a page, which would print it without brackets
+    kuhl = "Kuhl v Zurich Financial Services Australia Ltd [2011] HCA 11, [20]"
+    result = _process([_rich(1, "*Kuhl v Zurich Financial Services Australia Ltd* [2011] HCA 11, [20].")], [
+        {"number": 1, "segments": [_cite(kuhl, {"type": "case", "name": "Kuhl v Zurich Financial Services Australia Ltd",
+                                                "year": "2011", "court_id": "HCA", "judgment_number": "11"},
+                                         pinpoints=[{"kind": "page", "value": "20"}]), _DOT]},
+    ])
+    assert result.footnotes[0].formatted.text == kuhl + "."
 
 
 def test_body_author_of_website_becomes_website_name():
@@ -696,3 +699,32 @@ def test_ibid_keeps_the_judge_when_there_is_no_pinpoint():
                                          pinpoint_judges="Brennan J"), _DOT]},
     ])
     assert result.footnotes[1].formatted.text == "Ibid (Brennan J)."
+
+
+def test_a_bare_number_after_a_medium_neutral_citation_is_not_bracketed():
+    # 'Kvelde (n 8) 69, [202]': the author wrote 69 without brackets, so it isn't made '[69]'
+    kvelde = "Kvelde v The State of New South Wales [2023] NSWSC 1560"
+    result = _process([_rich(1, f"*{kvelde[:39]}*{kvelde[39:]} [202] (‘*Kvelde*’)."), _rich(2, "Discussed below."),
+                       _rich(3, "*Kvelde* (n 1) 69, [202].")], [
+        {"number": 1, "segments": [_cite(kvelde + " [202] (‘Kvelde’)", {
+            "type": "case", "name": "Kvelde v The State of New South Wales", "year": "2023", "court_id": "NSWSC",
+            "judgment_number": "1560"}, pinpoints=[{"kind": "paragraph", "value": "202"}], short_title="Kvelde"), _DOT]},
+        {"number": 2, "segments": [{"kind": "text", "text": "Discussed below."}]},
+        {"number": 3, "segments": [_cite("Kvelde (n 1) 69, [202]", {"type": "other", "text": "Kvelde"}, 1,
+                                         pinpoints=[{"kind": "page", "value": "69"}, {"kind": "paragraph", "value": "202"}],
+                                         short_title="Kvelde"), _DOT]},
+    ])
+    assert result.footnotes[2].formatted.text == "Kvelde (n 1) 69, [202]."
+    assert any("if it is a paragraph, write [69]" in w.message for w in result.warnings)
+
+
+def test_ibid_subsections_given_as_one_value_are_put_back_together():
+    # 'Ibid s 214A(1)(b)' came back as section '214A' then '1, b', which rendered 'Ibid s 214A 1, b'
+    for original in ("Ibid s 214A(1)(b)", "Ibid"):  # with and without the pinpoint in `original`
+        result = _process([_rich(1, "*Crimes Act 1900* (NSW) s 214A (‘*Crimes Act*’)."), _rich(2, "Ibid s 214A(1)(b).")], [
+            {"number": 1, "segments": [_cite("Crimes Act 1900 (NSW) s 214A (‘Crimes Act’)", _act("Crimes Act", "1900"),
+                                             pinpoints=[_sec("214A")], short_title="Crimes Act"), _DOT]},
+            {"number": 2, "segments": [_cite(original, {"type": "other", "text": "Ibid"}, 1,
+                                             pinpoints=[_sec("214A"), {"kind": "other", "value": "1, b"}]), _DOT]},
+        ])
+        assert result.footnotes[1].formatted.text == "Ibid s 214A(1)(b).", original
