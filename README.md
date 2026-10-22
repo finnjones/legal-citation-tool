@@ -16,6 +16,9 @@ Format legal citations in Word documents to the *Australian Guide to Legal Citat
 - **Flags what it can't safely fix**: a missing full stop before a new sentence, an italicised
   possessive like "*Maynard’s* affidavit" (the person, not the case), and *Ibid* or "(n x)" with
   no pinpoint
+- **Flags cases that may not exist**: a medium neutral citation from the High Court, the
+  Federal Court or a NSW court that belongs to a different case, or that the court never
+  reached that year, checked offline (see below)
 - **Multiple interfaces**: CLI, HTTP API, and web UI
 - **Model-agnostic**: Works with Anthropic Claude, OpenAI, Google Gemini, Ollama, LM Studio, etc.
 
@@ -108,6 +111,17 @@ The AI model's output is checked deterministically (no second AI involved, see
    invented or borrowed values are removed and show as `[MISSING: ...]`.
 4. **Rendering:** every field of a source must appear in its formatted citation; anything
    the formatter omits is reported as a warning.
+
+### Cases that may not exist
+
+A case cited by medium neutral citation is looked up in `aglc/data/case_index.json.gz`, the
+title of every decision published by the High Court, the Federal Court and NSW Caselaw (see
+`aglc/verify.py`). Nothing is sent anywhere. It is flagged if the citation belongs to a
+different case ("Case name mismatch"; shortened and respelt names still match), or is well
+past the court's last decision that year ("Case not found"). A number the index simply
+lacks is not flagged: the Corpus is missing some real decisions (about 8% of the High
+Court's), so a gap proves nothing. Other courts, recent decisions and years the court's own
+site barely has are never flagged.
 
 ### Try it
 
@@ -356,9 +370,22 @@ official PDF changes, rebuild the table from the new copy:
 uv run --no-project --with pypdf --with cryptography python scripts/build_aglc4_pages.py reference/AGLC4.pdf
 ```
 
+The case index is built from the [Open Australian Legal Corpus](https://huggingface.co/datasets/isaacus/open-australian-legal-corpus).
+Rebuild it when a new version of the Corpus comes out (it streams the 9.4 GB file and keeps
+only each decision's title):
+
+```bash
+uv run python scripts/build_case_index.py
+```
+
 ## References
 
 - [Australian Guide to Legal Citation (4th ed)](https://law.unimelb.edu.au/research/australian-guide-to-legal-citation)
+- The case index (`aglc/data/case_index.json.gz`) is derived from the
+  [Open Australian Legal Corpus](https://huggingface.co/datasets/isaacus/open-australian-legal-corpus)
+  by Isaacus, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); only
+  decision titles and citations are kept. The decisions are those of the High Court of
+  Australia, the Federal Court of Australia and the NSW courts and tribunals published on NSW Caselaw.
 - Project architecture: see `PLAN.md` for detailed design decisions.
 
 ## License

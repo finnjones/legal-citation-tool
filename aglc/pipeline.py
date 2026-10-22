@@ -13,11 +13,12 @@ from .document import render_document
 from .docx_io import read_footnotes, write_document
 from .extract import Extractor
 from .llm.base import LLMProvider, get_provider
-from .models import CitationSegment, Extraction, Footnote, ProcessResult, Warning_
+from .models import CaseCheckSummary, CitationSegment, Extraction, Footnote, ProcessResult, Warning_
 from .formatters import formatter_for
 from .normalise import normalise_citation, unify_source_keys
 from .progress import Progress, footnote_texts, found_in, safe
 from .validate import check_footnote_rendering
+from .verify import check_citation
 
 log = logging.getLogger("aglc")
 
@@ -81,6 +82,8 @@ def _render(extraction: Extraction, *, bibliography: bool, progress: Progress | 
 
     unify_source_keys(seg.citation for fn in extracted for seg in fn.segments if isinstance(seg, CitationSegment))
     _share_short_titles(extracted)
+    case_check, msgs = _check_cases(extracted)
+    warnings += msgs
 
     # Deterministic check that the formatter printed every field (aglc/validate.py)
     report("stage", {"name": "checking"})
@@ -89,7 +92,29 @@ def _render(extraction: Extraction, *, bibliography: bool, progress: Progress | 
 
     result = render_document(extracted, bibliography=bibliography)
     result.warnings = warnings + result.warnings
+    result.case_check = case_check
     return result
+
+
+def _check_cases(footnotes: list[Footnote]) -> tuple[CaseCheckSummary, list[Warning_]]:
+    """Check each case cited exists (offline index, aglc/verify.py). Each case counts once,
+    and a wrong one is flagged where it is first cited, not at every later reference."""
+    first: dict[str, tuple[int, CitationSegment]] = {}
+    for fn in footnotes:
+        for seg in fn.segments:
+            if isinstance(seg, CitationSegment):
+                first.setdefault(seg.citation.source_key or f"{fn.number}:{id(seg)}", (fn.number, seg))
+    summary, warnings = CaseCheckSummary(), []
+    for number, seg in first.values():
+        check = check_citation(seg.citation)
+        if check is None:
+            continue
+        summary.total += 1
+        summary.checked += check.checked
+        if check.warning:
+            summary.flagged += 1
+            warnings.append(Warning_(footnote=number, message=check.warning))
+    return summary, warnings
 
 
 def _share_short_titles(footnotes: list[Footnote]) -> None:
@@ -171,6 +196,8 @@ _WARNING_KINDS = (
     "has missing data",
     "unknown report series",
     "unknown court identifier",
+    "case not found",
+    "case name mismatch",
     "unknown jurisdiction",
     "missing year",
     "missing jurisdiction",

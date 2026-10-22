@@ -426,6 +426,8 @@ def _result_json(session_id: str, result: ProcessResult) -> dict:
         "warnings": warnings,
         "body_fixes": [{"footnote": b.footnote, "message": b.message, "applied": b.applied}
                        for b in result.body_fixes],
+        # cases checked against the case index: {"total", "checked", "flagged"} (aglc/verify.py)
+        "case_check": result.case_check.model_dump(),
     }
 
 
