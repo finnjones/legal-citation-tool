@@ -188,13 +188,26 @@ def _paragraph_mark_deleted(p) -> bool:
 
 
 def _richtext_from_footnote(fn_elem) -> RichText:
+    return _read_footnote(fn_elem)[0]
+
+
+def _read_footnote(fn_elem) -> tuple[RichText, list[int | None]]:
+    """The footnote's text, paragraphs joined by "\n", and for each paragraph after the
+    first, the offset of the "\n" that starts it (None when it has none, being merged
+    into the one before by a deleted paragraph mark)."""
     rt = RichText()
+    breaks: list[int | None] = []
     stripped_leading_space = False
-    for pi, p in enumerate(fn_elem.findall(qn("w:p"))):
-        # A paragraph whose own mark is a tracked deletion has been merged away
-        # (see _mark_paragraph_deleted): don't emit a break for it.
-        if pi > 0 and not _paragraph_mark_deleted(p):
-            rt.append("\n", False)
+    paragraphs = fn_elem.findall(qn("w:p"))
+    for pi, p in enumerate(paragraphs):
+        if pi > 0:
+            # A deleted paragraph mark joins the paragraph to the next one; a paragraph
+            # deleted whole (mark and text, see _mark_paragraph_deleted) leaves no break.
+            merged = _paragraph_mark_deleted(paragraphs[pi - 1]) or (
+                _paragraph_mark_deleted(p) and not any(_run_text(r) for r in p.iter(qn("w:r"))))
+            breaks.append(None if merged else len(rt.text))
+            if not merged:
+                rt.append("\n", False)
         for run in p.iter(qn("w:r")):
             if run.find(qn("w:footnoteRef")) is not None:
                 continue  # the reference mark itself, not content
@@ -205,7 +218,7 @@ def _richtext_from_footnote(fn_elem) -> RichText:
                     text = text[1:]
             if text:
                 rt.append(text, _run_italic(run.find(qn("w:rPr"))))
-    return rt
+    return rt, breaks
 
 
 def read_footnotes(path: str | Path) -> list[Footnote]:
@@ -232,7 +245,9 @@ def read_footnotes(path: str | Path) -> list[Footnote]:
 
 
 def _make_rpr(base_rpr, italic: bool):
-    """A copy of `base_rpr` with w:i/w:iCs set (or removed) to match `italic`."""
+    """A copy of `base_rpr` with w:i/w:iCs set (or removed) to match `italic`. A character
+    style copied from the base run (eg Emphasis) may itself be italic, so upright text
+    under one says so explicitly."""
     rpr = copy.deepcopy(base_rpr) if base_rpr is not None else None
     if rpr is not None:
         for tag in ("w:i", "w:iCs"):
@@ -244,6 +259,11 @@ def _make_rpr(base_rpr, italic: bool):
             rpr = etree.Element(qn("w:rPr"))
         _insert_ordered(rpr, etree.Element(qn("w:i")))
         _insert_ordered(rpr, etree.Element(qn("w:iCs")))
+    elif rpr is not None and rpr.find(qn("w:rStyle")) is not None:
+        for tag in ("w:i", "w:iCs"):
+            off = etree.Element(qn(tag))
+            off.set(qn("w:val"), "0")
+            _insert_ordered(rpr, off)
     if rpr is not None and len(rpr) == 0:
         rpr = None
     return rpr
@@ -329,7 +349,7 @@ def _make_id_gen(*roots):
 # Writing: word-level diff for tracked changes
 # --------------------------------------------------------------------------- #
 
-_TOKEN_RE = re.compile(r"\S+|\s+")
+_TOKEN_RE = re.compile(r"\n|[^\S\n]+|\S+")  # a line or paragraph break is a token of its own
 
 
 def _tokenize(rt: RichText) -> list[tuple[str, bool]]:
@@ -430,7 +450,19 @@ def _find_base_rpr(children):
 
 def _mark_paragraph_deleted(p, author: str, date: str, id_gen) -> None:
     """Mark an entire paragraph (its runs, and the paragraph mark itself) as a
-    tracked deletion, per r 17.13.5.15 (w:pPr/w:rPr/w:del marks the mark)."""
+    tracked deletion."""
+    _delete_paragraph_mark(p, author, date, id_gen)
+    for r in [c for c in list(p) if _local(c) == "r"]:
+        idx = list(p).index(r)
+        p.remove(r)
+        for t in r.findall(qn("w:t")):
+            t.tag = qn("w:delText")
+        p.insert(idx, _wrap_change("w:del", author, date, id_gen, [r]))
+
+
+def _delete_paragraph_mark(p, author: str, date: str, id_gen) -> None:
+    """Mark the paragraph mark as a tracked deletion, per r 17.13.5.15 (w:pPr/w:rPr/w:del):
+    accepting it joins the next paragraph onto this one."""
     ppr = p.find(qn("w:pPr"))
     if ppr is None:
         ppr = etree.Element(qn("w:pPr"))
@@ -444,18 +476,38 @@ def _mark_paragraph_deleted(p, author: str, date: str, id_gen) -> None:
     del_mark.set(qn("w:date"), date)
     rpr.append(del_mark)
 
-    for r in [c for c in list(p) if _local(c) == "r"]:
-        idx = list(p).index(r)
-        p.remove(r)
-        for t in r.findall(qn("w:t")):
-            t.tag = qn("w:delText")
-        p.insert(idx, _wrap_change("w:del", author, date, id_gen, [r]))
+
+def _paragraph_ops(fn_elem, result: FootnoteResult) -> tuple[list[list], list[bool]] | None:
+    """The word diff of a multi-paragraph footnote split at its paragraph breaks: one list
+    of ops per paragraph, and for each break whether the new text removes it. None when
+    the paragraphs can't be lined up with `result.original`."""
+    original, breaks = _read_footnote(fn_elem)
+    if None in breaks or original.text != result.original.text:
+        return None
+    at_break = set(breaks)
+    groups: list[list] = [[]]
+    removed: list[bool] = []
+    pos = 0
+    for kind, text, italic in _diff_tokens(_tokenize(result.original), _tokenize(result.formatted)):
+        if kind != "ins":
+            start, pos = pos, pos + len(text)
+            if text == "\n" and start in at_break:
+                groups.append([])
+                removed.append(kind == "del")
+                continue
+        groups[-1].append((kind, text, italic))
+    return groups, removed
 
 
 def _rewrite_footnote(fn_elem, result: FootnoteResult, track_changes: bool, author: str, date: str, id_gen) -> None:
     paragraphs = fn_elem.findall(qn("w:p"))
     if not paragraphs:
         return
+    if track_changes and len(paragraphs) > 1:
+        split = _paragraph_ops(fn_elem, result)
+        if split is not None:
+            _rewrite_paragraphs(paragraphs, *split, author, date, id_gen)
+            return
     first_p = paragraphs[0]
     children = list(first_p)
     marker, space_run, idx = _split_first_paragraph(first_p)
@@ -490,6 +542,25 @@ def _rewrite_footnote(fn_elem, result: FootnoteResult, track_changes: bool, auth
             _mark_paragraph_deleted(p, author, date, id_gen)
         else:
             fn_elem.remove(p)
+
+
+def _rewrite_paragraphs(paragraphs, groups: list[list], removed: list[bool], author: str, date: str, id_gen) -> None:
+    """Tracked changes for a multi-paragraph footnote, each paragraph's changes in that
+    paragraph: rejecting them all gives back exactly the original paragraphs, and a break
+    the new text removes is a deleted paragraph mark."""
+    first_base = None
+    for i, (p, ops) in enumerate(zip(paragraphs, groups)):
+        children = list(p)
+        idx = _split_first_paragraph(p)[2] if i == 0 else int(bool(children) and _local(children[0]) == "pPr")
+        base_rpr = _find_base_rpr(children[idx:])
+        first_base = base_rpr if i == 0 else first_base
+        for c in children[idx:]:
+            p.remove(c)
+        for el in _ops_to_elements(_merge_ops(ops), base_rpr if base_rpr is not None else first_base,
+                                   author, date, id_gen):
+            p.append(el)
+        if i < len(removed) and removed[i]:
+            _delete_paragraph_mark(p, author, date, id_gen)
 
 
 # --------------------------------------------------------------------------- #
@@ -651,7 +722,8 @@ def write_document(
         from .body import fix_body as _fix_body  # body.py builds on this module's helpers
 
         body_fixes = _fix_body(doc_root, styles_root, track_changes=track_changes,
-                               author=author, date=date, id_gen=id_gen)
+                               author=author, date=date, id_gen=id_gen,
+                               footnote_text=" ".join(r.original.text for r in results))
 
     if bibliography:
         _append_bibliography(doc_root, bibliography, styles_root, track_changes, author, date, id_gen)

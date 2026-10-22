@@ -799,3 +799,100 @@ def test_system_prompt_is_loaded_and_nonempty():
     assert len(system_prompt) > 500
     assert "AGLC4" in system_prompt
     assert "Ibid" in system_prompt
+
+
+# --------------------------------------------------------------------------- #
+# Subsequent references are resolved by rule, not by the model's say-so
+# --------------------------------------------------------------------------- #
+
+MABO = "Mabo v Queensland [No 2] (1992) 175 CLR 1"
+WIK = "Wik Peoples v Queensland (1996) 187 CLR 1"
+
+
+def _mabo() -> dict:
+    return cite_seg(MABO, {"source": case("Mabo v Queensland [No 2]", year="1992", volume="175", report="CLR", starting_page="1")})
+
+
+def _wik() -> dict:
+    return cite_seg(WIK, {"source": case("Wik Peoples v Queensland", year="1996", volume="187", report="CLR", starting_page="1")})
+
+
+def _ibid(ref: int) -> dict:
+    return cite_seg("Ibid 45", {"source": {"type": "other", "text": "Ibid"}, "pinpoints": [{"value": "45"}]}, refers_to_footnote=ref)
+
+
+def _run(footnotes: list[Footnote], segments: dict[int, list[dict]]) -> tuple[list[Footnote], Extractor]:
+    raw = batch_json([{"number": f.number, "segments": segments[f.number]} for f in footnotes])
+    extractor = Extractor(CannedProvider([raw]), verify=False)
+    return extractor.extract(footnotes), extractor
+
+
+def test_ibid_means_the_footnote_before_whatever_footnote_the_model_named():
+    result, ex = _run([fn(1, MABO + "."), fn(2, WIK + "."), fn(3, "Ibid 45.")],
+                      {1: [_mabo(), text_seg(".")], 2: [_wik(), text_seg(".")], 3: [_ibid(1), text_seg(".")]})
+    assert result[2].segments[0].citation.source.name == "Wik Peoples v Queensland"
+    assert any("'Ibid' points to footnote 2" in w for w in ex.warnings)
+
+
+def test_ibid_after_a_footnote_citing_two_sources_is_not_guessed():
+    result, ex = _run([fn(1, MABO + "; " + WIK + "."), fn(2, "Ibid 45.")],
+                      {1: [_mabo(), text_seg("; "), _wik(), text_seg(".")], 2: [_ibid(1), text_seg(".")]})
+    assert isinstance(result[1].segments[0].citation.source, OtherSource)
+    assert any("unclear" in w for w in ex.warnings)
+
+
+def test_ibid_later_in_a_footnote_means_the_citation_before_it():
+    result, _ = _run([fn(1, MABO + "."), fn(2, WIK + "; ibid 45.")],
+                     {1: [_mabo(), text_seg(".")],
+                      2: [_wik(), text_seg("; "),
+                          cite_seg("ibid 45", {"source": {"type": "other", "text": "ibid"}, "pinpoints": [{"value": "45"}]},
+                                   refers_to_footnote=1), text_seg(".")]})
+    assert result[1].segments[2].citation.source.name == "Wik Peoples v Queensland"
+
+
+def _book(author: str, title: str) -> dict:
+    return {"source": {"type": "book", "authors": [author], "title": title, "publisher": "Federation Press", "year": "2020"}}
+
+
+def test_a_surname_shared_by_two_sources_in_the_footnote_is_flagged_not_guessed():
+    first = "Jane Smith, Torts (Federation Press, 2020); John Smith, Contracts (Federation Press, 2020)."
+    result, ex = _run([fn(1, first), fn(2, "Smith (n 1) 4.")], {
+        1: [cite_seg("Jane Smith, Torts (Federation Press, 2020)", _book("Jane Smith", "Torts")), text_seg("; "),
+            cite_seg("John Smith, Contracts (Federation Press, 2020)", _book("John Smith", "Contracts")), text_seg(".")],
+        2: [cite_seg("Smith (n 1) 4", {"source": {"type": "other", "text": "Smith"}, "pinpoints": [{"value": "4"}]},
+                     refers_to_footnote=1), text_seg(".")],
+    })
+    assert isinstance(result[1].segments[0].citation.source, OtherSource)
+    assert any("'Smith' could mean any of 2 sources" in w for w in ex.warnings)
+
+
+def test_an_exact_surname_beats_one_that_merely_contains_it():
+    first = "John Smithers, Torts (Federation Press, 2020); Jane Smith, Contracts (Federation Press, 2020)."
+    result, _ = _run([fn(1, first), fn(2, "Smith (n 1) 4.")], {
+        1: [cite_seg("John Smithers, Torts (Federation Press, 2020)", _book("John Smithers", "Torts")), text_seg("; "),
+            cite_seg("Jane Smith, Contracts (Federation Press, 2020)", _book("Jane Smith", "Contracts")), text_seg(".")],
+        2: [cite_seg("Smith (n 1) 4", {"source": {"type": "other", "text": "Smith"}, "pinpoints": [{"value": "4"}]},
+                     refers_to_footnote=1), text_seg(".")],
+    })
+    assert result[1].segments[0].citation.source.title == "Contracts"
+
+
+def test_a_pinpoint_borrowed_from_another_citation_in_the_footnote_is_removed():
+    # 42 is Wik's pinpoint; it appears in the footnote, but not in Mabo's citation
+    text = MABO + "; " + WIK + ", 42."
+    mabo = cite_seg(MABO, {"source": case("Mabo v Queensland [No 2]", year="1992", volume="175", report="CLR",
+                                          starting_page="1"), "pinpoints": [{"value": "42"}]})
+    wik = cite_seg(WIK + ", 42", {"source": case("Wik Peoples v Queensland", year="1996", volume="187", report="CLR",
+                                                 starting_page="1"), "pinpoints": [{"value": "42"}]})
+    extractor = Extractor(CannedProvider([batch_json([{"number": 1, "segments": [mabo, text_seg("; "), wik, text_seg(".")]}])]))
+    segs = extractor.extract([fn(1, text)])[0].segments
+    assert segs[0].citation.pinpoints == [] and [p.value for p in segs[2].citation.pinpoints] == ["42"]
+
+
+def test_a_pinpoint_just_outside_the_citations_original_still_counts():
+    # the model's `original` stops before the pinpoint, which is still this citation's
+    seg = cite_seg(MABO, {"source": case("Mabo v Queensland [No 2]", year="1992", volume="175", report="CLR",
+                                         starting_page="1"), "pinpoints": [{"value": "42"}]})
+    extractor = Extractor(CannedProvider([batch_json([{"number": 1, "segments": [seg]}])]))
+    segs = extractor.extract([fn(1, MABO + ", 42.")])[0].segments
+    assert [p.value for p in segs[0].citation.pinpoints] == ["42"]

@@ -380,3 +380,69 @@ def test_a_real_edit_next_to_an_italic_space_leaves_the_space_alone(tmp_path):
     inserted = "".join(t.text or "" for ins in root.iter(qn("w:ins")) for t in ins.iter(qn("w:t")))
     assert deleted.strip() and inserted.strip()  # the comma edit is there...
     assert "," in inserted and "Kvelde" not in deleted + inserted  # ...and the case name isn't touched
+
+
+# --------------------------------------------------------------------------- #
+# multi-paragraph footnotes: accepting and rejecting the tracked changes
+# --------------------------------------------------------------------------- #
+
+_PARA_1 = "Mabo v Queensland (1992) 175 CLR 1, 42."
+_PARA_2 = "This was the first recognition of native title."
+
+
+def _two_paragraph_footnote(tmp_path, formatted: RichText) -> tuple[str, etree._Element]:
+    from tests.fixtures.build_fixtures import build_docx
+
+    src = tmp_path / "two.docx"
+    build_docx(src, [("para", [("text", "Body.", False), ("fnref", 1)])],
+               [(1, [[("text", _PARA_1, False)], [("text", _PARA_2, False)]])])
+    xml = _written_footnote(tmp_path, str(src), formatted)
+    root = etree.fromstring(xml)
+    return str(tmp_path / "out.docx"), next(fn for fn in root.iter(qn("w:footnote")) if fn.get(qn("w:id")) == "1")
+
+
+def _rejected_text(fn_elem) -> str:
+    """The footnote's text with every tracked change rejected: insertions gone, deletions
+    and deleted paragraph marks back."""
+    paragraphs = []
+    for p in fn_elem.findall(qn("w:p")):
+        text = ""
+        for el in p.iter(qn("w:t"), qn("w:delText"), qn("w:br")):
+            if any(_local_name(a) == "ins" for a in el.iterancestors()):
+                continue
+            text += "\n" if _local_name(el) == "br" else (el.text or "")
+        paragraphs.append(text)
+    return "\n".join(paragraphs).lstrip(" ")
+
+
+def _local_name(el) -> str:
+    return etree.QName(el).localname
+
+
+def test_rejecting_changes_to_a_two_paragraph_footnote_gives_back_the_original(tmp_path):
+    formatted = _rt(("Mabo v Queensland", True), (" [No 2] (1992) 175 CLR 1, 42.\n" + _PARA_2, False))
+    out, fn_elem = _two_paragraph_footnote(tmp_path, formatted)
+    assert read_footnotes(out)[0].original.text == formatted.text  # accepted
+    assert _rejected_text(fn_elem) == _PARA_1 + "\n" + _PARA_2  # rejected: nothing duplicated
+    paragraphs = fn_elem.findall(qn("w:p"))
+    assert len(paragraphs) == 2
+    assert "native title" in "".join(t.text or "" for t in paragraphs[1].iter(qn("w:t")))  # still its own paragraph
+
+
+def test_joining_two_footnote_paragraphs_is_a_deleted_paragraph_mark(tmp_path):
+    formatted = _rt((_PARA_1 + " " + _PARA_2, False))
+    out, fn_elem = _two_paragraph_footnote(tmp_path, formatted)
+    assert read_footnotes(out)[0].original.text == formatted.text
+    assert _rejected_text(fn_elem) == _PARA_1 + "\n" + _PARA_2
+
+
+@pytest.mark.parametrize("track_changes", [True, False])
+def test_upright_text_after_an_emphasis_styled_run_stays_upright(tmp_path, track_changes):
+    # The first run's character style (Emphasis, which is italic) is copied onto every new
+    # run; without an explicit 'not italic' the year, report and page came out italic too
+    src = _one_footnote_docx(tmp_path, [("text", "Mabo v Queensland", "emphasis"), ("text", " (1992) 175 CLR 1.", False)])
+    formatted = _rt(("Mabo v Queensland [No 2]", True), (" (1992) 175 CLR 1.", False))
+    dst = tmp_path / "out.docx"
+    write_document(src, dst, [FootnoteResult(number=1, original=read_footnotes(src)[0].original, formatted=formatted)],
+                   track_changes=track_changes)
+    assert read_footnotes(str(dst))[0].original.to_markup() == "*Mabo v Queensland [No 2]* (1992) 175 CLR 1."

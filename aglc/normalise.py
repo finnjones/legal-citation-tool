@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
 
@@ -832,7 +833,9 @@ def source_key(source: Source) -> str:
         return f"legislation:{title_key}:{year_key}:{juris_key}"
 
     if isinstance(source, TreatySource):
-        return f"treaty:{_norm_key(source.title)}"
+        parties = ",".join(sorted(_norm_key(p) for p in source.parties))
+        return f"treaty:{_norm_key(source.title)}" + _details(
+            parties, _year_in(source.opened_for_signature), source.treaty_series)
 
     if isinstance(source, ParliamentaryDebatesSource):
         # One day's debates in one chamber; a different speaker is cited afresh so that a
@@ -869,14 +872,56 @@ def source_key(source: Source) -> str:
     if isinstance(source, BookChapterSource):
         authors = source.authors
         surname = _norm_key(_surname(authors[0])) if authors else ""
-        return f"secondary:{surname}:{_norm_key(source.chapter_title)}"
+        return f"book_chapter:{surname}:{_norm_key(source.chapter_title)}" + _details(
+            source.book_title, source.year, source.starting_page)
 
     if isinstance(source, ReportSource):
         surname = _norm_key(_surname(source.author)) if source.author else ""
-        return f"secondary:{surname}:{_norm_key(source.title)}"
+        return f"report:{surname}:{_norm_key(source.title)}" + _details(source.document_number, _year_in(source.date))
 
-    # JournalArticleSource, BookSource, NewspaperSource, WebsiteSource: `authors` + `title`
+    # JournalArticleSource, BookSource, NewspaperSource, WebsiteSource...: `authors` + `title`,
+    # then whatever tells apart two works (or editions) sharing them
     authors = getattr(source, "authors", None) or []
     surname = _norm_key(_surname(authors[0])) if authors else ""
     title = getattr(source, "title", "") or ""
-    return f"secondary:{surname}:{_norm_key(title)}"
+    return f"{source.type}:{surname}:{_norm_key(title)}" + _details(
+        *(getattr(source, f, None) for f in ("edition", "volume", "starting_page", "website_name", "url", "newspaper")),
+        getattr(source, "year", None) or _year_in(getattr(source, "date", None)))
+
+
+_DETAIL = "\x1f"  # separates a source key's publication details (never in a title)
+
+
+def _details(*values: str | None) -> str:
+    """The publication details of a source key, each of which may be missing: see
+    `unify_source_keys`."""
+    return "".join(_DETAIL + _norm_key(v) for v in values)
+
+
+def _year_in(value: str | None) -> str:
+    m = re.search(r"\b\d{4}\b", value or "")
+    return m.group(0) if m else ""
+
+
+def _same_details(a: list[str], b: list[str]) -> bool:
+    return len(a) == len(b) and all(x == y or not x or not y for x, y in zip(a, b))
+
+
+def unify_source_keys(citations: Iterable[Citation]) -> None:
+    """Two citations of a source whose publication details agree wherever both have them
+    are the same source, so one missing the year ('Smith, Torts (Federation Press)')
+    shares the key of one that has it. Details that differ (another edition, year or
+    volume) keep sources apart, and a citation that could be either of two sources is
+    left alone. Run once over every citation in the document, in order."""
+    merged: dict[str, list[str]] = {}  # key -> the details of every citation given that key
+    for c in citations:
+        key = c.source_key
+        if not key or _DETAIL not in key:
+            continue
+        base, *details = key.split(_DETAIL)
+        same = [k for k, d in merged.items() if k.split(_DETAIL)[0] == base and _same_details(d, details)]
+        if len(same) == 1:
+            c.source_key = same[0]
+            merged[same[0]] = [x or y for x, y in zip(merged[same[0]], details)]
+        elif key not in merged:
+            merged[key] = details

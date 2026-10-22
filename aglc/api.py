@@ -285,7 +285,7 @@ async def process_document(
         shutil.rmtree(session_dir, ignore_errors=True)
         if started:
             billing.fail_document(session_id)
-        if slot is not None and progress:
+        if slot is not None and (progress or not started):
             slot.__exit__(None, None, None)  # the job never started
         if isinstance(e, HTTPException):
             raise

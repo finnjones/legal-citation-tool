@@ -19,7 +19,7 @@ from aglc.models import (
     TreatySource,
     WebsiteSource,
 )
-from aglc.normalise import normalise_citation, source_key
+from aglc.normalise import normalise_citation, source_key, unify_source_keys
 
 
 def make_citation(source) -> Citation:
@@ -339,6 +339,60 @@ def test_source_key_treaty_normalised_title():
     a = TreatySource(title="Vienna Convention on the Law of Treaties")
     b = TreatySource(title="  vienna convention on the law of treaties  ")
     assert source_key(a) == source_key(b)
+
+
+def test_a_book_and_an_article_with_the_same_author_and_title_differ():
+    book = BookSource(authors=["Jane Smith"], title="Torts", publisher="Federation Press", year="2020")
+    article = JournalArticleSource(authors=["Jane Smith"], title="Torts", journal="MULR", year="2021", volume="45")
+    assert source_key(book) != source_key(article)
+
+
+def test_two_editions_of_a_book_differ():
+    second = BookSource(authors=["Jane Smith"], title="Torts", edition="2", year="2015")
+    third = BookSource(authors=["Jane Smith"], title="Torts", edition="3", year="2019")
+    assert source_key(second) != source_key(third)
+
+
+def test_untitled_author_web_pages_on_different_sites_differ():
+    a = WebsiteSource(title="Fact Sheet", website_name="Australian Human Rights Commission")
+    b = WebsiteSource(title="Fact Sheet", website_name="Law Council of Australia")
+    assert source_key(a) != source_key(b)
+
+
+def test_treaties_with_the_same_title_and_different_parties_differ():
+    a = TreatySource(title="Agreement on Trade", parties=["Australia", "Japan"])
+    b = TreatySource(title="Agreement on Trade", parties=["Australia", "Chile"])
+    assert source_key(a) != source_key(b)
+
+
+def _keyed(*sources) -> list[Citation]:
+    return [Citation(source=s, source_key=source_key(s)) for s in sources]
+
+
+def test_a_citation_missing_a_detail_is_the_same_source_as_one_that_has_it():
+    full = BookSource(authors=["Jane Smith"], title="Torts", publisher="Federation Press", year="2020")
+    no_year = BookSource(authors=["Jane Smith"], title="Torts", publisher="Federation Press")
+    cites = _keyed(full, no_year)
+    unify_source_keys(cites)
+    assert cites[0].source_key == cites[1].source_key
+
+
+def test_a_citation_that_could_be_either_of_two_editions_is_left_alone():
+    second = BookSource(authors=["Jane Smith"], title="Torts", edition="2", year="2015")
+    third = BookSource(authors=["Jane Smith"], title="Torts", edition="3", year="2019")
+    unknown = BookSource(authors=["Jane Smith"], title="Torts")
+    cites = _keyed(second, third, unknown)
+    unify_source_keys(cites)
+    assert len({c.source_key for c in cites}) == 3
+
+
+def test_an_incomplete_first_citation_does_not_join_two_editions():
+    unknown = BookSource(authors=["Jane Smith"], title="Torts")
+    second = BookSource(authors=["Jane Smith"], title="Torts", edition="2", year="2015")
+    third = BookSource(authors=["Jane Smith"], title="Torts", edition="3", year="2019")
+    cites = _keyed(unknown, second, third)
+    unify_source_keys(cites)
+    assert cites[0].source_key == cites[1].source_key != cites[2].source_key
 
 
 def test_citation_source_key_set_by_normalise():

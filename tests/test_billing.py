@@ -312,6 +312,19 @@ def test_free_quota_per_browser_returns_429(paid, client, monkeypatch):
     assert paid.call_count == 2  # refused before any LLM call
 
 
+def test_uploads_that_all_pass_the_early_check_cant_all_take_the_last_free_run(paid, client, monkeypatch):
+    # Uploads at the same moment all see the quota unused when admitted; recording the run
+    # checks again in the same transaction, so only one gets it (and the others' processing
+    # slots are given back, so a later upload is refused for quota, not because the server is busy)
+    monkeypatch.setenv("AGLC_FREE_PER_DAY", "1")
+    monkeypatch.setattr(Store, "free_uses_today", lambda self, **kw: (0, 0, 0))
+    assert _process(client).status_code == 200
+    for _ in range(3):
+        r = _process(client)
+        assert r.status_code == 429 and "free previews" in r.json()["detail"]
+    assert paid.call_count == 1
+
+
 def test_free_quota_per_ip_survives_clearing_cookies(paid, monkeypatch):
     monkeypatch.setenv("AGLC_FREE_PER_DAY", "5")
     monkeypatch.setenv("AGLC_FREE_PER_IP_PER_DAY", "1")

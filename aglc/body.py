@@ -346,6 +346,10 @@ _CASE_V = re.compile(r"(?<=\S) v (?=\S)")
 # 's 57-64' -> 'ss 57–64' (r 3.1.4); 'ss 57-64' -> 'ss 57–64'. A hyphen followed by
 # '(' is part of a single provision number instead (eg ITAA 1997 's 20-110(1)').
 _SECTION_RANGE = re.compile(r"\b(ss?) (\d+[A-Z]*) ?[-–] ?(\d+[A-Z]*)\b(?![-(])")
+# Acts that number sections with a hyphen ('s 20-110' is one section of the ITAA 1997)
+_HYPHENATED_ACTS = re.compile(r"(?i)income tax assessment act 1997|\bITAA ?1997\b|a new tax system|"
+                              r"taxation administration act 1953|\bGST Act\b")
+_HYPHENATED_NUMBER = re.compile(r"\bs (\d+)[A-Z]*-(\d+)[A-Z]*(\()?")
 _SPACE_BEFORE_FN = re.compile(rf"(?<=[^\s{_FN}{_OPAQUE}]) +(?={_FN})")
 _NEW_SENTENCE = re.compile(rf"{_FN}(?= ([A-Z][a-z]*))")
 _POSSESSIVE = re.compile(r"\b([A-Z][A-Za-z-]+)[’']s\b")
@@ -484,7 +488,16 @@ def _footnote_at(pieces: list[_Piece], index: int) -> int | None:
     return None
 
 
-def _fix_paragraph_text(p, numbers: dict[str, int], styles: _Styles, edit: _Editor) -> list[BodyFix]:
+def _numbers_sections_with_hyphens(text: str) -> bool:
+    """Whether the document cites an Act whose section numbers contain a hyphen, or writes
+    one ('s 995-1', 's 20-110(1)'), so that 's 26-52' may be one section, not a range."""
+    if _HYPHENATED_ACTS.search(text):
+        return True
+    return any(m.group(3) or int(m.group(2)) <= int(m.group(1)) for m in _HYPHENATED_NUMBER.finditer(text))
+
+
+def _fix_paragraph_text(p, numbers: dict[str, int], styles: _Styles, edit: _Editor,
+                        hyphenated_sections: bool = False) -> list[BodyFix]:
     pieces = _pieces(p, numbers)
     text = "".join(piece.text for piece in pieces)
     if not text.strip(_FN + _OPAQUE + " "):
@@ -512,17 +525,25 @@ def _fix_paragraph_text(p, numbers: dict[str, int], styles: _Styles, edit: _Edit
             edits.append(_Edit(m.start(), m.end(),
                                f"‘v’ in ‘{left} v {right}’ italicised (AGLC4 r 2.1.1: it is part of "
                                "the case name)", italic=True))
+    checks: list[BodyFix] = []
     for m in _SECTION_RANGE.finditer(text):
         label, a, b = m.groups()
         if a.isdigit() and b.isdigit() and int(b) <= int(a):
             continue  # not an ascending range, so probably one provision's number
         fixed = f"ss {a}–{b}"
+        if label == "s" and hyphenated_sections and m.group(0) == f"s {a}-{b}":
+            # In a document citing the ITAA 1997, 's 26-52' is as likely one section as a range
+            checks.append(BodyFix(
+                footnote=_footnote_at(pieces, m.end()), applied=False,
+                message=f"‘{m.group(0)}’: if this is a range of sections, write ‘{fixed}’ (AGLC4 r 3.1.4); "
+                        "if it is one section’s number, leave it"))
+            continue
         if fixed != m.group(0):
             edits.append(_Edit(m.start(), m.end(),
                                f"‘{m.group(0)}’ changed to ‘{fixed}’ (AGLC4 r 3.1.4: ‘ss’ for more "
                                "than one section, and an en dash for a range)", replacement=fixed))
 
-    fixes = [BodyFix(footnote=e.footnote, message=e.message) for e in edit.apply(pieces, edits)]
+    fixes = [BodyFix(footnote=e.footnote, message=e.message) for e in edit.apply(pieces, edits)] + checks
 
     for m in _NEW_SENTENCE.finditer(text):
         before = text[:m.start()].rstrip("’”'\")]")
@@ -648,9 +669,11 @@ def _keep_headings_with_text(doc_root, styles: _Styles, track_changes: bool, aut
 # --------------------------------------------------------------------------- #
 
 
-def fix_body(doc_root, styles_root, *, track_changes: bool, author: str, date: str, id_gen) -> list[BodyFix]:
+def fix_body(doc_root, styles_root, *, track_changes: bool, author: str, date: str, id_gen,
+             footnote_text: str = "") -> list[BodyFix]:
     """Apply the body-text fixes in place and describe each one (plus the checks
-    that were only reported)."""
+    that were only reported). `footnote_text` is the footnotes' text, which says which
+    Acts the document cites."""
     styles = _Styles(styles_root)
     numbers = {fid: n for n, fid in enumerate(_footnote_reference_order(doc_root), start=1)}
     edit = _Editor(styles, track_changes, author, date, id_gen)
@@ -658,8 +681,9 @@ def fix_body(doc_root, styles_root, *, track_changes: bool, author: str, date: s
 
     body = doc_root.find(qn("w:body"))
     paragraphs = list(body.iter(qn("w:p"))) if body is not None else []
+    hyphenated = _numbers_sections_with_hyphens(footnote_text + " " + " ".join(_paragraph_text(p) for p in paragraphs))
     for p in paragraphs:
-        fixes += _fix_paragraph_text(p, numbers, styles, edit)
+        fixes += _fix_paragraph_text(p, numbers, styles, edit, hyphenated)
     fixes += _possessive_checks(paragraphs, styles)
 
     for ref in list(doc_root.iter(qn("w:footnoteReference"))):

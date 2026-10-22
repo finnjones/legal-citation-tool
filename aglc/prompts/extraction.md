@@ -207,6 +207,8 @@ Map each pinpoint reference to a `Pinpoint`. `value` is the number/range only (n
 | `pp 42-4` | `page` | `"42-4"` | `true` |
 | `[12]` / `para 12` / `at para 12` | `paragraph` | `"12"` | `false` |
 | `s 18` / `section 18` | `section` | `"18"` | `false` |
+| `s 214A(1)(b)` (subsections and paragraphs stay in the one value, never separate pinpoints) | `section` | `"214A(1)(b)"` | `false` |
+| `s 20-110` (one section whose number has a hyphen, eg ITAA 1997) | `section` | `"20-110"` | `false` |
 | `ss 5-7` | `section` | `"5-7"` | `true` |
 | `pt 2` | `part` | `"2"` | `false` |
 | `div 3` | `division` | `"3"` | `false` |

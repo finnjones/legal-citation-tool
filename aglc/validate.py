@@ -151,7 +151,7 @@ _NUMERIC_FIELDS = (
 
 def remove_invented_numbers(citation: Citation, original: str) -> tuple[Citation, list[str]]:
     """Blank any numeric source field (and drop any pinpoint) containing a number that
-    doesn't appear in the original footnote. Returns the cleaned citation and a note per
+    doesn't appear in `original` (the citation's own text). Returns the cleaned citation and a note per
     removal. Only for sources extracted from this footnote, not resolved references."""
     source_numbers = numbers(original)
     notes: list[str] = []

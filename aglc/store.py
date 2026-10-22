@@ -173,12 +173,25 @@ class Store:
 
     # ---- documents ---------------------------------------------------------- #
 
-    def add_document(self, session_id: str, filename: str, *, ip_hash: str | None, anon_id: str | None) -> None:
+    def add_document(self, session_id: str, filename: str, *, ip_hash: str | None, anon_id: str | None,
+                     limits: tuple[int, int, int] | None = None) -> str | None:
+        """Record a document. With `limits` (per IP, per browser, global), only while today's
+        free uses are under them: the count and the insert are one transaction, so two
+        uploads at once can't both take the last free run. Returns the limit that refused it
+        ('global' or 'visitor'), or None when recorded."""
         with self.transaction() as conn:
+            if limits is not None:
+                per_ip, per_browser, global_cap = limits
+                by_ip, by_browser, total = self._free_uses(conn, ip_hash=ip_hash, anon_id=anon_id)
+                if total >= global_cap:
+                    return "global"
+                if by_browser >= per_browser or by_ip >= per_ip:
+                    return "visitor"
             conn.execute(
                 "INSERT INTO documents (session_id, filename, ip_hash, anon_id, day, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (session_id, filename, ip_hash, anon_id, today(), now()),
             )
+        return None
 
     def finish_document(self, session_id: str, *, status: str, footnote_count: int = 0) -> None:
         with self.transaction() as conn:
@@ -238,15 +251,19 @@ class Store:
         """Documents processed today and not paid for: (by this IP, by this browser, by everyone).
         A run that failed doesn't count against the person, but does against the global cap."""
         with self.read() as conn:
-            def count(where: str, *args) -> int:
-                sql = f"SELECT COUNT(*) FROM documents WHERE day = ? AND unlocked_at IS NULL AND {where}"
-                return conn.execute(sql, (today(), *args)).fetchone()[0]
+            return self._free_uses(conn, ip_hash=ip_hash, anon_id=anon_id)
 
-            return (
-                count("ip_hash = ? AND status != 'failed'", ip_hash) if ip_hash else 0,
-                count("anon_id = ? AND status != 'failed'", anon_id) if anon_id else 0,
-                count("1"),
-            )
+    @staticmethod
+    def _free_uses(conn: sqlite3.Connection, *, ip_hash: str | None, anon_id: str | None) -> tuple[int, int, int]:
+        def count(where: str, *args) -> int:
+            sql = f"SELECT COUNT(*) FROM documents WHERE day = ? AND unlocked_at IS NULL AND {where}"
+            return conn.execute(sql, (today(), *args)).fetchone()[0]
+
+        return (
+            count("ip_hash = ? AND status != 'failed'", ip_hash) if ip_hash else 0,
+            count("anon_id = ? AND status != 'failed'", anon_id) if anon_id else 0,
+            count("1"),
+        )
 
     # ---- orders ------------------------------------------------------------- #
 

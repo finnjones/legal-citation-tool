@@ -104,7 +104,8 @@ The AI model's output is checked deterministically (no second AI involved, see
    gets the same repair round and leave-unchanged fallback as a dropped word. An unclassified
    source is emitted as the footnote's own text, italics included.
 3. **Grounding:** every number the model returns (year, volume, page, edition...) must
-   appear in the original; invented values are removed and show as `[MISSING: ...]`.
+   appear in that citation's own text in the original, not just somewhere in the footnote;
+   invented or borrowed values are removed and show as `[MISSING: ...]`.
 4. **Rendering:** every field of a source must appear in its formatted citation; anything
    the formatter omits is reported as a warning.
 

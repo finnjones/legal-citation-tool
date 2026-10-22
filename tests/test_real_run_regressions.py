@@ -604,3 +604,95 @@ def test_italic_markup_copied_into_the_citation_text_is_ignored():
         {"kind": "text", "text": "."}]}])
     texts = [s.text.text for s in out[0].segments if isinstance(s, TextSegment)]
     assert texts == ["."]  # no URL fragment left over
+
+
+def test_a_subsection_split_into_separate_pinpoints_is_put_back_together():
+    # The model returned 's 214A(1)(b)' as section '214A' then '1' and 'b', which rendered
+    # 'Crimes Act (n 1) s 214A 1, b'
+    fns = [_rich(1, "*Crimes Act 1900* (NSW) s 214A (‘*Crimes Act*’)."),
+           _rich(2, "*Interpretation Act 1987* (NSW) s 33."),
+           _rich(3, "*Crimes Act* (n 1) s 214A(1)(b)."),
+           _rich(4, "*Crimes Act* (n 1) s 214A(7).")]
+    result = _process(fns, [
+        {"number": 1, "segments": [_cite("Crimes Act 1900 (NSW) s 214A (‘Crimes Act’)", _act("Crimes Act", "1900"),
+                                         pinpoints=[_sec("214A")], short_title="Crimes Act"), _DOT]},
+        {"number": 2, "segments": [_cite("Interpretation Act 1987 (NSW) s 33", _act("Interpretation Act", "1987"),
+                                         pinpoints=[_sec("33")]), _DOT]},
+        {"number": 3, "segments": [_cite("Crimes Act (n 1) s 214A(1)(b)", {"type": "other", "text": "x"}, 1,
+                                         pinpoints=[_sec("214A"), {"kind": "other", "value": "1"},
+                                                    {"kind": "other", "value": "b"}], short_title="Crimes Act"), _DOT]},
+        {"number": 4, "segments": [_cite("Crimes Act (n 1) s 214A(7)", {"type": "other", "text": "x"}, 1,
+                                         pinpoints=[_sec("214A"), {"kind": "page", "value": "(7)"}],
+                                         short_title="Crimes Act"), _DOT]},
+    ])
+    assert result.footnotes[2].formatted.text == "Crimes Act (n 1) s 214A(1)(b)."
+    assert result.footnotes[3].formatted.text == "Ibid s 214A(7)."
+
+
+def test_separate_provisions_are_not_joined_into_subsections():
+    fns = [_rich(1, "*Crimes Act 1900* (NSW) s 5, sch 1.")]
+    result = _process(fns, [
+        {"number": 1, "segments": [_cite("Crimes Act 1900 (NSW) s 5, sch 1", _act("Crimes Act", "1900"),
+                                         pinpoints=[_sec("5"), {"kind": "schedule", "value": "1"}]), _DOT]},
+    ])
+    assert result.footnotes[0].formatted.text == "Crimes Act 1900 (NSW) s 5 sch 1."
+
+
+def _book_seg(original: str, pinpoints: list | None = None, **book) -> dict:
+    return _cite(original, {"type": "book", "authors": ["Jane Smith"], "title": "Torts", **book}, pinpoints=pinpoints or [])
+
+
+def test_a_book_and_an_article_sharing_author_and_title_are_both_cited_in_full():
+    book = "Jane Smith, *Torts* (Federation Press, 2020)"
+    article = "Jane Smith, ‘Torts’ (2021) 45 *Melbourne University Law Review* 1"
+    raw = json.dumps({"footnotes": [
+        {"number": 1, "segments": [_book_seg(book.replace("*", ""), publisher="Federation Press", year="2020"), _DOT]},
+        {"number": 2, "segments": [_cite(article.replace("*", ""), {
+            "type": "journal_article", "authors": ["Jane Smith"], "title": "Torts", "year": "2021", "volume": "45",
+            "journal": "Melbourne University Law Review", "starting_page": "1"}), _DOT]},
+    ]})
+    result = pipeline.process_footnotes([_rich(1, book + "."), _rich(2, article + ".")],
+                                        get_provider("fake:x", responses=[raw]))
+    assert not result.footnotes[1].formatted.text.startswith("Ibid")
+    assert sum(len(s.entries) for s in result.bibliography) == 2
+
+
+def test_the_bibliography_takes_a_detail_the_first_citation_lacked_from_a_later_one():
+    first = "Jane Smith, *Torts* (2020)"
+    later = "Jane Smith, *Torts* (Federation Press, 2020) 12"
+    raw = json.dumps({"footnotes": [
+        {"number": 1, "segments": [_book_seg(first.replace("*", ""), year="2020"), _DOT]},
+        {"number": 2, "segments": [{"kind": "text", "text": "See generally the discussion."}]},
+        {"number": 3, "segments": [_book_seg(later.replace("*", ""), publisher="Federation Press", year="2020",
+                                             pinpoints=[{"value": "12"}]), _DOT]},
+    ]})
+    result = pipeline.process_footnotes(
+        [_rich(1, first + "."), _rich(2, "See generally the discussion."), _rich(3, later + ".")],
+        get_provider("fake:x", responses=[raw]))
+    assert result.footnotes[2].formatted.text.startswith("Smith (n 1) 12")
+    entries = [e.text for s in result.bibliography for e in s.entries]
+    assert entries == ["Smith, Jane, Torts (Federation Press, 2020)"]
+
+
+_MABO = "Mabo v Queensland [No 2] (1992) 175 CLR 1"
+
+
+def _mabo(**citation) -> dict:
+    return _cite(_MABO, {"type": "case", "name": "Mabo v Queensland [No 2]", "year": "1992", "volume": "175",
+                         "report": "CLR", "starting_page": "1"}, **citation)
+
+
+def test_the_full_stop_before_commentary_is_kept():
+    text = _MABO + ". This was later doubted."
+    result = _process([_rich(1, "*Mabo v Queensland [No 2]* (1992) 175 CLR 1. This was later doubted.")],
+                      [{"number": 1, "segments": [_mabo(), _DOT, {"kind": "text", "text": " This was later doubted."}]}])
+    assert result.footnotes[0].formatted.text == text
+
+
+def test_ibid_keeps_the_judge_when_there_is_no_pinpoint():
+    result = _process([_rich(1, "*Mabo v Queensland [No 2]* (1992) 175 CLR 1."), _rich(2, "Ibid (Brennan J).")], [
+        {"number": 1, "segments": [_mabo(), _DOT]},
+        {"number": 2, "segments": [_cite("Ibid (Brennan J)", {"type": "other", "text": "Ibid"}, 1,
+                                         pinpoint_judges="Brennan J"), _DOT]},
+    ])
+    assert result.footnotes[1].formatted.text == "Ibid (Brennan J)."

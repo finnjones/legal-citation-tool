@@ -34,6 +34,8 @@ from .models import (
     CitationSegment,
     Footnote,
     OtherSource,
+    Pinpoint,
+    PinpointKind,
     RichText,
     Segment,
     Signal,
@@ -176,6 +178,50 @@ def _drop_repeated_start_page(citation: Citation, original: str) -> Citation:
     return citation
 
 
+_IBID = re.compile(r"(?i)\s*\*?ibid\b")
+
+_PROVISIONS = {PinpointKind.section, PinpointKind.regulation, PinpointKind.rule, PinpointKind.clause,
+               PinpointKind.article}
+_SUBDIVISION = re.compile(r"[0-9]{1,4}[A-Z]{0,2}|[a-z]{1,2}|[ivxlc]{1,6}|[A-Z]")
+
+
+def _as_subdivisions(value: str) -> str | None:
+    """'1' -> '(1)', '(1)(b)' -> '(1)(b)'; None for anything that isn't a subdivision."""
+    value = value.strip()
+    if _SUBDIVISION.fullmatch(value):
+        return f"({value})"
+    if re.fullmatch(r"(?:\((?:" + _SUBDIVISION.pattern + r")\))+", value):
+        return value
+    return None
+
+
+def _join_subdivisions(citation: Citation, original: str) -> Citation:
+    """'s 214A(1)(b)' sometimes comes back as three pinpoints (section '214A', then '1' and
+    'b'), which renders 's 214A 1, b'. Where the citation's own text has the provision with
+    those subdivisions bracketed after it, put them back into the provision's value."""
+    pins = citation.pinpoints
+    text = re.sub(r"\s+", "", original)
+    out: list[Pinpoint] = []
+    i = 0
+    while i < len(pins):
+        p = pins[i]
+        i += 1
+        if p.kind not in _PROVISIONS or p.plural:
+            out.append(p)
+            continue
+        value, j = p.value.strip(), i
+        while j < len(pins) and (sub := _as_subdivisions(pins[j].value)):
+            longer = value + sub
+            if re.sub(r"\s+", "", longer) not in text:
+                break
+            value, j = longer, j + 1
+        out.append(p.model_copy(update={"value": value}) if j > i else p)
+        i = j
+    if len(out) == len(pins):
+        return citation
+    return citation.model_copy(update={"pinpoints": out})
+
+
 def _dedupe_signal(citation: Citation, out: list[Segment]) -> Citation:
     """If the model left the signal word at the end of the preceding text as well as in
     `citation.signal` ('... this view, see ' + signal 'See'), drop it from the text."""
@@ -272,54 +318,62 @@ def _author_names(source: Source) -> list[str]:
     return names
 
 
-def _match_citation(citations: list[Citation], short_title: str | None) -> tuple[Source, str | None] | None:
-    """Find which of a footnote's citations a subsequent reference means.
+def _distinct(matches: list[tuple[Source, str | None]]) -> list[tuple[Source, str | None]]:
+    out: list[tuple[Source, str | None]] = []
+    for m in matches:
+        if all(m[0] != o[0] for o in out):
+            out.append(m)
+    return out
+
+
+def _match_citations(citations: list[Citation], short_title: str | None) -> list[tuple[Source, str | None]]:
+    """Which of a footnote's citations a subsequent reference can mean: one is a match,
+    none is no match, and several are ambiguous ('Smith (n 1)' where n 1 cites two Smiths).
 
     If a short title/name was given, match it (exact short-title match first, then a loose
-    substring match on the source's display name, then an author's name); a name matching
-    nothing is no match (see `_find_named`). If none was given, the reference is only
-    unambiguous when the target footnote has exactly one citation.
+    substring match on the source's display name, then an author's surname, then part of an
+    author's name); a name matching nothing is no match (see `_find_named`). If none was
+    given, the reference is only unambiguous when the target footnote has exactly one citation.
     """
     if not citations:
-        return None
+        return []
     if short_title:
         target = _norm(short_title)
         if target:
-            for c in citations:
-                if c.short_title and _norm(c.short_title) == target:
-                    return c.source, c.short_title
-            for c in citations:
-                name = _norm(_display_name(c.source))
-                if name and (target in name or name in target):
-                    return c.source, c.short_title
-            # Secondary sources are referred to by author surname ('Luntz (n 11)')
-            for c in citations:
-                if any(target in _norm(a) for a in _author_names(c.source)):
-                    return c.source, c.short_title
+            tiers = (
+                lambda c: bool(c.short_title) and _norm(c.short_title) == target,
+                lambda c: bool(name := _norm(_display_name(c.source))) and (target in name or name in target),
+                # Secondary sources are referred to by author surname ('Luntz (n 11)')
+                lambda c: any(a.split() and _norm(a.split()[-1]) == target for a in _author_names(c.source)),
+                lambda c: any(target in _norm(a) for a in _author_names(c.source)),
+            )
+            for matches in tiers:
+                found = _distinct([(c.source, c.short_title) for c in citations if matches(c)])
+                if found:
+                    return found
             # A name that matches nothing in the footnote is a wrong number, not a reason to
             # take whatever that footnote cites ('Kvelde (n 12)' where n 12 is the Crimes Act)
-            return None
-    if len(citations) == 1:
-        return citations[0].source, citations[0].short_title
-    return None
+            return []
+    return _distinct([(c.source, c.short_title) for c in citations])
 
 
 def _find_named(short_title: str, resolved: dict[int, Footnote], before: int) -> tuple[int, tuple[Source, str | None]] | None:
     """The earliest footnote before `before` that cites a source called exactly `short_title`
     (its short title, its name or title, or an author's surname), for a reference whose
-    footnote number is wrong."""
+    footnote number is wrong. None when no source, or more than one, is called that."""
     target = _norm(short_title)
     if not target:
         return None
+    found: list[tuple[int, tuple[Source, str | None]]] = []
     for number in sorted(n for n in resolved if n < before):
         for seg in resolved[number].segments:
             if not isinstance(seg, CitationSegment):
                 continue
             c = seg.citation
             names = [c.short_title or "", _display_name(c.source)] + [a.split()[-1] for a in _author_names(c.source) if a.split()]
-            if target in {_norm(n) for n in names if n}:
-                return number, (c.source, c.short_title)
-    return None
+            if target in {_norm(n) for n in names if n} and all(c.source != f[1][0] for f in found):
+                found.append((number, (c.source, c.short_title)))
+    return found[0] if len(found) == 1 else None
 
 
 _QUOTES = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
@@ -352,6 +406,8 @@ class _TextMapper:
             self._index.append(i)
         self._norm = "".join(norm)
         self.cursor: int = 0
+        #: where the last match started
+        self.start: int = 0
         #: text between the previous cursor and the start of the last match
         self.skipped: RichText = RichText()
 
@@ -380,6 +436,7 @@ class _TextMapper:
         if span is None:
             return None
         idx, end = span
+        self.start = idx
         self.skipped = RichText()
         for ch, italic in self._chars[self.cursor : idx]:
             self.skipped.append(ch, italic)
@@ -725,6 +782,8 @@ class Extractor:
         mapper = _TextMapper(footnote.original)
         out: list[Segment] = []
         unlocated: list[str] = []
+        starts: list[int] = []  # where each segment the model gave starts in the original
+        to_ground: list[tuple[int, int | None]] = []  # (index in out, start) of each new citation
         for seg in llm_fn.segments:
             if isinstance(seg, LLMTextSegment):
                 span = mapper.slice(seg.text)
@@ -734,12 +793,16 @@ class Extractor:
                             f"footnote {footnote.number}: ignored extracted text not in the footnote: {seg.text.strip()!r}"
                         )
                     continue
+                starts.append(mapper.start)
                 self._keep_skipped(footnote.number, mapper.skipped, out)
                 out.append(TextSegment(text=span))
             else:
-                citation = self._resolve_citation(footnote.number, seg, resolved)
+                earlier = [s.citation for s in out if isinstance(s, CitationSegment)]
+                citation = self._resolve_citation(footnote.number, seg, resolved, earlier)
                 span = mapper.slice(seg.original)  # also advances the cursor past this span
+                start = mapper.start if span is not None else None
                 if span is not None:
+                    starts.append(start)
                     citation = self._recover_skipped(footnote.number, mapper.skipped, citation, out)
                     _split_leading_commentary(span, citation, out)
                     if seg.refers_to_footnote is None:
@@ -754,10 +817,22 @@ class Extractor:
                 citation = _keep_title_italics(citation, span)
                 citation = _dedupe_signal(citation, out)
                 citation = _drop_repeated_start_page(citation, span.text if seg.original else "")
+                citation = _join_subdivisions(citation, span.text if seg.original else "")
                 if self.verify and seg.refers_to_footnote is None:  # references carry earlier footnotes' data
-                    citation, notes = validate.remove_invented_numbers(citation, footnote.original.text)
-                    self.warnings += [f"footnote {footnote.number}: {n}" for n in notes]
+                    to_ground.append((len(out), start))
                 out.append(CitationSegment(citation=citation, original=span.text if seg.original else ""))
+
+        # A citation's numbers must be in its own text: from where it starts to where the next
+        # segment does (so a pinpoint the model left out of `original` still counts), never a
+        # number belonging to another citation in the footnote
+        for i, start in to_ground:
+            if start is None:
+                own = mapper.plain  # nowhere to anchor it (reported as not in the footnote)
+            else:
+                own = mapper.plain[start: min((s for s in starts if s > start), default=len(mapper.plain))]
+            citation, notes = validate.remove_invented_numbers(out[i].citation, own)
+            out[i] = out[i].model_copy(update={"citation": citation})
+            self.warnings += [f"footnote {footnote.number}: {n}" for n in notes]
 
         if mapper.cursor < len(mapper.plain):
             leftover = mapper.remainder()
@@ -769,6 +844,37 @@ class Extractor:
                 )
                 out.append(TextSegment(text=leftover))
         return out, unlocated
+
+    def _ibid_target(
+        self, footnote_number: int, seg: LLMCitationSegment, resolved: dict[int, Footnote], earlier: list[Citation]
+    ) -> tuple[tuple[Source, str | None] | None, int]:
+        """r 1.4.3: 'Ibid' means the citation immediately before it: the one before it in its
+        own footnote, or the sole citation of the footnote before, whatever footnote the model
+        named. Otherwise no match, and the footnote for the ordinary lookup to search (with a
+        warning, as the reading can't be checked)."""
+        if earlier:
+            return (earlier[-1].source, earlier[-1].short_title), footnote_number
+        previous = footnote_number - 1
+        prev_fn = resolved.get(previous)
+        cites = [s.citation for s in prev_fn.segments if isinstance(s, CitationSegment)] if prev_fn else []
+        if len(cites) == 1:
+            if seg.refers_to_footnote != previous:
+                self.warnings.append(
+                    f"footnote {footnote_number}: 'Ibid' points to footnote {previous}, the one before it, "
+                    f"not footnote {seg.refers_to_footnote} as the extraction read it"
+                )
+            return (cites[0].source, cites[0].short_title), previous
+        if cites:
+            self.warnings.append(
+                f"footnote {footnote_number}: 'Ibid' follows a footnote citing {len(cites)} sources, so "
+                "which one it means is unclear (AGLC4 r 1.4.3); check it"
+            )
+            return None, previous
+        self.warnings.append(
+            f"footnote {footnote_number}: 'Ibid' follows a footnote that cites nothing; "
+            f"read as referring to footnote {seg.refers_to_footnote}; check it"
+        )
+        return None, seg.refers_to_footnote
 
     def _keep_skipped(self, number: int, skipped: RichText, out: list[Segment]) -> None:
         """Text the model left out of every segment, just before a text segment: kept as text
@@ -792,10 +898,21 @@ class Extractor:
         self.warnings.append(f"footnote {number}: kept text the extraction skipped: {skipped.text.strip()!r}")
         return citation
 
-    def _resolve_citation(self, footnote_number: int, seg: LLMCitationSegment, resolved: dict[int, Footnote]) -> Citation:
+    def _resolve_citation(
+        self, footnote_number: int, seg: LLMCitationSegment, resolved: dict[int, Footnote], earlier: list[Citation]
+    ) -> Citation:
+        """The source a subsequent reference means, looked up in the footnote it refers to.
+        `earlier` is the citations before it in its own footnote."""
         citation = seg.citation
         if seg.refers_to_footnote is None:
             return citation
+        ref = seg.refers_to_footnote
+        if _IBID.match(seg.original):
+            ibid, ref = self._ibid_target(footnote_number, seg, resolved, earlier)
+            if ibid is not None:
+                source, short_title = ibid
+                return _keep_only_real_short_title(citation.model_copy(
+                    update={"source": source, "short_title": citation.short_title or short_title}))
         if not citation.short_title:
             # The author's own short title is right there in the text of the subsequent
             # reference ("Adoption Act (n 2) s 24", "Maynard, above n 1"); read it rather
@@ -804,24 +921,30 @@ class Extractor:
             if m and m.group("title").strip().lower() not in {"ibid", "id"}:
                 citation = citation.model_copy(update={"short_title": m.group("title").strip(" ,*")})
 
-        ref_fn = resolved.get(seg.refers_to_footnote)
+        ref_fn = resolved.get(ref)
         ref_citations = [s.citation for s in ref_fn.segments if isinstance(s, CitationSegment)] if ref_fn else []
-        match = _match_citation(ref_citations, citation.short_title)
-        if match is None and citation.short_title:
+        matches = _match_citations(ref_citations, citation.short_title)
+        match = matches[0] if len(matches) == 1 else None
+        if len(matches) > 1 and citation.short_title:
+            self.warnings.append(
+                f"footnote {footnote_number}: {citation.short_title!r} could mean any of "
+                f"{len(matches)} sources cited in footnote {ref}; check it"
+            )
+        elif match is None and citation.short_title:
             found = _find_named(citation.short_title, resolved, before=footnote_number)
             if found is not None:
                 number, match = found
                 self.warnings.append(
-                    f"footnote {footnote_number}: '(n {seg.refers_to_footnote})' points to footnote "
-                    f"{seg.refers_to_footnote}, which doesn't cite {citation.short_title!r}; "
+                    f"footnote {footnote_number}: '(n {ref})' points to footnote "
+                    f"{ref}, which doesn't cite {citation.short_title!r}; "
                     f"changed to footnote {number}, where it is cited"
                 )
         if match is None:
             self.warnings.append(
                 f"footnote {footnote_number}: could not resolve reference to footnote "
-                f"{seg.refers_to_footnote} ({seg.original!r}); recorded as an unclassified source"
+                f"{ref} ({seg.original!r}); recorded as an unclassified source"
             )
-            fallback_text = seg.original or citation.short_title or f"(n {seg.refers_to_footnote})"
+            fallback_text = seg.original or citation.short_title or f"(n {ref})"
             # the original text already contains its pinpoint (and any name), so don't emit
             # either twice: kept as written, it defines no short title
             return citation.model_copy(

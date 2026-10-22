@@ -15,7 +15,7 @@ from .extract import Extractor
 from .llm.base import LLMProvider, get_provider
 from .models import CitationSegment, Extraction, Footnote, ProcessResult, Warning_
 from .formatters import formatter_for
-from .normalise import normalise_citation
+from .normalise import normalise_citation, unify_source_keys
 from .progress import Progress, footnote_texts, found_in, safe
 from .validate import check_footnote_rendering
 
@@ -79,6 +79,7 @@ def _render(extraction: Extraction, *, bibliography: bool, progress: Progress | 
                 seg.citation, msgs = normalise_citation(seg.citation)
                 warnings += [Warning_(footnote=fn.number, message=m) for m in msgs]
 
+    unify_source_keys(seg.citation for fn in extracted for seg in fn.segments if isinstance(seg, CitationSegment))
     _share_short_titles(extracted)
 
     # Deterministic check that the formatter printed every field (aglc/validate.py)
