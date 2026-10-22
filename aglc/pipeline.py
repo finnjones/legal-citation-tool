@@ -13,7 +13,7 @@ from .document import render_document
 from .docx_io import read_footnotes, write_document
 from .extract import Extractor
 from .llm.base import LLMProvider, get_provider
-from .models import CaseCheckSummary, CitationSegment, Extraction, Footnote, ProcessResult, Warning_
+from .models import CaseCheckSummary, CitationSegment, Extraction, Footnote, FoundCase, ProcessResult, Warning_
 from .formatters import formatter_for
 from .normalise import normalise_citation, unify_source_keys
 from .progress import Progress, footnote_texts, found_in, safe
@@ -114,6 +114,9 @@ def _check_cases(footnotes: list[Footnote]) -> tuple[CaseCheckSummary, list[Warn
         if check.warning:
             summary.flagged += 1
             warnings.append(Warning_(footnote=number, message=check.warning))
+        if check.found:
+            found = check.found
+            summary.found.append(FoundCase(footnote=number, title=found.title, citation=found.citation, url=found.url))
     return summary, warnings
 
 

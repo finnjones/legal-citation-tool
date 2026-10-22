@@ -249,6 +249,13 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .notes { margin-top: 10px; display: grid; gap: 6px; font-size: 0.875rem; }
         .notes p { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: baseline; }
         .notes p::before { content: "Check"; font-weight: 600; color: var(--check); }
+        /* A cited case found among the courts' published decisions, and the link to read it */
+        .found { margin-top: 10px; display: grid; gap: 6px; font-size: 0.875rem; color: var(--muted); }
+        .found p { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: baseline; }
+        .found p::before { content: "Found"; font-weight: 600; color: var(--accent); }
+        .found .decision { font-family: var(--font-serif); font-size: 0.9375rem; color: var(--ink); overflow-wrap: anywhere; }
+        .found .decision em { font-style: italic; }
+        .found .link { white-space: nowrap; }
         .chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
         /* What changed and why: one quiet line per kind of change, with its rule */
         .why { list-style: none; margin-top: 10px; display: grid; gap: 4px; font-size: 0.875rem; line-height: 1.5; color: var(--muted); }
@@ -291,7 +298,6 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .doc-head h1 { font-family: var(--font-serif); font-size: 1.875rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.012em; overflow-wrap: anywhere; }
         .doc-head p { color: var(--muted); margin-top: 6px; font-size: 0.9375rem; }
         .doc-head .relink { margin-top: 10px; font-size: 0.875rem; color: var(--muted); }
-        .doc-head .case-check { margin-top: 10px; font-size: 0.875rem; max-width: 64ch; }
         #banners:not(:empty) { margin-bottom: 24px; }
 
         .toolbar {
@@ -682,7 +688,6 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     <div>
                         <h1 id="docTitle">Your footnotes</h1>
                         <p id="summary"></p>
-                        <p class="case-check" id="caseCheck" hidden></p>
                         <p class="relink" id="relink" hidden></p>
                     </div>
                     <a class="btn btn-secondary" href="/">Check another document</a>
@@ -1305,8 +1310,9 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             }
             entries = data.footnotes.map(fn => {
                 const notes = notesFor.get(fn.number) || [];
+                const found = (data.case_check?.found || []).filter(f => f.footnote === fn.number);
                 const unread = failed.has(fn.number);
-                return { ...fn, notes, unread, state: unread || notes.length ? "check" : fn.changed ? "amended" : "unchanged" };
+                return { ...fn, notes, found, unread, state: unread || notes.length ? "check" : fn.changed ? "amended" : "unchanged" };
             });
 
             showView("results");
@@ -1327,7 +1333,6 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             const next = document.getElementById("nextCheck");
             next.hidden = counts.check === 0;
             next.textContent = `Next Check (${counts.check})`;
-            renderCaseCheck(data.case_check);
 
             renderBanners(data, general, failed);
             renderRegister();
@@ -1337,20 +1342,32 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             setFilter("all");
         }
 
-        // How many cases were checked against the courts' published decisions, so that no
-        // Check on a case isn't read as every case having been confirmed (aglc/verify.py)
-        function renderCaseCheck(check) {
-            const el = document.getElementById("caseCheck");
-            el.hidden = !check || !check.total;
-            if (el.hidden) return;
+        // How the document's cases fared against the courts' published decisions, so a case
+        // with no Check isn't read as confirmed unless it was (aglc/verify.py)
+        function caseCheckBanner(check) {
+            if (!check || !check.total) return "";
             const { total, checked, flagged } = check;
-            const others = total - checked;
-            const limit = "only High Court, Federal Court and NSW cases can be checked, and a few of their decisions aren't in our list.";
-            el.textContent = checked
-                ? `Checked ${checked} of ${plural(total, "case")} against the courts' published decisions`
-                    + (flagged ? `; ${flagged} ${flagged === 1 ? "looks" : "look"} wrong (marked Check).` : ".")
-                    + (others ? ` The other ${others === 1 ? "one wasn't" : `${others} weren't`}: ${limit}` : "")
-                : `${total === 1 ? "Your case couldn't" : `None of your ${total} cases could`} be checked against the courts' published decisions: ${limit}`;
+            const found = checked - flagged, others = total - checked;
+            const [kind, title] = flagged
+                ? ["check", `${flagged} of ${plural(total, "case")} ${flagged === 1 ? "looks" : "look"} wrong`]
+                : found ? ["ok", `Found ${found} of ${plural(total, "case")} in the courts' published decisions`]
+                : ["", `Couldn't check your ${total === 1 ? "case" : "cases"}`];
+            const text = [
+                flagged ? `${flagged === 1 ? "Its footnote is" : "Their footnotes are"} marked Check, saying why.` : "",
+                found ? "Found cases are marked on their footnotes, with a link to read the judgment on AustLII." : "",
+                others ? `${others === total ? (total === 1 ? "It wasn't checked" : "None were checked") : others === 1 ? "One wasn't checked" : `${others} weren't checked`}: `
+                    + "only High Court, Federal Court and NSW cases can be, and a few of their decisions aren't in our list." : "",
+            ].filter(Boolean).join(" ");
+            return banner(kind, title, text);
+        }
+
+        // Cases on this footnote found among the courts' published decisions, by the court's
+        // own title, with the judgment on AustLII
+        function foundHtml(e) {
+            if (!e.found.length) return "";
+            return `<div class="found">${e.found.map(f => `<p><span><span class="decision"><em>${escapeHtml(f.title)}</em>`
+                + `${f.citation ? ` ${escapeHtml(f.citation)}` : ""}</span>`
+                + `${f.url ? ` <span class="link">· <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener">Read on AustLII</a></span>` : ""}</span></p>`).join("")}</div>`;
         }
 
         function renderBanners(data, general, failed) {
@@ -1382,6 +1399,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             setBanner("general", outside.length ? banner("check", `Check ${outside.length === 1 ? "this" : `these ${outside.length}`} outside the footnotes`,
                 "These aren't changed for you, because they need your judgement.",
                 "", `<ul class="check-list">${outside.map(item => `<li>${item}</li>`).join("")}</ul>`) : "");
+            setBanner("cases", caseCheckBanner(data.case_check));
 
             const relink = document.getElementById("relink");
             relink.hidden = !(config.payments && !locked);
@@ -1409,10 +1427,11 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             const notes = e.notes;
             const notesHtml = notes.length ? `<div class="notes">${notes.map(m => `<p><span>${noteHtml(m)}</span></p>`).join("")}</div>` : "";
             const whyLines = whyHtml(e);
+            const found = foundHtml(e);
             if (e.unread) return `<p class="placeholder">Left as written. The AI model couldn't read this footnote.</p>`;
-            if (e.locked) return `<p class="placeholder">${ICON_LOCK}<span>Result hidden until you unlock</span></p>${notesHtml}`;
-            if (!e.changed) return `<p class="placeholder">${notes.length ? "Left as written" : "No change needed"}</p>${notesHtml}`;
-            return `<p class="cite now" data-index="${i}"></p>${notesHtml}${whyLines}`;
+            if (e.locked) return `<p class="placeholder">${ICON_LOCK}<span>Result hidden until you unlock</span></p>${notesHtml}${found}`;
+            if (!e.changed) return `<p class="placeholder">${notes.length ? "Left as written" : "No change needed"}</p>${notesHtml}${found}`;
+            return `<p class="cite now" data-index="${i}"></p>${notesHtml}${found}${whyLines}`;
         }
 
         function renderCitationBodies() {
@@ -1847,7 +1866,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             </div>`;
         }
 
-        const BANNER_ORDER = ["payment", "error", "failed", "preview", "general"];
+        const BANNER_ORDER = ["payment", "error", "failed", "preview", "general", "cases"];
         const banners = {};
         function setBanner(key, html) {
             banners[key] = html;

@@ -127,7 +127,8 @@ A case cited only by its CLR, FCR or NSWLR report is looked for by name among th
 decisions of the report's year and the year before. Every party must match, by a word or
 its initials ('ACCC'). Finding it counts the case as checked; not finding it doesn't flag
 it, since the Corpus lacks some of the most cited decisions (*Pape*, *Momcilovic*).
-The results page says how many of the document's cases were checked.
+The results page says how many of the document's cases were found, and marks each one
+found on its footnote with the court's own title and a link to the judgment on AustLII.
 
 ### Try it
 
