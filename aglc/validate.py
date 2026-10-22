@@ -41,13 +41,23 @@ NOISE = frozenset(
 # for them: '*Parliamentary Debates*', 'Submission' and 'Evidence to' are printed by the
 # formatter whatever the author called them ('Hansard', 'Sub'), r 7.5.1 and 7.5.4 drop
 # designations like 'MP' and 'the Hon' from a speaker's name, and r 7.5.2 drops
-# 'Anonymous' and 'Name withheld' authors.
+# 'Anonymous' and 'Name withheld' authors. Likewise 'Speech' and 'Media Release' (r 7.3,
+# 7.4), a dictionary's 'def' and an online source's 'online at' (r 7.6, 7.7), and the labels
+# a UN document's elements are printed with ('UN Doc', 'GA Res', '54th sess', r 9.2).
 _SPEAKER_TITLES = "Hon Honourable Senator Mr Mrs Ms Miss Dr Prof Professor MP MLA MLC MHR MHA QC SC KC"
 _IMPLIED_BY_TYPE = {
     "parliamentary_debates": "Parliamentary Debates Hansard " + _SPEAKER_TITLES,
     "submission": "Submission Submissions Sub Anonymous Name Withheld Confidential",
     "committee_evidence": "Evidence Hansard Proof " + _SPEAKER_TITLES,
     "convention_debates": _SPEAKER_TITLES,
+    "speech": "Speech Address Delivered Annual " + _SPEAKER_TITLES,
+    "media_release": "Media Release " + _SPEAKER_TITLES,
+    "dictionary": "def definition online accessed retrieved",
+    "legal_encyclopedia": "online accessed retrieved",
+    "un_document": "UN United Nations Doc Docs GA SC ESC Res Resolution Dec Decision General Assembly Security "
+                   "Economic Social Council Official Records GAOR SCOR ESCOR TCOR Comm Committee Main sess session "
+                   "mtg meeting plen plenary Agenda Item Items Supp Supplement adopted "
+                   "first second third fourth fifth sixth",
 }
 
 _ABBREV_DOTS = re.compile(r"(?<=\b[A-Za-z])\.")          # N.S.W. -> NSW, U.N.T.S. -> UNTS
@@ -146,6 +156,7 @@ def missing_from_extraction(original: str, segments: list, extra: Iterable[str] 
 _NUMERIC_FIELDS = (
     "year", "volume", "issue", "starting_page", "judgment_number", "edition", "page",
     "document_number", "submission_number", "treaty_series", "date", "opened_for_signature", "entry_into_force",
+    "session", "meeting", "supplement", "retrieved",
 )
 
 

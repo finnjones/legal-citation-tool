@@ -40,6 +40,12 @@ _CHAPTERS = {
     "committee_evidence": ("evidence to a parliamentary committee", "r 7.5.3"),
     "convention_debates": ("the Constitutional Convention Debates", "r 7.5.4"),
     "explanatory_memorandum": ("an explanatory memorandum", "r 3.7"),
+    "speech": ("a speech", "r 7.3"),
+    "media_release": ("a media release", "r 7.4"),
+    "dictionary": ("a dictionary entry", "r 7.6"),
+    "legal_encyclopedia": ("a legal encyclopedia", "r 7.7"),
+    "social_media": ("a social media post", "r 7.16"),
+    "un_document": ("a UN document", "r 9.2"),
 }
 
 # Reference-manager type labels AGLC4 never prints, eg Zotero's '(Journal Article, 2010)'

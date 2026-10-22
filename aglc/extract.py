@@ -126,6 +126,10 @@ def _display_name(source: Source) -> str:
     if source.type == "committee_evidence":
         parts = ("Evidence", source.committee, source.location, source.date, source.speaker)
         return ", ".join(p for p in parts if p)
+    if source.type == "social_media":
+        return source.username
+    if source.type == "un_document":
+        return source.resolution or source.document_number or ""
     return getattr(source, "text", "") or ""
 
 
@@ -328,8 +332,11 @@ def _keep_et_al(citation: Citation, original: str) -> Citation:
     return citation
 
 
-#: Source types whose title is quoted and roman (r 5.2, 6.6.1, 7.10, 7.15), and its field
-_QUOTED_TITLES = {"journal_article": "title", "book_chapter": "chapter_title", "newspaper": "title", "website": "title"}
+#: Source types whose title is quoted and roman (r 5.2, 6.6.1, 7.3, 7.4, 7.10, 7.15, 7.16), and its field
+_QUOTED_TITLES = {
+    "journal_article": "title", "book_chapter": "chapter_title", "newspaper": "title", "website": "title",
+    "speech": "title", "media_release": "title", "social_media": "title",
+}
 
 
 def _keep_title_italics(citation: Citation, span: RichText) -> Citation:

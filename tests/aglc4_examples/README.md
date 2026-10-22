@@ -46,7 +46,9 @@ assertion message names the rule and guide page so you can go back to the *Guide
 
 1. Find a worked example in `reference/aglc4.txt` (chapter 1-3 coverage lives in `cases.json`
    and `legislation.json`; parliamentary materials, research papers and committee reports
-   (r 3.7, 7.1.2, 7.2, 7.5.1-7.5.4, 24.4.1) in `parliamentary.json`; other source types can add their own `*.json` file following the
+   (r 3.7, 7.1.2, 7.2, 7.5.1-7.5.4, 24.4.1) in `parliamentary.json`; speeches, media releases,
+   dictionaries, legal encyclopedias and social media (r 7.3, 7.4, 7.6, 7.7, 7.16) in
+   `other_sources.json`; UN documents (ch 9) in `un.json`; other source types can add their own `*.json` file following the
    same schema -- the test loader picks up every file in this directory automatically).
 2. Build the `citation` object by hand from `aglc/models.py`'s `CaseSource` / `LegislationSource`
    (or another `Source` subtype) plus `pinpoints` / `pinpoint_judges` / `short_title` / `signal`
@@ -73,6 +75,22 @@ the Commonwealth Constitution and state Constitution Acts, pinpoints to `s`/`ss`
 `cl`/`reg`/`r` (singular and plural, consecutive and non-consecutive ranges, decimal/hyphenated
 section numbers), an `item` pinpoint, `(definition of '...')` pinpoints, and short titles defined
 for a portion of an Act (`sch 1 ('Criminal Code')`).
+
+`other_sources.json` (17 examples): every worked example in r 7.3 (speeches and named lectures,
+with and without a URL), r 7.4 (media releases, with a document number and a pinpoint), r 7.6
+(print and online dictionaries, entry designations and definitions), r 7.7 (print and online
+legal encyclopedias, hyphenated paragraph numbers) and r 7.16 (YouTube with a time pinpoint,
+an untitled Instagram post, a tweet with the poster's name, a time zone and an archived URL).
+
+`un.json` (43 examples, ch 9): resolutions and decisions of each organ, Official Records,
+committee, session (and part), meeting, agenda item, supplement and document number elements,
+several document numbers ('UN Docs ... and Corr.1'), adoption dates, pinpoints to resolutions
+('para 3', 'paras 138–9', 'Preamble paras 3–4', 'pt K', 'annex para 3') and to reports
+('6 [3]–[4]'), treaty committee decisions (r 9.3.1) and the r 9.6 table of common documents.
+Left out: r 9.2.5 example 12, which the guide misprints ('Agenda items 94 and 96 UN Doc', with
+no comma); annexes cited as documents in their own right with a short title in the pinpoint
+(r 9.2.12 examples 30 and 32, r 9.6 example 60); and documents of several organs with parallel
+Official Records (r 9.2.14 example 37).
 
 ## Skipped categories
 

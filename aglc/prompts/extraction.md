@@ -55,7 +55,7 @@ should be a single `text` segment. Do not invent a citation that is not there.
 
 ## The `citation` object
 
-`citation.source` is one of the sixteen source types below, chosen by its `type` field. `citation` also
+`citation.source` is one of the twenty-two source types below, chosen by its `type` field. `citation` also
 carries, alongside the source:
 
 - `pinpoints`: a list of `{"kind": ..., "value": ..., "plural": false}` objects (see "Pinpoints").
@@ -136,6 +136,44 @@ carries, alongside the source:
     `document_type: "Research Paper"`, `document_number: "8"`,
     `institution: "Parliamentary Library, Parliament of Australia"`, `date: "22 September 2008"`,
     pinpoint page `15`.
+- **`speech`** (r 7.3) — a speech, address or lecture (one published in a journal or book is cited as
+  that instead). `authors` (the speaker, copied as written, judicial titles included), `title`,
+  `lecture` (only for a named lecture or oration, eg `"Lucinda Lecture"`; leave it out for an
+  ordinary speech, keynote or address, because "Speech" is printed for those), `forum` (the
+  institution or event it was given at; the city only if no forum is named), `date`, `url`.
+  - Example: `Virginia Bell, 'Section 80: The Great Constitutional Tautology' (Lucinda Lecture,
+    Monash University, 24 October 2013)` → `authors: ["Virginia Bell"]`, `authors_are_bodies: false`,
+    `title: "Section 80: The Great Constitutional Tautology"`, `lecture: "Lucinda Lecture"`,
+    `forum: "Monash University"`, `date: "24 October 2013"`.
+- **`media_release`** (r 7.4) — a press or media release or press statement. `authors` (the
+  person or body that made it), `title`, `release_type` (as written, eg `"Media Release"`,
+  `"Press Release"`, `"Joint Media Release"`), `document_number` (only if the release has one),
+  `body` (the office or body that issued it when that isn't the author, eg a minister's portfolio
+  `"Attorney-General"` or `"Prime Minister of Australia"`), `date`, `url`.
+  - Example: `The Hon Mark Dreyfus KC MP, Attorney-General, 'Strengthening Australia's Privacy Laws'
+    (Media Release, 28 September 2023)` → `authors: ["The Hon Mark Dreyfus KC MP"]`,
+    `authors_are_bodies: false`, `title: "Strengthening Australia's Privacy Laws"`,
+    `release_type: "Media Release"`, `body: "Attorney-General"`, `date: "28 September 2023"`.
+- **`dictionary`** (r 7.6) — an entry in a dictionary (including legal dictionaries like *Black's
+  Law Dictionary*). `title` (the dictionary), `edition` (number only) and `year` for a print
+  dictionary, `online: true` and `retrieved` (the date it was accessed) for an online one, `entry`
+  (the headword, without quotation marks), `entry_designation` (which of several entries for the
+  word, eg `"n1"`, `"adj"`), `definition` (the definition number only, without "def").
+  - Example: `Macquarie Dictionary (5th ed, 2009) 'demise' (def 4)` → `title: "Macquarie Dictionary"`,
+    `edition: "5"`, `year: "2009"`, `entry: "demise"`, `definition: "4"`.
+  - Example: `Oxford English Dictionary (online, accessed 3 March 2024) "reasonable", def 2` →
+    `title: "Oxford English Dictionary"`, `online: true`, `retrieved: "3 March 2024"`,
+    `entry: "reasonable"`, `definition: "2"`.
+- **`legal_encyclopedia`** (r 7.7) — *Halsbury's Laws of Australia*, *The Laws of Australia* and
+  similar. `publisher` (eg `"LexisNexis"`, `"Westlaw AU"`), `title` (the encyclopedia), `volume`
+  and `date` (the date of last update, "at ...") for print, `online: true` and `retrieved` for
+  online, `title_number` and `title_name` (the numbered subject title, eg `"235"` and
+  `"Insurance"`), `chapter` (its number and name together, without quotation marks). The
+  paragraph is a pinpoint, copied exactly, hyphen included (`[235-270]` → paragraph `"235-270"`).
+  - Example: `LexisNexis, Halsbury's Laws of Australia, vol 15 (at 25 May 2009) 235 Insurance, '2
+    General Principles' [235-270]` → `publisher: "LexisNexis"`, `title: "Halsbury's Laws of
+    Australia"`, `volume: "15"`, `date: "25 May 2009"`, `title_number: "235"`,
+    `title_name: "Insurance"`, `chapter: "2 General Principles"`, pinpoint paragraph `235-270`.
 - **`parliamentary_debates`** (r 7.5.1) — Hansard, including second reading speeches. The words
   "Parliamentary Debates" or "Hansard" are implied by the type and go in no field.
   `jurisdiction` (as written, eg `"Commonwealth"`, `"New South Wales"`, `"NSW"`), `chamber`
@@ -190,9 +228,41 @@ carries, alongside the source:
 - **`newspaper`** (r 7.11) — `authors`, `title` (article headline), `newspaper` (publication name),
   `place`, `date`, `page`, `url`.
 - **`website`** (r 7.15) — `authors`, `title` (page title), `website_name`, `date`, `url`.
+- **`social_media`** (r 7.16) — a post on Twitter/X, Facebook, Instagram, LinkedIn or a forum, or
+  a YouTube video (a profile page is a `website`). `username` (exactly as on the platform,
+  capitalisation unchanged, with "@" for Twitter), `author_name` (the poster's name if given in
+  brackets after the username), `title` (only if the post or video has one), `platform`, `date`,
+  `time`, `time_zone` (eg `"AEST"`), `url`, `archived_url`. A point or span of time in a video is
+  an `other` pinpoint, eg `"00:00:00–00:01:00"`.
+  - Example: `@s_m_stephenson (Scott Stephenson) (Twitter, 17 July 2017, 9:37pm AEST)
+    <https://twitter.com/s_m_stephenson/status/887169425551441921>` →
+    `username: "@s_m_stephenson"`, `author_name: "Scott Stephenson"`, `platform: "Twitter"`,
+    `date: "17 July 2017"`, `time: "9:37pm"`, `time_zone: "AEST"`,
+    `url: "https://twitter.com/s_m_stephenson/status/887169425551441921"`.
 - **`treaty`** (r 8.1–8.2) — `title`, `parties` (bilateral treaties only), `opened_for_signature`,
   `signed` (`true` if described as "signed" rather than "opened for signature"), `treaty_series`
   (eg `"1155 UNTS 331"`), `entry_into_force`.
+- **`un_document`** (r 9.2) — an official UN document: a General Assembly or Security Council
+  resolution or decision, a report, a treaty body's general comment or views, a meeting record.
+  Fill only the elements the footnote gives. The labels around each element ("UN Doc", "sess",
+  "mtg", "Supp No", "Agenda Item") are printed by the tool, so give the numbers alone. `author` (an
+  individual or body other than a principal organ, eg `"Human Rights Committee"`, with any position
+  after a comma, eg `"Giorgio Gaja, Special Rapporteur"`), `title`, `resolution` (organ, type and
+  number, eg `"GA Res 61/295"`, `"SC Res 1441"`), `official_records` (eg `"UN GAOR"`),
+  `committee` (number of the General Assembly committee), `session`, `session_part`, `meeting`,
+  `plenary` (`true` for a plenary meeting), `agenda_items` (a list), `supplement`,
+  `document_number` (exactly as written, without "UN Doc", eg `"A/RES/61/295"`), `date`,
+  `adopted` (a separate date of adoption). Paragraphs are `paragraph` pinpoints (`para 3` →
+  `"3"`), and a preambular paragraph is an `other` pinpoint (`"Preamble para 3"`).
+  - Example: `2005 World Summit Outcome, GA Res 60/1, UN GAOR, 60th sess, 8th plen mtg, Agenda
+    Items 46 and 120, Supp No 49, UN Doc A/RES/60/1 (24 October 2005, adopted 16 September 2005)
+    para 138` → `title: "2005 World Summit Outcome"`, `resolution: "GA Res 60/1"`,
+    `official_records: "UN GAOR"`, `session: "60"`, `meeting: "8"`, `plenary: true`,
+    `agenda_items: ["46", "120"]`, `supplement: "49"`, `document_number: "A/RES/60/1"`,
+    `date: "24 October 2005"`, `adopted: "16 September 2005"`, pinpoint paragraph `138`.
+  - Example: `Human Rights Committee, General Comment No 36, UN Doc CCPR/C/GC/36 (30 October
+    2018) [12]` → `author: "Human Rights Committee"`, `title: "General Comment No 36"`,
+    `document_number: "CCPR/C/GC/36"`, `date: "30 October 2018"`, pinpoint paragraph `12`.
 - **`other`** — anything you cannot classify into the above, or the placeholder used for
   subsequent references (see below). `text`: copy the source text verbatim.
 

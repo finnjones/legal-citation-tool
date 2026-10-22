@@ -1,0 +1,795 @@
+[
+ {
+  "id": "9.2-2",
+  "rule": "9.2",
+  "page": 143,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Millennium Summit of the United Nations",
+    "resolution": "GA Res 54/254",
+    "document_number": "A/RES/54/254",
+    "date": "23 March 2000",
+    "adopted": "15 March 2000"
+   },
+   "pinpoints": [
+    {
+     "kind": "paragraph",
+     "value": "3"
+    }
+   ]
+  },
+  "expected_full": "*Millennium Summit of the United Nations*, GA Res 54/254, UN Doc A/RES/54/254 (23 March 2000, adopted 15 March 2000) para 3"
+ },
+ {
+  "id": "9.2.1-3",
+  "rule": "9.2.1",
+  "page": 144,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "Fatma Zohra Ksentini",
+    "title": "Report of the Special Rapporteur on Human Rights and the Environment",
+    "document_number": "E/CN.4/Sub.2/1994/9",
+    "date": "6 July 1994"
+   }
+  },
+  "expected_full": "Fatma Zohra Ksentini, *Report of the Special Rapporteur on Human Rights and the Environment*, UN Doc E/CN.4/Sub.2/1994/9 (6 July 1994)"
+ },
+ {
+  "id": "9.2.1-4",
+  "rule": "9.2.1",
+  "page": 144,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "Giorgio Gaja, Special Rapporteur",
+    "title": "Second Report on Responsibility of International Organizations",
+    "document_number": "A/CN.4/541",
+    "date": "2 April 2004"
+   }
+  },
+  "expected_full": "Giorgio Gaja, Special Rapporteur, *Second Report on Responsibility of International Organizations*, UN Doc A/CN.4/541 (2 April 2004)"
+ },
+ {
+  "id": "9.2.2-5",
+  "rule": "9.2.2",
+  "page": 144,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "Human Rights Committee",
+    "title": "General Comment No 33: Obligations of States Parties under the Optional Protocol to the International Covenant on Civil and Political Rights",
+    "session": "94",
+    "document_number": "CCPR/C/GC/33",
+    "date": "25 June 2009"
+   }
+  },
+  "expected_full": "Human Rights Committee, *General Comment No 33: Obligations of States Parties under the Optional Protocol to the International Covenant on Civil and Political Rights*, 94th sess, UN Doc CCPR/C/GC/33 (25 June 2009)"
+ },
+ {
+  "id": "9.2.3-6",
+  "rule": "9.2.3",
+  "page": 145,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "United Nations Declaration on the Rights of Indigenous Peoples",
+    "resolution": "GA Res 61/295",
+    "document_number": "A/RES/61/295",
+    "date": "2 October 2007",
+    "adopted": "13 September 2007"
+   }
+  },
+  "expected_full": "*United Nations Declaration on the Rights of Indigenous Peoples*, GA Res 61/295, UN Doc A/RES/61/295 (2 October 2007, adopted 13 September 2007)"
+ },
+ {
+  "id": "9.2.3-7",
+  "rule": "9.2.3",
+  "page": 145,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "resolution": "SC Res 1441",
+    "document_number": "S/RES/1441",
+    "date": "8 November 2002"
+   }
+  },
+  "expected_full": "SC Res 1441, UN Doc S/RES/1441 (8 November 2002)"
+ },
+ {
+  "id": "9.2.4-8",
+  "rule": "9.2.4",
+  "page": 145,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Universal Declaration of Human Rights",
+    "resolution": "GA Res 217A (III)",
+    "official_records": "UN GAOR",
+    "document_number": "A/810",
+    "date": "10 December 1948"
+   }
+  },
+  "expected_full": "*Universal Declaration of Human Rights*, GA Res 217A (III), UN GAOR, UN Doc A/810 (10 December 1948)"
+ },
+ {
+  "id": "9.2.4-9",
+  "rule": "9.2.4",
+  "page": 145,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "resolution": "SC Res 1734",
+    "official_records": "UN SCOR",
+    "document_number": "S/RES/1734",
+    "date": "22 December 2006"
+   }
+  },
+  "expected_full": "SC Res 1734, UN SCOR, UN Doc S/RES/1734 (22 December 2006)"
+ },
+ {
+  "id": "9.2.4-10",
+  "rule": "9.2.4",
+  "page": 145,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "Sub-Commission on the Promotion and Protection of Human Rights",
+    "title": "Norms on the Responsibilities of Transnational Corporations and Other Business Enterprises with Regard to Human Rights",
+    "official_records": "UN ESCOR",
+    "document_number": "E/CN.4/Sub.2/2003/12/Rev.2",
+    "date": "26 August 2003",
+    "adopted": "13 August 2003"
+   }
+  },
+  "expected_full": "Sub-Commission on the Promotion and Protection of Human Rights, *Norms on the Responsibilities of Transnational Corporations and Other Business Enterprises with Regard to Human Rights*, UN ESCOR, UN Doc E/CN.4/Sub.2/2003/12/Rev.2 (26 August 2003, adopted 13 August 2003)"
+ },
+ {
+  "id": "9.2.4-11",
+  "rule": "9.2.4",
+  "page": 145,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Amendment of the Rules of Procedure of the Trusteeship Council",
+    "official_records": "UN TCOR",
+    "document_number": "T/RES/2200 (LXI)",
+    "date": "25 May 1994"
+   },
+   "pinpoints": [
+    {
+     "kind": "annex",
+     "value": ""
+    },
+    {
+     "kind": "paragraph",
+     "value": "3"
+    }
+   ]
+  },
+  "expected_full": "*Amendment of the Rules of Procedure of the Trusteeship Council*, UN TCOR, UN Doc T/RES/2200 (LXI) (25 May 1994) annex para 3"
+ },
+ {
+  "id": "9.2.6-13",
+  "rule": "9.2.6",
+  "page": 146,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "official_records": "UN SCOR",
+    "session": "62",
+    "meeting": "5663",
+    "document_number": "S/PV.5663",
+    "date": "17 April 2007"
+   }
+  },
+  "expected_full": "UN SCOR, 62nd sess, 5663rd mtg, UN Doc S/PV.5663 (17 April 2007)"
+ },
+ {
+  "id": "9.2.6-14",
+  "rule": "9.2.6",
+  "page": 146,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "official_records": "UN GAOR",
+    "committee": "6",
+    "session": "3",
+    "session_part": "1",
+    "meeting": "77",
+    "document_number": "A/C.6/SR.77",
+    "date": "18 October 1948"
+   }
+  },
+  "expected_full": "UN GAOR, 6th Comm, 3rd sess, 1st pt, 77th mtg, UN Doc A/C.6/SR.77 (18 October 1948)"
+ },
+ {
+  "id": "9.2.7-15",
+  "rule": "9.2.7",
+  "page": 146,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "resolution": "SC Res 1546",
+    "official_records": "UN SCOR",
+    "session": "59",
+    "meeting": "4987",
+    "document_number": "S/RES/1546",
+    "date": "8 June 2004"
+   }
+  },
+  "expected_full": "SC Res 1546, UN SCOR, 59th sess, 4987th mtg, UN Doc S/RES/1546 (8 June 2004)"
+ },
+ {
+  "id": "9.2.7-16",
+  "rule": "9.2.7",
+  "page": 146,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Measures to Eliminate International Terrorism",
+    "resolution": "GA Res 49/60",
+    "official_records": "UN GAOR",
+    "session": "49",
+    "meeting": "84",
+    "plenary": true,
+    "document_number": "A/RES/49/60",
+    "date": "9 December 1994"
+   }
+  },
+  "expected_full": "*Measures to Eliminate International Terrorism*, GA Res 49/60, UN GAOR, 49th sess, 84th plen mtg, UN Doc A/RES/49/60 (9 December 1994)"
+ },
+ {
+  "id": "9.2.8-17",
+  "rule": "9.2.8",
+  "page": 147,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "The Ethiopian Millennium",
+    "resolution": "GA Res 61/270",
+    "official_records": "UN GAOR",
+    "session": "61",
+    "meeting": "103",
+    "plenary": true,
+    "agenda_items": [
+     "44"
+    ],
+    "document_number": "A/RES/61/270",
+    "date": "27 June 2007",
+    "adopted": "15 June 2007"
+   }
+  },
+  "expected_full": "*The Ethiopian Millennium*, GA Res 61/270, UN GAOR, 61st sess, 103rd plen mtg, Agenda Item 44, UN Doc A/RES/61/270 (27 June 2007, adopted 15 June 2007)"
+ },
+ {
+  "id": "9.2.8-18",
+  "rule": "9.2.8",
+  "page": 147,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "International Migration and Development: Report of the Secretary-General",
+    "official_records": "UN GAOR",
+    "session": "60",
+    "agenda_items": [
+     "54(c)"
+    ],
+    "document_number": "A/60/871",
+    "date": "18 May 2006"
+   }
+  },
+  "expected_full": "*International Migration and Development: Report of the Secretary-General*, UN GAOR, 60th sess, Agenda Item 54(c), UN Doc A/60/871 (18 May 2006)"
+ },
+ {
+  "id": "9.2.8-19",
+  "rule": "9.2.8",
+  "page": 147,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Gratis Personnel Provided by Governments",
+    "resolution": "GA Res 53/218",
+    "official_records": "UN GAOR",
+    "agenda_items": [
+     "112",
+     "119"
+    ],
+    "supplement": "49",
+    "document_number": "A/RES/53/218",
+    "date": "21 April 1999"
+   }
+  },
+  "expected_full": "*Gratis Personnel Provided by Governments*, GA Res 53/218, UN GAOR, Agenda Items 112 and 119, Supp No 49, UN Doc A/RES/53/218 (21 April 1999)"
+ },
+ {
+  "id": "9.2.9-20",
+  "rule": "9.2.9",
+  "page": 147,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "2005 World Summit Outcome",
+    "resolution": "GA Res 60/1",
+    "official_records": "UN GAOR",
+    "session": "60",
+    "meeting": "8",
+    "plenary": true,
+    "agenda_items": [
+     "46",
+     "120"
+    ],
+    "supplement": "49",
+    "document_number": "A/RES/60/1",
+    "date": "24 October 2005",
+    "adopted": "16 September 2005"
+   }
+  },
+  "expected_full": "*2005 World Summit Outcome*, GA Res 60/1, UN GAOR, 60th sess, 8th plen mtg, Agenda Items 46 and 120, Supp No 49, UN Doc A/RES/60/1 (24 October 2005, adopted 16 September 2005)"
+ },
+ {
+  "id": "9.2.10-21",
+  "rule": "9.2.10",
+  "page": 148,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "International Day of Peace",
+    "resolution": "GA Res 55/282",
+    "document_number": "A/RES/55/282",
+    "date": "28 September 2001",
+    "adopted": "7 September 2001"
+   },
+   "pinpoints": [
+    {
+     "kind": "paragraph",
+     "value": "3"
+    }
+   ]
+  },
+  "expected_full": "*International Day of Peace*, GA Res 55/282, UN Doc A/RES/55/282 (28 September 2001, adopted 7 September 2001) para 3"
+ },
+ {
+  "id": "9.2.10-22",
+  "rule": "9.2.10",
+  "page": 148,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "resolution": "SC Res 1905",
+    "document_number": "S/RES/1905",
+    "date": "21 December 2009"
+   }
+  },
+  "expected_full": "SC Res 1905, UN Doc S/RES/1905 (21 December 2009)"
+ },
+ {
+  "id": "9.2.10-23",
+  "rule": "9.2.10",
+  "page": 148,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "The Situation in the Occupied Territories of Azerbaijan: Report of the Secretary-General",
+    "document_number": "A/63/804 and Corr.1",
+    "date": "30 March 2009"
+   }
+  },
+  "expected_full": "*The Situation in the Occupied Territories of Azerbaijan: Report of the Secretary-General*, UN Docs A/63/804 and Corr.1 (30 March 2009)"
+ },
+ {
+  "id": "9.2.10-24",
+  "rule": "9.2.10",
+  "page": 148,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "International Law Commission",
+    "title": "Provisional Summary Record of the 3253rd Meeting",
+    "session": "67",
+    "session_part": "1",
+    "meeting": "3253",
+    "agenda_items": [
+     "9"
+    ],
+    "document_number": "A/CN.4/SR.3253",
+    "date": "15 July 2015"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "6"
+    }
+   ]
+  },
+  "expected_full": "International Law Commission, *Provisional Summary Record of the 3253rd Meeting*, 67th sess, 1st pt, 3253rd mtg, Agenda Item 9, UN Doc A/CN.4/SR.3253 (15 July 2015) 6"
+ },
+ {
+  "id": "9.2.10-25",
+  "rule": "9.2.10",
+  "page": 148,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "Committee on Economic, Social and Cultural Rights",
+    "title": "General Comment No 14 (2000): The Right to the Highest Attainable Standard of Health (Article 12 of the International Covenant on Economic, Social and Cultural Rights)",
+    "official_records": "UN ESCOR",
+    "session": "22",
+    "agenda_items": [
+     "3"
+    ],
+    "document_number": "E/C.12/2000/4",
+    "date": "11 August 2000"
+   }
+  },
+  "expected_full": "Committee on Economic, Social and Cultural Rights, *General Comment No 14 (2000): The Right to the Highest Attainable Standard of Health (Article 12 of the International Covenant on Economic, Social and Cultural Rights)*, UN ESCOR, 22nd sess, Agenda Item 3, UN Doc E/C.12/2000/4 (11 August 2000)"
+ },
+ {
+  "id": "9.2.11-26",
+  "rule": "9.2.11",
+  "page": 151,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "Maurice Kamto, Special Rapporteur",
+    "title": "Third Report on the Expulsion of Aliens",
+    "document_number": "A/CN.4/581",
+    "date": "19 April 2007"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "6"
+    },
+    {
+     "kind": "paragraph",
+     "value": "11"
+    }
+   ]
+  },
+  "expected_full": "Maurice Kamto, Special Rapporteur, *Third Report on the Expulsion of Aliens*, UN Doc A/CN.4/581 (19 April 2007) 6 [11]"
+ },
+ {
+  "id": "9.2.11-27",
+  "rule": "9.2.11",
+  "page": 151,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "official_records": "UN GAOR",
+    "committee": "5",
+    "session": "51",
+    "meeting": "68",
+    "document_number": "A/C.5/51/SR.68",
+    "date": "12 August 1997"
+   }
+  },
+  "expected_full": "UN GAOR, 5th Comm, 51st sess, 68th mtg, UN Doc A/C.5/51/SR.68 (12 August 1997)"
+ },
+ {
+  "id": "9.2.11-28",
+  "rule": "9.2.11",
+  "page": 151,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "General and Complete Disarmament",
+    "resolution": "GA Res 49/75",
+    "document_number": "A/RES/49/75",
+    "date": "9 January 1995",
+    "adopted": "15 December 1994"
+   },
+   "pinpoints": [
+    {
+     "kind": "part",
+     "value": "K"
+    }
+   ]
+  },
+  "expected_full": "*General and Complete Disarmament*, GA Res 49/75, UN Doc A/RES/49/75 (9 January 1995, adopted 15 December 1994) pt K"
+ },
+ {
+  "id": "9.2.11-29",
+  "rule": "9.2.11",
+  "page": 151,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Rules of Procedure of the General Assembly",
+    "document_number": "A/520/Rev.17",
+    "date": "2008"
+   }
+  },
+  "expected_full": "*Rules of Procedure of the General Assembly*, UN Doc A/520/Rev.17 (2008)"
+ },
+ {
+  "id": "9.2.12-31",
+  "rule": "9.2.12",
+  "page": 151,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "resolution": "SC Res 1512",
+    "document_number": "S/RES/1512",
+    "date": "27 October 2003"
+   },
+   "pinpoints": [
+    {
+     "kind": "annex",
+     "value": ""
+    }
+   ]
+  },
+  "expected_full": "SC Res 1512, UN Doc S/RES/1512 (27 October 2003) annex"
+ },
+ {
+  "id": "9.2.13-33",
+  "rule": "9.2.13",
+  "page": 153,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "2005 World Summit Outcome",
+    "resolution": "GA Res 60/1",
+    "document_number": "A/RES/60/1",
+    "date": "24 October 2005"
+   },
+   "pinpoints": [
+    {
+     "kind": "paragraph",
+     "value": "138-139",
+     "plural": true
+    }
+   ]
+  },
+  "expected_full": "*2005 World Summit Outcome*, GA Res 60/1, UN Doc A/RES/60/1 (24 October 2005) paras 138–9"
+ },
+ {
+  "id": "9.2.13-34",
+  "rule": "9.2.13",
+  "page": 153,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "resolution": "SC Res 1717",
+    "document_number": "S/RES/1717",
+    "date": "13 October 2006"
+   },
+   "pinpoints": [
+    {
+     "kind": "other",
+     "value": "Preamble paras 3–4"
+    }
+   ]
+  },
+  "expected_full": "SC Res 1717, UN Doc S/RES/1717 (13 October 2006) Preamble paras 3–4"
+ },
+ {
+  "id": "9.2.13-35",
+  "rule": "9.2.13",
+  "page": 153,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Report of the Secretary-General Pursuant to General Assembly Resolution 53/35: The Fall of Srebrenica",
+    "document_number": "A/54/549",
+    "date": "15 November 1999"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "6"
+    },
+    {
+     "kind": "paragraph",
+     "value": "3-4"
+    }
+   ]
+  },
+  "expected_full": "*Report of the Secretary-General Pursuant to General Assembly Resolution 53/35: The Fall of Srebrenica*, UN Doc A/54/549 (15 November 1999) 6 [3]–[4]"
+ },
+ {
+  "id": "9.2.13-36",
+  "rule": "9.2.13",
+  "page": 153,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "Committee against Torture",
+    "title": "Decision: Communication No 227/2003",
+    "session": "37",
+    "document_number": "CAT/C/37/D/227/2003",
+    "date": "14 December 2006"
+   },
+   "pinpoints": [
+    {
+     "kind": "paragraph",
+     "value": "8.6-8.7"
+    }
+   ],
+   "short_title": "AAC v Sweden"
+  },
+  "expected_full": "Committee against Torture, *Decision: Communication No 227/2003*, 37th sess, UN Doc CAT/C/37/D/227/2003 (14 December 2006) [8.6]–[8.7]"
+ },
+ {
+  "id": "9.3.1-38",
+  "rule": "9.3.1",
+  "page": 154,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "author": "Human Rights Committee",
+    "title": "Views: Communication No 1011/2001",
+    "session": "81",
+    "document_number": "CCPR/C/81/D/1011/2001",
+    "date": "26 August 2004"
+   },
+   "pinpoints": [
+    {
+     "kind": "page",
+     "value": "21"
+    },
+    {
+     "kind": "paragraph",
+     "value": "9.8"
+    }
+   ],
+   "short_title": "Madafferi v Australia"
+  },
+  "expected_full": "Human Rights Committee, *Views: Communication No 1011/2001*, 81st sess, UN Doc CCPR/C/81/D/1011/2001 (26 August 2004) 21 [9.8]"
+ },
+ {
+  "id": "9.5-45",
+  "rule": "9.5",
+  "page": 157,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "resolution": "SC Res 1325",
+    "official_records": "UN SCOR",
+    "meeting": "4213",
+    "document_number": "S/RES/1325",
+    "date": "31 October 2000"
+   },
+   "short_title": "Resolution 1325"
+  },
+  "expected_full": "SC Res 1325, UN SCOR, 4213th mtg, UN Doc S/RES/1325 (31 October 2000)"
+ },
+ {
+  "id": "9.6-52",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Prevention of Armed Conflict",
+    "resolution": "GA Res 57/337",
+    "document_number": "A/RES/57/337",
+    "date": "18 July 2003",
+    "adopted": "3 July 2003"
+   }
+  },
+  "expected_full": "*Prevention of Armed Conflict*, GA Res 57/337, UN Doc A/RES/57/337 (18 July 2003, adopted 3 July 2003)"
+ },
+ {
+  "id": "9.6-53",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "resolution": "SC Res 827",
+    "document_number": "S/RES/827",
+    "date": "25 May 1993"
+   }
+  },
+  "expected_full": "SC Res 827, UN Doc S/RES/827 (25 May 1993)"
+ },
+ {
+  "id": "9.6-54",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "official_records": "UN GAOR",
+    "session": "63",
+    "meeting": "55",
+    "plenary": true,
+    "document_number": "A/63/PV.55",
+    "date": "19 November 2008"
+   }
+  },
+  "expected_full": "UN GAOR, 63rd sess, 55th plen mtg, UN Doc A/63/PV.55 (19 November 2008)"
+ },
+ {
+  "id": "9.6-55",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Report of the Economic and Social Council for 2005",
+    "document_number": "A/60/3/Rev.1",
+    "date": "11 July 2007"
+   }
+  },
+  "expected_full": "*Report of the Economic and Social Council for 2005*, UN Doc A/60/3/Rev.1 (11 July 2007)"
+ },
+ {
+  "id": "9.6-56",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Human Rights Council, Report of the Working Group on the Universal Periodic Review: Central African Republic",
+    "document_number": "A/HRC/12/2",
+    "date": "4 June 2009"
+   }
+  },
+  "expected_full": "*Human Rights Council, Report of the Working Group on the Universal Periodic Review: Central African Republic*, UN Doc A/HRC/12/2 (4 June 2009)"
+ },
+ {
+  "id": "9.6-57",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Basic Program of Work of the Economic and Social Council for 2001",
+    "resolution": "ESC Dec 2001/203",
+    "official_records": "UN ESCOR",
+    "meeting": "3",
+    "plenary": true,
+    "supplement": "1",
+    "document_number": "E/2000/99",
+    "date": "4 February 2000"
+   }
+  },
+  "expected_full": "*Basic Program of Work of the Economic and Social Council for 2001*, ESC Dec 2001/203, UN ESCOR, 3rd plen mtg, Supp No 1, UN Doc E/2000/99 (4 February 2000)"
+ },
+ {
+  "id": "9.6-58",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "In Larger Freedom: Towards Development, Security and Human Rights for All — Report of the Secretary-General",
+    "document_number": "A/59/2005",
+    "date": "21 March 2005"
+   }
+  },
+  "expected_full": "*In Larger Freedom: Towards Development, Security and Human Rights for All — Report of the Secretary-General*, UN Doc A/59/2005 (21 March 2005)"
+ },
+ {
+  "id": "9.6-59",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Secretary-General’s Bulletin — Organization of the Office of Central Support Services",
+    "document_number": "ST/SGB/1998/11",
+    "date": "1 June 1998"
+   }
+  },
+  "expected_full": "*Secretary-General’s Bulletin — Organization of the Office of Central Support Services*, UN Doc ST/SGB/1998/11 (1 June 1998)"
+ },
+ {
+  "id": "9.6-61",
+  "rule": "9.6",
+  "page": 158,
+  "citation": {
+   "source": {
+    "type": "un_document",
+    "title": "Draft Resolution — International Cooperation in the Peaceful Uses of Outer Space",
+    "document_number": "A/C.4/62/L.2",
+    "date": "14 November 2007"
+   }
+  },
+  "expected_full": "*Draft Resolution — International Cooperation in the Peaceful Uses of Outer Space*, UN Doc A/C.4/62/L.2 (14 November 2007)"
+ }
+]
