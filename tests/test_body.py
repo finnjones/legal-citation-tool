@@ -297,3 +297,18 @@ def test_provision_numbers_with_hyphens_are_left_alone(tmp_path):
     ], [])
     out = tmp_path / "out.docx"
     assert write_document(src, out, []) == []
+
+
+def test_an_ascending_hyphenated_section_in_a_tax_paper_is_only_flagged(tmp_path):
+    # 's 26-52' is one section of the ITAA 1997, not ss 26–52; in a paper citing that Act
+    # it is reported for the author to decide, not rewritten
+    src = build_docx(tmp_path / "itaa.docx", [
+        ("para", [("text", "Under the Income Tax Assessment Act 1997 (Cth), s 26-52 denies the deduction.", False)]),
+    ], [])
+    fixes = write_document(src, tmp_path / "out.docx", [])
+    assert [(f.applied, f.message) for f in fixes] == [
+        (False, "‘s 26-52’: if this is a range of sections, write ‘ss 26–52’ (AGLC4 r 3.1.4); "
+                "if it is one section’s number, leave it"),
+    ]
+    text = "\n".join(p.text for p in docx.Document(str(tmp_path / "out.docx")).paragraphs)
+    assert "s 26-52 denies" in text

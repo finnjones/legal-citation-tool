@@ -176,18 +176,30 @@ def _visitor(request: Request) -> Visitor:
     return Visitor(ip_hash=ip_hash, anon_id=anon, new_cookie=new)
 
 
-def admit(request: Request, response: Response) -> Visitor:
-    """Refuse (429) a free run over today's limits; set the anonymous cookie."""
-    v = _visitor(request)
+def _free_limits() -> tuple[int, int, int]:
+    """Today's free runs: (per IP, per browser, for everyone)."""
     per_browser = _int_env("AGLC_FREE_PER_DAY", 3)
     # One address is often a whole campus or household behind NAT, so it gets more headroom.
     per_ip = _int_env("AGLC_FREE_PER_IP_PER_DAY", per_browser * 5)
-    global_cap = _int_env("AGLC_FREE_GLOBAL_PER_DAY", 300)
+    return per_ip, per_browser, _int_env("AGLC_FREE_GLOBAL_PER_DAY", 300)
+
+
+def _refuse(limit: str, per_browser: int) -> None:
+    if limit == "global":
+        raise HTTPException(429, "The free preview has reached today's limit. Please try again tomorrow.")
+    raise HTTPException(429, f"You've used today's {per_browser} free previews. Please try again tomorrow.")
+
+
+def admit(request: Request, response: Response) -> Visitor:
+    """Refuse (429) a free run over today's limits; set the anonymous cookie. This is the
+    early check, before the upload is read; `start_document` checks again as it records the run."""
+    v = _visitor(request)
+    per_ip, per_browser, global_cap = _free_limits()
     by_ip, by_browser, total = get_store().free_uses_today(ip_hash=v.ip_hash, anon_id=v.anon_id)
     if total >= global_cap:
-        raise HTTPException(429, "The free preview has reached today's limit. Please try again tomorrow.")
+        _refuse("global", per_browser)
     if by_browser >= per_browser or by_ip >= per_ip:
-        raise HTTPException(429, f"You've used today's {per_browser} free previews. Please try again tomorrow.")
+        _refuse("visitor", per_browser)
     if v.new_cookie:
         response.set_cookie(
             ANON_COOKIE, v.anon_id, max_age=365 * 86400, httponly=True, samesite="lax",
@@ -242,7 +254,14 @@ def extraction_report(full: dict) -> dict:
 
 
 def start_document(session_id: str, filename: str, visitor: Visitor) -> None:
-    get_store().add_document(session_id, filename, ip_hash=visitor.ip_hash, anon_id=visitor.anon_id)
+    """Record a free run, refusing (429) one over today's limits. The check and the record
+    are one transaction, so uploads at the same moment can't all pass `admit` and then
+    all be recorded."""
+    limits = _free_limits()
+    refused = get_store().add_document(session_id, filename, ip_hash=visitor.ip_hash, anon_id=visitor.anon_id,
+                                       limits=limits)
+    if refused:
+        _refuse(refused, limits[1])
 
 
 def fail_document(session_id: str) -> None:

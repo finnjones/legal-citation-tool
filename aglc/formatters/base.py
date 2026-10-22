@@ -77,10 +77,11 @@ class Formatter(ABC):
         return None
 
     def ibid_pinpoint(self, citation: Citation) -> str:
-        """Text after 'Ibid' when only the pinpoint changes (r 1.4.3): 'Ibid 42'."""
+        """Text after 'Ibid' when only the pinpoint changes (r 1.4.3): 'Ibid 42', and the
+        judges it is attributed to, with or without a pinpoint ('Ibid (Mason J)')."""
         pin = self.pinpoints(citation.pinpoints)
-        if pin and citation.pinpoint_judges:
-            pin += f" ({citation.pinpoint_judges})"
+        if citation.pinpoint_judges:
+            pin = f"{pin} ({citation.pinpoint_judges})".lstrip()
         return pin
 
     def bibliography(self, citation: Citation) -> RichText:

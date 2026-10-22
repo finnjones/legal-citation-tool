@@ -338,6 +338,17 @@ def _render_citation(
 _BARE_SEPARATORS = {"", ";", ".", ","}
 
 
+def _commentary_follows(fn: Footnote, i: int) -> bool:
+    """Whether the next segment with any text after segment `i` is commentary (words, not
+    another citation or more punctuation)."""
+    for seg in fn.segments[i + 1:]:
+        if isinstance(seg, CitationSegment):
+            return False
+        if seg.text.text.strip():
+            return any(ch.isalnum() for ch in seg.text.text)
+    return False
+
+
 def _render_footnote(
     fn: Footnote,
     plans: dict[int, _Plan],
@@ -353,12 +364,13 @@ def _render_footnote(
     prev_was_citation = False
     prev_citation: Citation | None = None
 
-    for seg in fn.segments:
+    for i, seg in enumerate(fn.segments):
         if isinstance(seg, TextSegment):
-            if prev_was_citation and seg.text.text.strip() in _BARE_SEPARATORS:
+            if prev_was_citation and seg.text.text.strip() in _BARE_SEPARATORS and not _commentary_follows(fn, i):
                 # A bare ';' / '.' between citations from extraction: the separator is
                 # decided below from the signals (r 1.1.3), and closing punctuation by
-                # _ensure_closing_punctuation, so drop the extracted one.
+                # _ensure_closing_punctuation, so drop the extracted one. Before commentary
+                # it ends the citation's sentence, so it stays.
                 continue
             out.extend(seg.text)
             prev_was_citation = False
@@ -398,6 +410,25 @@ def _render_footnote(
 # --------------------------------------------------------------------------- #
 # bibliography (r 1.13)
 # --------------------------------------------------------------------------- #
+
+
+def _completed(first_citation: dict[str, Citation], footnotes: list[Footnote]) -> dict[str, Citation]:
+    """Each source's first citation with any detail it lacks (a publisher, a year) filled
+    in from a later citation of the same source, for its bibliography entry."""
+    out = dict(first_citation)
+    for fn in footnotes:
+        for seg in _citation_segments(fn):
+            key = _source_key(seg.citation)
+            first, later = out.get(key), seg.citation.source
+            if first is None or later is first.source or type(later) is not type(first.source):
+                continue
+            fill = {name: getattr(later, name) for name in type(later).model_fields
+                    if not name.endswith("rich")  # styling of a field's text, not a detail
+                    and getattr(first.source, name) in (None, "", [])
+                    and getattr(later, name) not in (None, "", [])}
+            if fill:
+                out[key] = first.model_copy(update={"source": first.source.model_copy(update=fill)})
+    return out
 
 
 def _build_bibliography(first_citation: dict[str, Citation]) -> list[BibliographySection]:
@@ -473,6 +504,6 @@ def render_document(footnotes: list[Footnote], *, bibliography: bool = True) -> 
             warnings.append(Warning_(footnote=fn.number, message=f"Footnote {fn.number} has missing data"))
         warnings += _pinpoint_warnings(fn, plans)
 
-    bib_sections = _build_bibliography(first_citation) if bibliography else []
+    bib_sections = _build_bibliography(_completed(first_citation, footnotes)) if bibliography else []
 
     return ProcessResult(footnotes=results, bibliography=bib_sections, warnings=warnings)
