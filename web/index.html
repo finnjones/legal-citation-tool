@@ -291,6 +291,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .doc-head h1 { font-family: var(--font-serif); font-size: 1.875rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.012em; overflow-wrap: anywhere; }
         .doc-head p { color: var(--muted); margin-top: 6px; font-size: 0.9375rem; }
         .doc-head .relink { margin-top: 10px; font-size: 0.875rem; color: var(--muted); }
+        .doc-head .case-check { margin-top: 10px; font-size: 0.875rem; max-width: 64ch; }
         #banners:not(:empty) { margin-bottom: 24px; }
 
         .toolbar {
@@ -681,6 +682,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     <div>
                         <h1 id="docTitle">Your footnotes</h1>
                         <p id="summary"></p>
+                        <p class="case-check" id="caseCheck" hidden></p>
                         <p class="relink" id="relink" hidden></p>
                     </div>
                     <a class="btn btn-secondary" href="/">Check another document</a>
@@ -1325,6 +1327,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             const next = document.getElementById("nextCheck");
             next.hidden = counts.check === 0;
             next.textContent = `Next Check (${counts.check})`;
+            renderCaseCheck(data.case_check);
 
             renderBanners(data, general, failed);
             renderRegister();
@@ -1332,6 +1335,22 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             renderBibliography(data);
             renderActions(data);
             setFilter("all");
+        }
+
+        // How many cases were checked against the courts' published decisions, so that no
+        // Check on a case isn't read as every case having been confirmed (aglc/verify.py)
+        function renderCaseCheck(check) {
+            const el = document.getElementById("caseCheck");
+            el.hidden = !check || !check.total;
+            if (el.hidden) return;
+            const { total, checked, flagged } = check;
+            const others = total - checked;
+            const limit = "only High Court, Federal Court and NSW cases with a medium neutral citation can be checked.";
+            el.textContent = checked
+                ? `Checked ${checked} of ${plural(total, "case")} against the courts' published decisions`
+                    + (flagged ? `; ${flagged} ${flagged === 1 ? "looks" : "look"} wrong (marked Check).` : ".")
+                    + (others ? ` The other ${others === 1 ? "one wasn't" : `${others} weren't`}: ${limit}` : "")
+                : `${total === 1 ? "Your case couldn't" : `None of your ${total} cases could`} be checked against the courts' published decisions: ${limit}`;
         }
 
         function renderBanners(data, general, failed) {
@@ -1514,6 +1533,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             m = m.replace(/^Unknown report series: '(.+)'$/, "‘$1’ isn't a report series we recognise. Check its abbreviation.");
             m = m.replace(/^Unknown court identifier: '(.+)'$/, "‘$1’ isn't a court we recognise. Check the medium neutral citation.");
             m = m.replace(/^Unknown jurisdiction: '(.+)'$/, "‘$1’ isn't a jurisdiction we recognise.");
+            m = m.replace(/^Case not found: (.+) is past the court's last decision that year, (.+)$/, "The court's last decision that year was $2, so there is no $1. Check the citation: this case may not exist.");
+            m = m.replace(/^Case name mismatch: (.+) is '(.+)', not '(.+)'$/, "$1 is ‘$2’, not ‘$3’. Check the citation is for the case you mean.");
             return m.charAt(0).toUpperCase() + m.slice(1);
         }
 

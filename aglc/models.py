@@ -730,11 +730,20 @@ class Extraction(BaseModel):
     provider_down: bool = False
 
 
+class CaseCheckSummary(BaseModel):
+    """How many of the document's cases (each counted once) the case index could check
+    (aglc/verify.py), and how many of those it flagged."""
+    total: int = 0
+    checked: int = 0
+    flagged: int = 0
+
+
 class ProcessResult(BaseModel):
     footnotes: list[FootnoteResult]
     bibliography: list[BibliographySection] = Field(default_factory=list)
     warnings: list[Warning_] = Field(default_factory=list)
     body_fixes: list[BodyFix] = Field(default_factory=list)
+    case_check: CaseCheckSummary = Field(default_factory=CaseCheckSummary)
     extraction: Extraction | None = Field(default=None, exclude=True)
 
     @property
