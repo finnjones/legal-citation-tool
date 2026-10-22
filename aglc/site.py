@@ -18,6 +18,7 @@ and analytics are set in one place:
     {{gst_note}}      from $AGLC_GST_REGISTERED (default: not registered)
     {{analytics_note}} whether analytics is on ($AGLC_PLAUSIBLE_DOMAIN)
     {{payment_provider}} "Stripe" when $AGLC_PAYMENTS=stripe, otherwise "Square"
+    {{rule_pages}}    index only: where each rule is in the AGLC4 PDF (aglc/guide_pdf.py)
     {{> name}}        web/partials/<name>.html
 
 The AGLC4 guides (/guides and /guides/<slug>, GUIDES below) use web/guide.html with the
@@ -36,7 +37,7 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
-from . import billing, retention
+from . import billing, guide_pdf, retention
 
 #: The product's name ("aforecited": cited above, which is what Ibid and (n x) do). Set here only.
 BRAND = "Aforecite"
@@ -199,7 +200,7 @@ def _read(path: Path) -> str:
 
 
 def index(request: Request) -> HTMLResponse:
-    return HTMLResponse(_fill(_read(WEB_DIR / "index.html"), request))
+    return HTMLResponse(_fill(_read(WEB_DIR / "index.html"), request, {"rule_pages": guide_pdf.page_json()}))
 
 
 def page(name: str, request: Request) -> HTMLResponse:

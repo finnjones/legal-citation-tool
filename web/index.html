@@ -183,6 +183,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .coverage thead th { font-size: 0.8125rem; font-weight: 500; color: var(--muted); padding-top: 0; border-top: 0; }
         .coverage tbody th { font-weight: 600; width: 22%; }
         .coverage td.rules { color: var(--muted); white-space: nowrap; width: 18%; font-variant-numeric: tabular-nums; }
+        .coverage td.rules a { color: inherit; }
+        .coverage td.rules a:hover { color: var(--accent); }
         .coverage tbody tr:last-child > * { border-bottom: 1px solid var(--hairline); }
         .flags { margin-top: 56px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 40px; }
         .flags h3 { font-family: var(--font-serif); font-size: 1.375rem; font-weight: 600; line-height: 1.3; }
@@ -251,12 +253,15 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         /* What changed and why: one quiet line per kind of change, with its rule */
         .why { list-style: none; margin-top: 10px; display: grid; gap: 4px; font-size: 0.875rem; line-height: 1.5; color: var(--muted); }
         .why .nowrap { white-space: nowrap; }
-        .why .chip { display: inline-block; min-height: 0; margin-left: 8px; padding: 0 6px; line-height: 1.5; }
+        .why .chip, .notes .chip, .check-list .chip { display: inline-block; min-height: 0; margin-left: 8px; padding: 0 6px; line-height: 1.5; }
         .chip {
             display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px;
             font-size: 0.75rem; font-weight: 500; color: var(--muted);
             border: 1px solid var(--hairline); border-radius: 4px; white-space: nowrap; font-variant-numeric: tabular-nums;
         }
+        /* A rule chip opens the Guide at that rule */
+        a.chip { text-decoration: none; transition: color 0.15s, border-color 0.15s; }
+        a.chip:hover { color: var(--accent); border-color: var(--accent); }
 
         .badge {
             display: inline-flex; align-items: center; min-height: 24px; padding: 4px 7px; border-radius: 4px;
@@ -343,6 +348,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .fix-title { font-weight: 500; }
         .fix-why { grid-column: 2; color: var(--muted); font-size: 0.875rem; }
         .fix-rule { font-size: 0.8125rem; color: var(--muted); white-space: nowrap; }
+        a.fix-rule:hover { color: var(--accent); }
         .fix-count {
             min-width: 28px; padding: 2px 8px; border-radius: 999px; text-align: center;
             font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums;
@@ -509,7 +515,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite"><em>Mabo v Queensland (No 2)</em> (1992) 175 C.L.R. 1 at 42 per Brennan J.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline><em>Mabo v Queensland [No 2]</em> (1992) 175 CLR 1, 42 (Brennan J) (‘<em>Mabo</em>’).</p>
-                                <ul class="why" aria-label="What changed"><li>Defines the short title ‘Mabo’ for later references to this <span class="nowrap">source<span class="chip" title="AGLC4 rule 1.4.4">r 1.4.4</span></span></li><li>A case’s number goes in square brackets: ‘[No <span class="nowrap">2]’<span class="chip" title="AGLC4 rule 2.1.13">r 2.1.13</span></span></li><li>Judges are named in brackets after the pinpoint, without <span class="nowrap">‘per’<span class="chip" title="AGLC4 rule 2.4.1">r 2.4.1</span></span></li><li>A comma and a space go before a <span class="nowrap">pinpoint<span class="chip" title="AGLC4 rule 2.2.5">r 2.2.5</span></span></li><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<span class="chip" title="AGLC4 rule 1.1.6">r 1.1.6</span></span></li><li>No full stops in <span class="nowrap">abbreviations<span class="chip" title="AGLC4 rule 1.6.1">r 1.6.1</span></span></li></ul>
+                                <ul class="why" aria-label="What changed"><li>Defines the short title ‘Mabo’ for later references to this <span class="nowrap">source<a class="chip" data-rule="r 1.4.4">r 1.4.4</a></span></li><li>A case’s number goes in square brackets: ‘[No <span class="nowrap">2]’<a class="chip" data-rule="r 2.1.13">r 2.1.13</a></span></li><li>Judges are named in brackets after the pinpoint, without <span class="nowrap">‘per’<a class="chip" data-rule="r 2.4.1">r 2.4.1</a></span></li><li>A comma and a space go before a <span class="nowrap">pinpoint<a class="chip" data-rule="r 2.2.5">r 2.2.5</a></span></li><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<a class="chip" data-rule="r 1.1.6">r 1.1.6</a></span></li><li>No full stops in <span class="nowrap">abbreviations<a class="chip" data-rule="r 1.6.1">r 1.6.1</a></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -518,7 +524,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite">Ibid, at 45.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline>Ibid 45.</p>
-                                <ul class="why" aria-label="What changed"><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<span class="chip" title="AGLC4 rule 1.1.6">r 1.1.6</span></span></li></ul>
+                                <ul class="why" aria-label="What changed"><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<a class="chip" data-rule="r 1.1.6">r 1.1.6</a></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -528,7 +534,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite"><em>Mabo</em>, above n 1, 60.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline><em>Mabo</em> (n 1) 60.</p>
-                                <ul class="why" aria-label="What changed"><li>AGLC4 refers back with ‘(n&nbsp;1)’, not ‘above n <span class="nowrap">1’<span class="chip" title="AGLC4 rule 1.4.1">r 1.4.1</span></span></li></ul>
+                                <ul class="why" aria-label="What changed"><li>AGLC4 refers back with ‘(n&nbsp;1)’, not ‘above n <span class="nowrap">1’<a class="chip" data-rule="r 1.4.1">r 1.4.1</a></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -574,13 +580,13 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                         <caption class="sr-only">AGLC4 rules covered</caption>
                         <thead><tr><th scope="col">Area</th><th scope="col">What it does</th><th scope="col">AGLC4 rules</th></tr></thead>
                         <tbody>
-                            <tr><th scope="row">Across the essay</th><td>Ibid when a source repeats; short titles and (n&nbsp;x) for later references; several sources in one footnote; signals such as <em>See</em> and <em>Cf</em>; pinpoints and en dash ranges</td><td class="rules">rr 1.1.3, 1.1.6, 1.2, 1.4.1, 1.4.3, 1.4.4</td></tr>
-                            <tr><th scope="row">Cases</th><td>Party names (Re, Ex parte, the Crown, [No 2]); reported decisions with the right brackets and report series; medium neutral and unreported citations; pinpoints and judges</td><td class="rules">rr 2.1–2.4</td></tr>
-                            <tr><th scope="row">Legislation</th><td>Acts with title, year and jurisdiction; pinpoints such as s, ss, pt, div and sch; Bills; regulations and rules; constitutions</td><td class="rules">rr 3.1, 3.2, 3.4, 3.6</td></tr>
-                            <tr><th scope="row">Secondary sources</th><td>Authors and editors; journal articles; books and chapters; reports; newspapers; websites</td><td class="rules">rr 4.1, 5, 6, 7.1, 7.11, 7.15</td></tr>
-                            <tr><th scope="row">Treaties</th><td>Treaty series, parties, and dates signed and entered into force</td><td class="rules">ch 8</td></tr>
-                            <tr><th scope="row">Bibliography</th><td>An optional bibliography, sorted into AGLC4 categories, first author's name inverted</td><td class="rules">r 1.13</td></tr>
-                            <tr><th scope="row">Body text</th><td>Footnote numbers after punctuation; case names and Act titles italicised; ss with an en dash for section ranges</td><td class="rules">rr 1.1.2, 3.1.4</td></tr>
+                            <tr><th scope="row">Across the essay</th><td>Ibid when a source repeats; short titles and (n&nbsp;x) for later references; several sources in one footnote; signals such as <em>See</em> and <em>Cf</em>; pinpoints and en dash ranges</td><td class="rules">rr <a data-rule="1.1.3">1.1.3</a>, <a data-rule="1.1.6">1.1.6</a>, <a data-rule="1.2">1.2</a>, <a data-rule="1.4.1">1.4.1</a>, <a data-rule="1.4.3">1.4.3</a>, <a data-rule="1.4.4">1.4.4</a></td></tr>
+                            <tr><th scope="row">Cases</th><td>Party names (Re, Ex parte, the Crown, [No 2]); reported decisions with the right brackets and report series; medium neutral and unreported citations; pinpoints and judges</td><td class="rules">rr <a data-rule="2.1">2.1</a>–<a data-rule="2.4">2.4</a></td></tr>
+                            <tr><th scope="row">Legislation</th><td>Acts with title, year and jurisdiction; pinpoints such as s, ss, pt, div and sch; Bills; regulations and rules; constitutions</td><td class="rules">rr <a data-rule="3.1">3.1</a>, <a data-rule="3.2">3.2</a>, <a data-rule="3.4">3.4</a>, <a data-rule="3.6">3.6</a></td></tr>
+                            <tr><th scope="row">Secondary sources</th><td>Authors and editors; journal articles; books and chapters; reports; newspapers; websites</td><td class="rules">rr <a data-rule="4.1">4.1</a>, <a data-rule="5">5</a>, <a data-rule="6">6</a>, <a data-rule="7.1">7.1</a>, <a data-rule="7.11">7.11</a>, <a data-rule="7.15">7.15</a></td></tr>
+                            <tr><th scope="row">Treaties</th><td>Treaty series, parties, and dates signed and entered into force</td><td class="rules">ch <a data-rule="8">8</a></td></tr>
+                            <tr><th scope="row">Bibliography</th><td>An optional bibliography, sorted into AGLC4 categories, first author's name inverted</td><td class="rules">r <a data-rule="1.13">1.13</a></td></tr>
+                            <tr><th scope="row">Body text</th><td>Footnote numbers after punctuation; case names and Act titles italicised; ss with an en dash for section ranges</td><td class="rules">rr <a data-rule="1.1.2">1.1.2</a>, <a data-rule="3.1.4">3.1.4</a></td></tr>
                         </tbody>
                     </table>
 
@@ -590,7 +596,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <p>Check means look at this one yourself. Every Check item is shown free, before you pay.</p>
                         </div>
                         <ul>
-                            <li><span class="badge check">Check</span><span>An Ibid or (n&nbsp;x) with no pinpoint: add the page or paragraph you rely on (r 1.1.6).</span></li>
+                            <li><span class="badge check">Check</span><span>An Ibid or (n&nbsp;x) with no pinpoint: add the page or paragraph you rely on (<a data-rule="r 1.1.6">r 1.1.6</a>).</span></li>
                             <li><span class="badge check">Check</span><span>Something a citation needs but your footnote doesn't have, such as a year. It is marked <span class="missing">[MISSING: year]</span> in the result, never made up.</span></li>
                             <li><span class="badge check">Check</span><span>A report series, court or jurisdiction it doesn't recognise.</span></li>
                             <li><span class="badge check">Check</span><span>A footnote the AI model couldn't read, or may have read incompletely. It is left exactly as written.</span></li>
@@ -727,6 +733,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
     {{> footer}}
 
+    <script type="application/json" id="rulePages">{{rule_pages}}</script>
     <script>
         const MAX_BYTES = 10 * 1024 * 1024;
         const STAGES = [
@@ -739,9 +746,11 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         const RULES = {
             "1.1.6": "Pinpoint", "1.4.1": "(n x)", "1.4.3": "Ibid", "1.4.4": "Short title",
         };
-        const RULE_TITLES = {
-            "1.1.6": "pinpoint references", "1.4.1": "subsequent references", "1.4.3": "Ibid", "1.4.4": "short titles",
-        };
+        // Where each rule is in the official AGLC4 PDF (aglc/guide_pdf.py), so rule chips open it there
+        const RULE_PAGES = (() => {
+            try { return JSON.parse(document.getElementById("rulePages").textContent); }
+            catch { return { pdf: null, sections: {} }; }
+        })();
         const ICON_CHECK = `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg>`;
         const ICON_LOCK = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="7" width="10" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>`;
         const WRONG_TYPE = {
@@ -764,6 +773,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
         document.addEventListener("DOMContentLoaded", async () => {
             renderExampleRedlines();
+            linkStaticRules();
             setupUpload();
             setupControls();
             trackStickyHeights();
@@ -1346,7 +1356,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             // Things to check that aren't on a footnote's row: general notes and body-text checks
             const bodyChecks = (data.body_fixes || []).filter(b => b.applied === false);
             const outside = [
-                ...general.map(m => escapeHtml(humanNote(m))),
+                ...general.map(noteHtml),
                 ...bodyChecks.map(b => (b.footnote ? `<span class="where">In the text, near footnote ${b.footnote}</span>` : `<span class="where">In the text</span>`)
                     + escapeHtml(sentence(b.message))),
             ];
@@ -1377,8 +1387,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         }
 
         function resultCell(e, i) {
-            const notes = e.notes.map(humanNote);
-            const notesHtml = notes.length ? `<div class="notes">${notes.map(m => `<p><span>${escapeHtml(m)}</span></p>`).join("")}</div>` : "";
+            const notes = e.notes;
+            const notesHtml = notes.length ? `<div class="notes">${notes.map(m => `<p><span>${noteHtml(m)}</span></p>`).join("")}</div>` : "";
             const whyLines = whyHtml(e);
             if (e.unread) return `<p class="placeholder">Left as written. The AI model couldn't read this footnote.</p>`;
             if (e.locked) return `<p class="placeholder">${ICON_LOCK}<span>Result hidden until you unlock</span></p>${notesHtml}`;
@@ -1400,7 +1410,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         function whyHtml(e) {
             if (!Array.isArray(e.changes)) {
                 const chips = rulesFor(e);
-                return chips.length ? `<div class="chips">${chips.map(([r, name]) => `<span class="chip" title="AGLC4 rule ${r}: ${RULE_TITLES[r]}">r ${r} ${escapeHtml(name)}</span>`).join("")}</div>` : "";
+                return chips.length ? `<div class="chips">${chips.map(([r, name]) => ruleLink(`r ${r}`, `r ${r} ${name}`)).join("")}</div>` : "";
             }
             if (!e.changes.length) return "";
             return `<ul class="why" aria-label="What changed">${e.changes.map(c => `<li>${whyLine(c)}</li>`).join("")}</ul>`;
@@ -1410,12 +1420,68 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         function whyLine({ text, rule }) {
             if (!rule) return escapeHtml(text);
             const at = text.lastIndexOf(" ") + 1;
-            return `${escapeHtml(text.slice(0, at))}<span class="nowrap">${escapeHtml(text.slice(at))}<span class="chip" title="${ruleTitle(rule)}">${escapeHtml(rule)}</span></span>`;
+            return `${escapeHtml(text.slice(0, at))}<span class="nowrap">${escapeHtml(text.slice(at))}${ruleLink(rule)}</span>`;
         }
 
         // "r 3.1.2" -> "AGLC4 rule 3.1.2"; "rr 1.1.6–1.1.7" -> "AGLC4 rules 1.1.6–1.1.7"; "ch 5" -> "AGLC4 chapter 5"
         function ruleTitle(rule) {
             return "AGLC4 " + rule.replace(/^rr /, "rules ").replace(/^r /, "rule ").replace(/^ch /, "chapter ");
+        }
+
+        // The section a rule opens at: its first number, or the closest section above it with a
+        // bookmark in the PDF ("2.5.9" -> "2.5"), as section() in aglc/guide_pdf.py
+        function ruleSection(rule) {
+            const m = String(rule).trim().match(/^(?:AGLC4\s+)?(?:rr?|ch)?\s*(\d+(?:\.\d+)*)/);
+            if (!m) return null;
+            const parts = m[1].split(".");
+            for (; parts.length; parts.pop()) {
+                if (RULE_PAGES.sections[parts.join(".")]) return parts.join(".");
+            }
+            return null;
+        }
+
+        // The link to a rule in the official PDF, opened at its page, and a tooltip naming the
+        // section and its printed page (Safari on iPhone ignores #page and opens page 1)
+        function ruleHref(rule) {
+            const key = ruleSection(rule);
+            if (!key || !RULE_PAGES.pdf) return null;
+            const [page, printed, heading] = RULE_PAGES.sections[key];
+            const name = /^\d/.test(rule) ? `AGLC4 ${rule.includes(".") ? "rule" : "chapter"} ${rule}` : ruleTitle(rule);
+            const exact = String(rule).match(/\d[\d.]*/)[0] === key && !/[–-]/.test(rule);
+            return {
+                href: `${RULE_PAGES.pdf}#page=${page}`,
+                title: exact ? `${name}: ${heading}. Opens the Guide at page ${printed}`
+                    : `${name}. Opens the Guide at ${key} ${heading}, page ${printed}`,
+            };
+        }
+
+        // A rule chip that opens the Guide at the rule ("r 3.1.2", or "ch 5"), or a plain chip
+        // when the rule isn't in the table
+        function ruleLink(rule, label = rule, className = "chip") {
+            const link = ruleHref(rule);
+            if (!link) return `<span class="${className}" title="${escapeHtml(ruleTitle(rule))}">${escapeHtml(label)}</span>`;
+            return `<a class="${className}" href="${escapeHtml(link.href)}" target="_blank" rel="noopener" title="${escapeHtml(link.title)}">${escapeHtml(label)}</a>`;
+        }
+
+        // Rules written into the page itself (the sample results, the rules table): <a data-rule="1.1.6">
+        function linkStaticRules() {
+            document.querySelectorAll("a[data-rule]").forEach(a => {
+                const link = ruleHref(a.dataset.rule);
+                if (!link) return a.replaceWith(...a.childNodes);
+                Object.assign(a, { href: link.href, title: link.title, target: "_blank", rel: "noopener" });
+            });
+        }
+
+        // "... (AGLC4 r 1.1.6)" at the end of a formatter note -> "r 1.1.6"
+        function noteRule(message) {
+            const m = message.match(/\(AGLC4 (rr? [\d.]+)\)/);
+            return m ? m[1] : null;
+        }
+
+        // A note in plain words, with a link to its rule when the note names one
+        function noteHtml(message) {
+            const rule = noteRule(message);
+            return escapeHtml(humanNote(message)) + (rule ? ruleLink(rule) : "");
         }
 
         // Rule chips, only where the result or a warning says which rule applied
@@ -1504,7 +1570,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     <summary>
                         <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
                         <span class="fix-title">${escapeHtml(kind.title)}</span>
-                        ${kind.rule ? `<span class="fix-rule">AGLC4 ${escapeHtml(kind.rule)}</span>` : ""}
+                        ${kind.rule ? ruleLink(kind.rule, `AGLC4 ${kind.rule}`, "fix-rule") : ""}
                         <span class="fix-count" aria-label="${plural(total, "change", "changes")}">${total}</span>
                         ${kind.why ? `<span class="fix-why">${escapeHtml(kind.why)}</span>` : ""}
                     </summary>

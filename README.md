@@ -341,6 +341,14 @@ uv run pytest tests/ -xvs
 
 Formatter examples come from `reference/AGLC4.pdf` and live in `tests/aglc4_examples/`.
 
+Rule chips on the results page (eg "r 3.1.2") link to the official AGLC4 PDF, opened at the
+rule's page. The pages come from the PDF's bookmarks, in `aglc/data/aglc4_pages.json`; if the
+official PDF changes, rebuild the table from the new copy:
+
+```bash
+uv run --no-project --with pypdf --with cryptography python scripts/build_aglc4_pages.py reference/AGLC4.pdf
+```
+
 ## References
 
 - [Australian Guide to Legal Citation (4th ed)](https://law.unimelb.edu.au/research/australian-guide-to-legal-citation)
