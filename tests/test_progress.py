@@ -55,6 +55,44 @@ def test_job_snapshot_tracks_counts_notes_and_the_result():
     assert store.snapshot("nope") is None
 
 
+def test_a_snapshot_shows_only_the_footnotes_the_page_is_about_to_show():
+    store = Jobs()
+    report = store.start("abc")
+    report("total", {"footnotes": 40, "texts": {n: {"text": f"Footnote {n}.", "italic": []} for n in range(1, 41)}})
+    report("writing", {"numbers": [30]})
+    report("done", {"numbers": list(range(1, 26)), "found": {1: [{"kind": "Case", "text": "Footnote 1"}]}})
+    snap = store.snapshot("abc")
+    # the 20 read most recently (in the order read), the next 3 not read, and the one being written
+    assert snap["read"] == list(range(6, 26))
+    assert sorted(map(int, snap["showing"])) == list(range(6, 29)) + [30]
+    assert snap["showing"][30] == {"text": "Footnote 30.", "italic": []}
+    assert snap["showing"][6] == {"text": "Footnote 6.", "italic": [], "found": []}
+    assert snap["kinds"] == {"Case": 1}
+    assert store.snapshot("abc")["showing"][25]["text"] == "Footnote 25."
+
+
+def test_footnote_texts_keep_the_italics():
+    from aglc.models import Run
+    from aglc.progress import footnote_texts
+
+    fn = Footnote(number=3, original=RichText(runs=[Run(text=" See "), Run(text="Mabo", italic=True), Run(text=" at 4.")]))
+    assert footnote_texts([fn]) == {3: {"text": "See Mabo at 4.", "italic": [[4, 8]]}}
+
+
+def test_found_in_lists_the_citations_read_in_a_footnote():
+    from aglc.models import CaseSource, Citation, CitationSegment, TextSegment, OtherSource
+    from aglc.progress import found_in
+
+    fn = _fn(1, "See Mabo v Queensland (No 2) (1992) 175 CLR 1; something odd.")
+    fn.segments = [
+        TextSegment(text=RichText.plain("See ")),
+        CitationSegment(citation=Citation(source=CaseSource(name="Mabo v Queensland [No 2]", year="1992")),
+                        original="Mabo v Queensland (No 2) (1992) 175 CLR 1"),
+        CitationSegment(citation=Citation(source=OtherSource(text="something odd")), original="something odd"),
+    ]
+    assert found_in(fn) == [{"kind": "Case", "text": "Mabo v Queensland (No 2) (1992) 175 CLR 1"}]
+
+
 def test_finished_jobs_are_dropped_after_a_while(monkeypatch):
     store = Jobs()
     store.start("old")
@@ -148,8 +186,11 @@ def test_progress_flow_ends_with_the_same_result_as_the_direct_call(fake_model):
     assert snap["done"] == list(range(1, 11)) and snap["stage"] == "writing_doc"
     direct = client.post("/api/process", files={"file": ("essay.docx", ESSAY.read_bytes(), DOCX)}).json()
     assert [f["formatted"] for f in snap["result"]["footnotes"]] == [f["formatted"] for f in direct["footnotes"]]
-    # no footnote text in the progress itself
+    # the progress itself carries only the text of the footnotes the page is about to show
     assert not any(key in snap for key in ("footnotes", "original", "formatted"))
+    assert set(snap["showing"]) == {str(n) for n in snap["read"]} and snap["read"] == list(range(1, 11))
+    assert all(set(entry) == {"text", "italic", "found"} for entry in snap["showing"].values())
+    assert sum(snap["kinds"].values()) == sum(len(entry["found"]) for entry in snap["showing"].values())
 
 
 def test_a_failure_in_the_background_is_reported_without_details(fake_model, tmp_path):

@@ -36,7 +36,7 @@ app = typer.Typer(
 def fix(
     input_path: Annotated[Path, typer.Argument(help="Input .docx file")],
     output_path: Annotated[Optional[Path], typer.Option("-o", "--output", help="Output .docx file (default: INPUT stem + '.aglc.docx')")] = None,
-    model: Annotated[Optional[str], typer.Option("--model", help="LLM provider:model (default: AGLC_LLM or openrouter:deepseek/deepseek-v4.1-flash-1017)")] = None,
+    model: Annotated[Optional[str], typer.Option("--model", help="LLM provider:model (default: AGLC_LLM or openrouter:@preset/aglc)")] = None,
     no_track_changes: Annotated[bool, typer.Option("--no-track-changes", help="Don't use tracked changes")] = False,
     no_bibliography: Annotated[bool, typer.Option("--no-bibliography", help="Don't generate bibliography")] = False,
     no_body_fixes: Annotated[bool, typer.Option("--no-body-fixes", help="Don't fix footnote numbers and headings in the body text")] = False,

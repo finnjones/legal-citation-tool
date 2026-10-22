@@ -16,7 +16,7 @@ from .llm.base import LLMProvider, get_provider
 from .models import CitationSegment, Extraction, Footnote, ProcessResult, Warning_
 from .formatters import formatter_for
 from .normalise import normalise_citation
-from .progress import Progress, safe
+from .progress import Progress, footnote_texts, found_in, safe
 from .validate import check_footnote_rendering
 
 log = logging.getLogger("aglc")
@@ -56,7 +56,8 @@ def extract_footnotes(
         return Extraction(footnotes=extracted, warnings=extractor.warnings, provider_down=extractor.provider_down)
     kept = {fn.number: fn for fn in previous.footnotes if fn.number not in only}
     if kept:
-        safe(progress)("done", {"numbers": sorted(kept)})  # read the first time round
+        # read the first time round
+        safe(progress)("done", {"numbers": sorted(kept), "found": {n: found_in(fn) for n, fn in kept.items()}})
     redo = extractor.extract([fn for fn in footnotes if fn.number in only], context=list(kept.values()))
     merged = {**kept, **{fn.number: fn for fn in redo}}
     warnings = [m for m in previous.warnings if not (warning_footnotes(m) & only)] + extractor.warnings
@@ -133,7 +134,7 @@ def process_docx(
         provider = get_provider(provider)
     footnotes = read_footnotes(src)
     log.info("read %d footnotes from %s", len(footnotes), Path(src).name)
-    report("total", {"footnotes": len(footnotes)})
+    report("total", {"footnotes": len(footnotes), "texts": footnote_texts(footnotes)})
     result = process_footnotes(
         footnotes, provider, bibliography=bibliography, previous=previous, only=only, progress=progress
     )

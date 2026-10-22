@@ -78,45 +78,62 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .privacy-note a { color: var(--muted); }
         .sample { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); text-align: center; font-size: 0.875rem; color: var(--muted); }
 
-        /* Processing stages */
+        /* Processing: one meter and a plain status line for the whole job; while the AI model
+           reads, the footnote it's on, in the citation serif, with each citation it found marked,
+           and the footnotes just read underneath */
         .progress h2 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
         .progress > p { margin-top: 4px; color: var(--muted); font-size: 0.875rem; }
-        .stages { list-style: none; margin-top: 20px; display: grid; gap: 2px; }
-        .stage {
-            display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center;
-            padding: 10px 0; color: var(--muted); font-size: 0.9375rem;
+        .meter { margin-top: 20px; height: 4px; border-radius: 4px; background: var(--hairline); overflow: hidden; }
+        .meter span { display: block; height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(var(--p, 0)); }
+        .progress > .status-line {
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; margin-top: 10px;
+            color: var(--ink); font-size: 0.9375rem; font-weight: 500; font-variant-numeric: tabular-nums;
         }
-        .stage + .stage { border-top: 1px solid var(--hairline); }
-        .stage .mark { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--hairline-strong); display: grid; place-items: center; }
-        .stage .mark svg { width: 12px; height: 12px; opacity: 0; }
-        .stage .time { font-variant-numeric: tabular-nums; font-size: 0.8125rem; }
-        .stage.current { color: var(--ink); font-weight: 500; }
-        .stage.current .mark { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 3.5px, transparent 4px); }
-        .stage.done { color: var(--ink); }
-        .stage.done .mark { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
-        .stage.done .mark svg { opacity: 1; }
-        @media (prefers-reduced-motion: no-preference) {
-            .stage.current .mark { animation: pulse 1.6s var(--ease-out) infinite; }
+        .status-line .left { margin-left: auto; color: var(--muted); font-size: 0.875rem; font-weight: 400; white-space: nowrap; }
+        .desk { margin-top: 18px; border-top: 1px solid var(--hairline); }
+        .spot { padding: 14px 0 12px; border-bottom: 1px solid var(--hairline); }
+        .spot-head { display: flex; justify-content: space-between; gap: 12px; font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
+        .spot-state { display: inline-flex; align-items: center; gap: 5px; }
+        .spot-state svg { width: 12px; height: 12px; }
+        .spot.read .spot-state { color: var(--accent); }
+        .spot-text {
+            margin-top: 6px; font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.6; color: var(--ink);
+            min-height: calc(2 * 1.6em); overflow-wrap: anywhere;
+            display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
         }
-        @keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--accent-wash); } }
-
-        /* Footnote grid: one tile per footnote, filled as the AI model reads it */
-        .reading { margin-top: 18px; }
-        .reading-line { font-size: 0.9375rem; font-weight: 500; font-variant-numeric: tabular-nums; }
-        .reading-line .left { color: var(--muted); font-weight: 400; }
-        .tiles { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; }
-        .tile-group { display: grid; gap: 5px; justify-items: center; }
-        .tile-row { display: flex; gap: 3px; }
-        .tile { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--hairline-strong); }
-        .tile.writing { background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-        .tile.done { background: var(--accent); border-color: var(--accent); }
-        .tile.failed { background: var(--check-wash); border-color: var(--check); }
-        .tile-label { font-size: 0.6875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .spot-text mark {
+            color: inherit; background: var(--accent-wash); border-radius: 4px;
+            text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 4px;
+        }
+        .spot-found { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; margin-top: 8px; }
+        .kind {
+            font-size: 0.75rem; font-weight: 600; line-height: 1; letter-spacing: 0.01em; color: var(--accent);
+            border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 4px; padding: 5px 7px;
+        }
+        .spot-summary { margin-top: 6px; font-size: 0.9375rem; color: var(--muted); }
+        .feed { list-style: none; padding-top: 6px; min-height: calc(3 * 30px); }
+        .feed li {
+            display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: 10px; align-items: baseline;
+            min-height: 30px; padding: 4px 0; color: var(--muted);
+        }
+        .feed li:nth-child(2) { opacity: 0.75; }
+        .feed li:nth-child(3) { opacity: 0.45; }
+        .feed-no { text-align: right; font-family: var(--font-serif); font-weight: 600; font-size: 0.875rem; font-variant-numeric: tabular-nums lining-nums; }
+        .feed-text { font-family: var(--font-serif); font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .feed-kind { font-size: 0.75rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
         .reading-note { margin-top: 12px; font-size: 0.875rem; color: var(--muted); }
         .reading-note.problem { color: var(--check); }
         @media (prefers-reduced-motion: no-preference) {
-            .tile { transition: background-color 0.35s var(--ease-out), border-color 0.35s var(--ease-out); }
+            .meter span { transition: transform 0.6s var(--ease-out); }
+            .spot-text.reading .w { animation: read 0.5s var(--ease-out) var(--d) both; }
+            .spot-text mark { animation: found 0.5s var(--ease-out) var(--d, 0s) both; }
+            .kind { animation: enter 0.35s var(--ease-out) var(--d, 0s) both; }
+            .feed li.new { animation: enter 0.35s var(--ease-out) both; }
+            .spot.turn .spot-text, .spot.turn .spot-head { animation: enter 0.3s var(--ease-out); }
         }
+        @keyframes read { from { color: var(--muted); } }
+        @keyframes found { from { background-color: transparent; text-decoration-color: transparent; } }
+        @keyframes enter { from { opacity: 0.3; transform: translateY(-4px); } }
 
         /* ---- Banners --------------------------------------------------------- */
         .banner {
@@ -166,6 +183,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .coverage thead th { font-size: 0.8125rem; font-weight: 500; color: var(--muted); padding-top: 0; border-top: 0; }
         .coverage tbody th { font-weight: 600; width: 22%; }
         .coverage td.rules { color: var(--muted); white-space: nowrap; width: 18%; font-variant-numeric: tabular-nums; }
+        .coverage td.rules a { color: inherit; }
+        .coverage td.rules a:hover { color: var(--accent); }
         .coverage tbody tr:last-child > * { border-bottom: 1px solid var(--hairline); }
         .flags { margin-top: 56px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 40px; }
         .flags h3 { font-family: var(--font-serif); font-size: 1.375rem; font-weight: 600; line-height: 1.3; }
@@ -234,12 +253,15 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         /* What changed and why: one quiet line per kind of change, with its rule */
         .why { list-style: none; margin-top: 10px; display: grid; gap: 4px; font-size: 0.875rem; line-height: 1.5; color: var(--muted); }
         .why .nowrap { white-space: nowrap; }
-        .why .chip { display: inline-block; min-height: 0; margin-left: 8px; padding: 0 6px; line-height: 1.5; }
+        .why .chip, .notes .chip, .check-list .chip { display: inline-block; min-height: 0; margin-left: 8px; padding: 0 6px; line-height: 1.5; }
         .chip {
             display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px;
             font-size: 0.75rem; font-weight: 500; color: var(--muted);
             border: 1px solid var(--hairline); border-radius: 4px; white-space: nowrap; font-variant-numeric: tabular-nums;
         }
+        /* A rule chip opens the Guide at that rule */
+        a.chip { text-decoration: none; transition: color 0.15s, border-color 0.15s; }
+        a.chip:hover { color: var(--accent); border-color: var(--accent); }
 
         .badge {
             display: inline-flex; align-items: center; min-height: 24px; padding: 4px 7px; border-radius: 4px;
@@ -326,6 +348,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .fix-title { font-weight: 500; }
         .fix-why { grid-column: 2; color: var(--muted); font-size: 0.875rem; }
         .fix-rule { font-size: 0.8125rem; color: var(--muted); white-space: nowrap; }
+        a.fix-rule:hover { color: var(--accent); }
         .fix-count {
             min-width: 28px; padding: 2px 8px; border-radius: 999px; text-align: center;
             font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums;
@@ -460,12 +483,17 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     <div class="progress" id="progress" hidden>
                         <h2 id="progressTitle">Checking your essay</h2>
                         <p id="progressHint">Usually under a minute. Keep this tab open.</p>
-                        <div class="reading" id="reading" hidden>
-                            <p class="reading-line" id="readingLine"></p>
-                            <div class="tiles" id="tiles" aria-hidden="true"></div>
-                            <p class="reading-note" id="readingNote" aria-live="polite" hidden></p>
+                        <div class="meter" aria-hidden="true"><span id="meter"></span></div>
+                        <p class="status-line"><span id="statusText">Uploading your document</span><span class="left" id="statusLeft"></span></p>
+                        <div class="desk" id="desk" aria-hidden="true" hidden>
+                            <div class="spot" id="spot">
+                                <div class="spot-head"><span id="spotNo"></span><span class="spot-state" id="spotState"></span></div>
+                                <p class="spot-text" id="spotText"></p>
+                                <div class="spot-found" id="spotFound"></div>
+                            </div>
+                            <ol class="feed" id="feed"></ol>
                         </div>
-                        <ol class="stages" id="stages"></ol>
+                        <p class="reading-note" id="readingNote" aria-live="polite" hidden></p>
                     </div>
 
                     <div id="uploadError" hidden></div>
@@ -487,7 +515,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite"><em>Mabo v Queensland (No 2)</em> (1992) 175 C.L.R. 1 at 42 per Brennan J.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline><em>Mabo v Queensland [No 2]</em> (1992) 175 CLR 1, 42 (Brennan J) (‘<em>Mabo</em>’).</p>
-                                <ul class="why" aria-label="What changed"><li>Defines the short title ‘Mabo’ for later references to this <span class="nowrap">source<span class="chip" title="AGLC4 rule 1.4.4">r 1.4.4</span></span></li><li>A case’s number goes in square brackets: ‘[No <span class="nowrap">2]’<span class="chip" title="AGLC4 rule 2.1.13">r 2.1.13</span></span></li><li>Judges are named in brackets after the pinpoint, without <span class="nowrap">‘per’<span class="chip" title="AGLC4 rule 2.4.1">r 2.4.1</span></span></li><li>A comma and a space go before a <span class="nowrap">pinpoint<span class="chip" title="AGLC4 rule 2.2.5">r 2.2.5</span></span></li><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<span class="chip" title="AGLC4 rule 1.1.6">r 1.1.6</span></span></li><li>No full stops in <span class="nowrap">abbreviations<span class="chip" title="AGLC4 rule 1.6.1">r 1.6.1</span></span></li></ul>
+                                <ul class="why" aria-label="What changed"><li>Defines the short title ‘Mabo’ for later references to this <span class="nowrap">source<a class="chip" data-rule="r 1.4.4">r 1.4.4</a></span></li><li>A case’s number goes in square brackets: ‘[No <span class="nowrap">2]’<a class="chip" data-rule="r 2.1.13">r 2.1.13</a></span></li><li>Judges are named in brackets after the pinpoint, without <span class="nowrap">‘per’<a class="chip" data-rule="r 2.4.1">r 2.4.1</a></span></li><li>A comma and a space go before a <span class="nowrap">pinpoint<a class="chip" data-rule="r 2.2.5">r 2.2.5</a></span></li><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<a class="chip" data-rule="r 1.1.6">r 1.1.6</a></span></li><li>No full stops in <span class="nowrap">abbreviations<a class="chip" data-rule="r 1.6.1">r 1.6.1</a></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -496,7 +524,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite">Ibid, at 45.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline>Ibid 45.</p>
-                                <ul class="why" aria-label="What changed"><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<span class="chip" title="AGLC4 rule 1.1.6">r 1.1.6</span></span></li></ul>
+                                <ul class="why" aria-label="What changed"><li>Pinpoints follow the citation directly, without <span class="nowrap">‘at’<a class="chip" data-rule="r 1.1.6">r 1.1.6</a></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -506,7 +534,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <div class="e-orig"><span class="e-label">As written</span><p class="cite"><em>Mabo</em>, above n 1, 60.</p></div>
                             <div class="e-result"><span class="e-label">AGLC4</span>
                                 <p class="cite now" data-redline><em>Mabo</em> (n 1) 60.</p>
-                                <ul class="why" aria-label="What changed"><li>AGLC4 refers back with ‘(n&nbsp;1)’, not ‘above n <span class="nowrap">1’<span class="chip" title="AGLC4 rule 1.4.1">r 1.4.1</span></span></li></ul>
+                                <ul class="why" aria-label="What changed"><li>AGLC4 refers back with ‘(n&nbsp;1)’, not ‘above n <span class="nowrap">1’<a class="chip" data-rule="r 1.4.1">r 1.4.1</a></span></li></ul>
                             </div>
                             <div class="e-status"><span class="badge amended">Amended</span></div>
                         </article>
@@ -552,13 +580,13 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                         <caption class="sr-only">AGLC4 rules covered</caption>
                         <thead><tr><th scope="col">Area</th><th scope="col">What it does</th><th scope="col">AGLC4 rules</th></tr></thead>
                         <tbody>
-                            <tr><th scope="row">Across the essay</th><td>Ibid when a source repeats; short titles and (n&nbsp;x) for later references; several sources in one footnote; signals such as <em>See</em> and <em>Cf</em>; pinpoints and en dash ranges</td><td class="rules">rr 1.1.3, 1.1.6, 1.2, 1.4.1, 1.4.3, 1.4.4</td></tr>
-                            <tr><th scope="row">Cases</th><td>Party names (Re, Ex parte, the Crown, [No 2]); reported decisions with the right brackets and report series; medium neutral and unreported citations; pinpoints and judges</td><td class="rules">rr 2.1–2.4</td></tr>
-                            <tr><th scope="row">Legislation</th><td>Acts with title, year and jurisdiction; pinpoints such as s, ss, pt, div and sch; Bills; regulations and rules; constitutions</td><td class="rules">rr 3.1, 3.2, 3.4, 3.6</td></tr>
-                            <tr><th scope="row">Secondary sources</th><td>Authors and editors; journal articles; books and chapters; reports; newspapers; websites</td><td class="rules">rr 4.1, 5, 6, 7.1, 7.11, 7.15</td></tr>
-                            <tr><th scope="row">Treaties</th><td>Treaty series, parties, and dates signed and entered into force</td><td class="rules">ch 8</td></tr>
-                            <tr><th scope="row">Bibliography</th><td>An optional bibliography, sorted into AGLC4 categories, first author's name inverted</td><td class="rules">r 1.13</td></tr>
-                            <tr><th scope="row">Body text</th><td>Footnote numbers after punctuation; case names and Act titles italicised; ss with an en dash for section ranges</td><td class="rules">rr 1.1.2, 3.1.4</td></tr>
+                            <tr><th scope="row">Across the essay</th><td>Ibid when a source repeats; short titles and (n&nbsp;x) for later references; several sources in one footnote; signals such as <em>See</em> and <em>Cf</em>; pinpoints and en dash ranges</td><td class="rules">rr <a data-rule="1.1.3">1.1.3</a>, <a data-rule="1.1.6">1.1.6</a>, <a data-rule="1.2">1.2</a>, <a data-rule="1.4.1">1.4.1</a>, <a data-rule="1.4.3">1.4.3</a>, <a data-rule="1.4.4">1.4.4</a></td></tr>
+                            <tr><th scope="row">Cases</th><td>Party names (Re, Ex parte, the Crown, [No 2]); reported decisions with the right brackets and report series; medium neutral and unreported citations; pinpoints and judges</td><td class="rules">rr <a data-rule="2.1">2.1</a>–<a data-rule="2.4">2.4</a></td></tr>
+                            <tr><th scope="row">Legislation</th><td>Acts with title, year and jurisdiction; pinpoints such as s, ss, pt, div and sch; Bills; regulations and rules; constitutions</td><td class="rules">rr <a data-rule="3.1">3.1</a>, <a data-rule="3.2">3.2</a>, <a data-rule="3.4">3.4</a>, <a data-rule="3.6">3.6</a></td></tr>
+                            <tr><th scope="row">Secondary sources</th><td>Authors and editors; journal articles; books and chapters; reports; newspapers; websites</td><td class="rules">rr <a data-rule="4.1">4.1</a>, <a data-rule="5">5</a>, <a data-rule="6">6</a>, <a data-rule="7.1">7.1</a>, <a data-rule="7.11">7.11</a>, <a data-rule="7.15">7.15</a></td></tr>
+                            <tr><th scope="row">Treaties</th><td>Treaty series, parties, and dates signed and entered into force</td><td class="rules">ch <a data-rule="8">8</a></td></tr>
+                            <tr><th scope="row">Bibliography</th><td>An optional bibliography, sorted into AGLC4 categories, first author's name inverted</td><td class="rules">r <a data-rule="1.13">1.13</a></td></tr>
+                            <tr><th scope="row">Body text</th><td>Footnote numbers after punctuation; case names and Act titles italicised; ss with an en dash for section ranges</td><td class="rules">rr <a data-rule="1.1.2">1.1.2</a>, <a data-rule="3.1.4">3.1.4</a></td></tr>
                         </tbody>
                     </table>
 
@@ -568,7 +596,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <p>Check means look at this one yourself. Every Check item is shown free, before you pay.</p>
                         </div>
                         <ul>
-                            <li><span class="badge check">Check</span><span>An Ibid or (n&nbsp;x) with no pinpoint: add the page or paragraph you rely on (r 1.1.6).</span></li>
+                            <li><span class="badge check">Check</span><span>An Ibid or (n&nbsp;x) with no pinpoint: add the page or paragraph you rely on (<a data-rule="r 1.1.6">r 1.1.6</a>).</span></li>
                             <li><span class="badge check">Check</span><span>Something a citation needs but your footnote doesn't have, such as a year. It is marked <span class="missing">[MISSING: year]</span> in the result, never made up.</span></li>
                             <li><span class="badge check">Check</span><span>A report series, court or jurisdiction it doesn't recognise.</span></li>
                             <li><span class="badge check">Check</span><span>A footnote the AI model couldn't read, or may have read incompletely. It is left exactly as written.</span></li>
@@ -667,7 +695,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                         <button type="button" class="filter" data-filter="check" aria-pressed="false">Check <span class="count" id="countCheck">0</span></button>
                         <button type="button" class="filter" data-filter="unchanged" aria-pressed="false">Unchanged <span class="count" id="countUnchanged">0</span></button>
                     </div>
-                    <label class="switch"><input type="checkbox" id="markupToggle" role="switch"> Show changes</label>
+                    <label class="switch"><input type="checkbox" id="markupToggle" role="switch" checked> Show changes</label>
                     <button type="button" class="btn btn-secondary" id="nextCheck">Next Check</button>
                     <span class="spacer"></span>
                     <button type="button" class="btn btn-secondary" id="copyBib" hidden>Copy bibliography</button>
@@ -705,6 +733,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
     {{> footer}}
 
+    <script type="application/json" id="rulePages">{{rule_pages}}</script>
     <script>
         const MAX_BYTES = 10 * 1024 * 1024;
         const STAGES = [
@@ -717,9 +746,11 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         const RULES = {
             "1.1.6": "Pinpoint", "1.4.1": "(n x)", "1.4.3": "Ibid", "1.4.4": "Short title",
         };
-        const RULE_TITLES = {
-            "1.1.6": "pinpoint references", "1.4.1": "subsequent references", "1.4.3": "Ibid", "1.4.4": "short titles",
-        };
+        // Where each rule is in the official AGLC4 PDF (aglc/guide_pdf.py), so rule chips open it there
+        const RULE_PAGES = (() => {
+            try { return JSON.parse(document.getElementById("rulePages").textContent); }
+            catch { return { pdf: null, sections: {} }; }
+        })();
         const ICON_CHECK = `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg>`;
         const ICON_LOCK = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="7" width="10" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>`;
         const WRONG_TYPE = {
@@ -742,6 +773,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
         document.addEventListener("DOMContentLoaded", async () => {
             renderExampleRedlines();
+            linkStaticRules();
             setupUpload();
             setupControls();
             trackStickyHeights();
@@ -955,11 +987,69 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             }
         }
 
-        // Named stages, moved on by the server's own progress (GET /api/progress/{id}), with a tile
-        // per footnote that fills as the AI model reads it, a time-left estimate, and a plain line
-        // for anything the tool is doing about a problem.
+        // One meter and a status line for the whole job, moved on by the server's own progress
+        // (GET /api/progress/{id}). While the AI model reads, the page shows the footnote it's on
+        // (the one it started writing most recently, else the next one not read), marks each
+        // citation it found once it's read, and lists the footnotes just read underneath.
+        // Re-asks, repairs and footnotes the model got wrong are handled quietly: they aren't
+        // shown here, and the results page flags any footnote still unread at the end.
         const STAGE_INDEX = { reading: 1, formatting: 2, checking: 3, writing_doc: 4 };
-        const TILE_STATES = { failed: "couldn't be read, kept as written", done: "read", writing: "being read" };
+        // Where the meter stands at the start of each stage; reading fills most of it
+        const METER = [0.03, 0.05, 0.88, 0.93, 0.97];
+        // How long a footnote stays in view at least, so the text can be taken in
+        const SPOT_DWELL = 1100;
+        const KIND_PLURALS = {
+            Case: "cases", Legislation: "pieces of legislation", Article: "articles", Book: "books",
+            "Book chapter": "book chapters", Report: "reports", "Research paper": "research papers",
+            Hansard: "Hansard debates", Submission: "submissions", "Committee evidence": "committee hearings",
+            "Convention debates": "convention debates", "Explanatory memorandum": "explanatory memoranda",
+            Newspaper: "newspaper articles", Website: "websites", Treaty: "treaties",
+        };
+
+        // A footnote's text as HTML, with its italics: each citation found marked, or (while it's
+        // being read) each word in its own span, so the reading can sweep across it
+        function footnoteHtml(fn, { words = false, found = [] } = {}) {
+            const text = fn.text || "", italic = fn.italic || [];
+            const cuts = new Set([0, text.length]);
+            italic.forEach(([a, b]) => { cuts.add(a); cuts.add(b); });
+            const marks = [];
+            let from = 0;
+            for (const f of found) {
+                const at = f.text ? text.indexOf(f.text, from) : -1;  // in the order written
+                if (at < 0) continue;
+                marks.push([at, at + f.text.length]);
+                cuts.add(at); cuts.add(at + f.text.length);
+                from = at + f.text.length;
+            }
+            if (words) for (const m of text.matchAll(/\s+/g)) cuts.add(m.index + m[0].length);
+            const points = [...cuts].sort((a, b) => a - b);
+            let html = "", open = -1;
+            for (let i = 0; i < points.length - 1; i++) {
+                const a = points[i], b = points[i + 1];
+                let piece = escapeHtml(text.slice(a, b));
+                if (italic.some(([x, y]) => a >= x && b <= y)) piece = `<em>${piece}</em>`;
+                if (words) piece = `<span class="w" style="--d:${(a / text.length * 1.2).toFixed(2)}s">${piece}</span>`;
+                const mark = marks.findIndex(([x, y]) => a >= x && b <= y);
+                if (mark !== open) {
+                    if (open >= 0) html += "</mark>";
+                    if (mark >= 0) html += `<mark style="--d:${(0.12 * mark).toFixed(2)}s">`;
+                    open = mark;
+                }
+                html += piece;
+            }
+            return open >= 0 ? `${html}</mark>` : html;
+        }
+
+        function kindsOf(found) {
+            return [...new Set((found || []).map(f => f.kind))];
+        }
+
+        function foundSummary(kinds) {
+            const parts = Object.entries(kinds || {}).sort((a, b) => b[1] - a[1])
+                .map(([kind, n]) => n === 1 ? `1 ${kind.toLowerCase()}` : `${n} ${KIND_PLURALS[kind] || kind.toLowerCase()}`);
+            if (!parts.length) return "";
+            return `Found ${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]}.`;
+        }
 
         function startProgress(name) {
             document.getElementById("uploadForm").hidden = true;
@@ -968,49 +1058,119 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             document.getElementById("progressTitle").textContent = `Checking ${name}`;
             const hint = document.getElementById("progressHint");
             hint.textContent = "Usually under a minute. Keep this tab open.";
-            const reading = document.getElementById("reading");
-            const tiles = document.getElementById("tiles");
-            const line = document.getElementById("readingLine");
+            const meter = document.getElementById("meter");
+            const statusText = document.getElementById("statusText");
+            const statusLeft = document.getElementById("statusLeft");
+            const desk = document.getElementById("desk");
+            const spot = document.getElementById("spot");
+            const spotNo = document.getElementById("spotNo");
+            const spotState = document.getElementById("spotState");
+            const spotText = document.getElementById("spotText");
+            const spotFound = document.getElementById("spotFound");
+            const feed = document.getElementById("feed");
             const note = document.getElementById("readingNote");
-            reading.hidden = true;
-            tiles.innerHTML = "";
+            const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+            desk.hidden = true;
+            feed.innerHTML = "";
             note.hidden = true;
-            const list = document.getElementById("stages");
-            list.innerHTML = STAGES.map(s => `<li class="stage"><span class="mark">${ICON_CHECK}</span><span>${s}</span><span class="time"></span></li>`).join("");
-            const items = [...list.children];
             const started = Date.now();
-            let current = 0, stageSince = started, readingSince = null, total = 0, lastAnnounced = 0;
-            const set = (i) => {
-                if (i !== current) stageSince = Date.now();
-                current = i;
-                items.forEach((li, j) => li.className = `stage ${j < i ? "done" : j === i ? "current" : ""}`);
-                items.forEach((li, j) => li.setAttribute("aria-current", j === i ? "step" : "false"));
-            };
-            set(0);
+            let current = 0, readingSince = null, total = 0, lastAnnounced = 0;
+
+            const cache = new Map();  // footnote number -> {text, italic, found once read}
+            let done = new Set(), writing = [], kinds = {};
+            let spotN = null, spotSince = 0, spotKey = "";
+            let feedQueue = [], fed = new Set(), fedAt = 0;
+
+            function setStatus(stage, count = 0, left = "") {
+                current = stage;
+                const p = stage === 1 && total ? METER[1] + (METER[2] - METER[1]) * count / total : METER[stage] ?? 1;
+                meter.style.setProperty("--p", p.toFixed(3));
+                statusText.textContent = stage === 1 ? "Reading your footnotes" : STAGES[stage];
+                statusLeft.textContent = stage === 1 && total ? `${count} of ${total}${left ? ` · ${left}` : ""}` : "";
+            }
+            setStatus(0);
             const tick = setInterval(() => {
-                const secs = Math.round((Date.now() - stageSince) / 1000);
-                items.forEach((li, j) => li.querySelector(".time").textContent = j === current && secs >= 3 ? `${secs}s` : "");
                 if ((Date.now() - started) / 1000 > 90) hint.textContent = "Taking longer than usual. Keep this tab open: it's still working.";
             }, 1000);
 
-            function buildTiles(n) {
-                total = n;
-                const groups = [];
-                for (let first = 1; first <= n; first += 5) {
-                    const last = Math.min(first + 4, n);
-                    const row = [];
-                    for (let k = first; k <= last; k++) row.push(`<span class="tile" data-n="${k}" title="Footnote ${k}: waiting"></span>`);
-                    groups.push(`<div class="tile-group"><div class="tile-row">${row.join("")}</div><span class="tile-label">${first === last ? first : `${first}–${last}`}</span></div>`);
-                }
-                tiles.innerHTML = groups.join("");
-                reading.hidden = n === 0;
+            // The footnote to show: the one the model started writing most recently, else the
+            // next one not read
+            function target() {
+                const under = writing.filter(n => !done.has(n) && cache.has(n));
+                if (under.length) return Math.max(...under);
+                const next = [...cache.keys()].filter(n => !done.has(n)).sort((a, b) => a - b);
+                return next.length ? next[0] : spotN;
             }
 
-            function timeLeft(done) {
+            function showSpot(n, switched) {
+                const fn = cache.get(n);
+                const read = done.has(n);
+                spot.classList.toggle("read", read);
+                spotNo.textContent = `Footnote ${n}`;
+                spotState.innerHTML = read ? `${ICON_CHECK}Read` : "Reading…";
+                spotText.className = `spot-text${read ? "" : " reading"}`;
+                spotText.innerHTML = footnoteHtml(fn, read ? { found: fn.found } : { words: true });
+                spotFound.hidden = false;
+                spotFound.innerHTML = read ? kindsOf(fn.found).map((k, i) =>
+                    `<span class="kind" style="--d:${(0.12 * i + 0.1).toFixed(2)}s">${escapeHtml(k)}</span>`).join("") : "";
+                if (switched && !still) {
+                    spot.classList.remove("turn");
+                    void spot.offsetWidth;  // so the animation runs again
+                    spot.classList.add("turn");
+                }
+            }
+
+            function showSummary() {
+                spot.classList.add("read");
+                spotNo.textContent = `All ${total} footnotes read`;
+                spotState.innerHTML = ICON_CHECK;
+                spotText.className = "spot-summary";
+                spotText.textContent = foundSummary(kinds);
+                spotFound.hidden = true;
+                spotKey = "summary";
+            }
+
+            function addFeed(n) {
+                const fn = cache.get(n);
+                if (!fn) return;
+                const k = kindsOf(fn.found);
+                const li = document.createElement("li");
+                if (!still) li.className = "new";
+                li.innerHTML = `<span class="feed-no">${n}</span><span class="feed-text">${footnoteHtml(fn)}</span>`
+                    + `<span class="feed-kind">${escapeHtml(k.length > 1 ? `${k[0]} +${k.length - 1}` : k[0] || "")}</span>`;
+                feed.prepend(li);
+                while (feed.children.length > 3) feed.lastElementChild.remove();
+            }
+
+            const loop = setInterval(() => {
+                if (current !== 1 || !cache.size) return;
+                const now = Date.now(), next = target();
+                if (next != null && next !== spotN && (spotN === null || now - spotSince >= SPOT_DWELL)) {
+                    spotN = next;
+                    spotSince = now;
+                }
+                if (spotN != null) {
+                    const key = `${spotN}:${done.has(spotN)}`;
+                    if (key !== spotKey) {
+                        const switched = !spotKey.startsWith(`${spotN}:`);
+                        if (!switched) spotSince = now;  // just read: keep it in view a moment
+                        spotKey = key;
+                        showSpot(spotN, switched);
+                    }
+                }
+                // The footnotes just read, one at a time (a batch arrives all at once)
+                if (feedQueue.length > 8) feedQueue.splice(0, feedQueue.length - 3);
+                if (feedQueue.length && now - fedAt >= (feedQueue.length > 3 ? 140 : 280)) {
+                    fedAt = now;
+                    addFeed(feedQueue.shift());
+                }
+            }, 100);
+
+            function timeLeft(count) {
                 // Too early to say until a few footnotes (and a tenth of them) are done
-                if (!readingSince || done < Math.max(3, Math.ceil(total / 10)) || done >= total) return "";
+                if (!readingSince || count < Math.max(3, Math.ceil(total / 10)) || count >= total) return "";
                 const spent = (Date.now() - readingSince) / 1000;
-                const left = (total - done) * spent / done;
+                const left = (total - count) * spent / count;
                 if (left < 10) return "nearly done";
                 if (left < 60) return `about ${Math.ceil(left / 5) * 5}s left`;
                 const mins = Math.floor(left / 60), secs = Math.round((left % 60) / 10) * 10;
@@ -1019,30 +1179,21 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
             function noteText(snap) {
                 const latest = snap.notes[snap.notes.length - 1];
-                // Shown until something moves on after it (or for 20s at most)
-                if (latest && latest.ago < 20 && snap.idle >= latest.ago - 0.5) {
+                // Only the deadline is worth saying (it changes the result); shown until something
+                // moves on after it, or for 20s at most
+                if (latest?.kind === "deadline" && latest.ago < 20 && snap.idle >= latest.ago - 0.5) {
                     const n = latest.count, s = n === 1 ? "" : "s";
-                    const text = {
-                        reask: "The AI model skipped some footnotes in this batch, so they're being asked about again.",
-                        split: `The AI model didn't answer, so these ${n} footnotes are being asked about in smaller groups.`,
-                        single: `Asking about footnote ${latest.number} on its own.`,
-                        repair: `Footnote ${latest.number} came back incomplete; asking again.`,
-                        retry: "The AI model didn't answer properly; trying again.",
-                        slow: "The AI model didn't answer in time; trying again.",
-                        fallback: "Trying a backup AI model.",
-                        deadline: `This is taking too long, so ${n} footnote${s} will be left as you wrote ${n === 1 ? "it" : "them"}. The results will show which.`,
-                        retry_failed: `Trying the ${n} footnote${s} the AI model couldn't read once more.`,
-                    }[latest.kind];
-                    if (text) return { text, problem: latest.kind !== "single" };
+                    return { text: `This is taking too long, so ${n} footnote${s} will be left as you wrote ${n === 1 ? "it" : "them"}. The results will show which.`, problem: true };
                 }
                 if (snap.stage === "reading" && snap.idle >= 25) {
-                    return { text: `The AI model is slow right now; still waiting (${Math.round(snap.idle)}s).`, problem: true };
+                    return { text: `The AI model is slow right now; still working (${Math.round(snap.idle)}s).`, problem: false };
                 }
                 return null;
             }
 
             const stop = () => {
                 clearInterval(tick);
+                clearInterval(loop);
                 panel.hidden = true;
                 document.getElementById("uploadForm").hidden = false;
             };
@@ -1051,27 +1202,20 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 update(snap) {
                     const stage = STAGE_INDEX[snap.stage] ?? 1;
                     if (stage >= 1 && readingSince === null) readingSince = Date.now();
-                    if (stage > current) set(stage);
-                    if (snap.total && snap.total !== total) buildTiles(snap.total);
-                    if (!total) return;
-                    const done = new Set(snap.done), failed = new Set(snap.failed), writing = new Set(snap.writing);
-                    tiles.querySelectorAll(".tile").forEach(t => {
-                        const n = Number(t.dataset.n);
-                        const state = failed.has(n) ? "failed" : done.has(n) ? "done" : writing.has(n) ? "writing" : "";
-                        if (t.dataset.state === state) return;
-                        t.dataset.state = state;
-                        t.className = `tile ${state}`;
-                        t.title = `Footnote ${n}: ${TILE_STATES[state] || "waiting"}`;
-                    });
-                    const count = done.size;
-                    if (stage > 1 || count >= total) {
-                        line.innerHTML = `All ${total} footnotes read` + (failed.size ? ` <span class="left">· ${failed.size} couldn't be read</span>` : "");
-                    } else {
-                        const left = snap.idle < 10 ? timeLeft(count) : "";  // no estimate while it's stalled
-                        line.innerHTML = `Reading your footnotes · ${count} of ${total}` + (left ? ` <span class="left">· ${left}</span>` : "");
-                    }
+                    if (snap.total) total = snap.total;
+                    // A footnote the model couldn't read counts as read here (it may be read on a
+                    // retry); the results page says which, if any, are still unread
+                    for (const [n, fn] of Object.entries(snap.showing || {})) cache.set(Number(n), fn);
+                    done = new Set(snap.done);
+                    writing = snap.writing || [];
+                    kinds = snap.kinds || kinds;
+                    for (const n of snap.read || []) if (!fed.has(n)) { fed.add(n); feedQueue.push(n); }
+                    const count = stage > 1 ? total : done.size;
+                    setStatus(stage, count, stage === 1 && snap.idle < 10 ? timeLeft(count) : "");  // no estimate while it's stalled
+                    desk.hidden = !total || !cache.size;
+                    if (stage > 1 && spotKey !== "summary" && cache.size) showSummary();
                     // Announce every quarter or so, not every poll
-                    if (count - lastAnnounced >= Math.max(1, Math.ceil(total / 4))) {
+                    if (total && count - lastAnnounced >= Math.max(1, Math.ceil(total / 4))) {
                         lastAnnounced = count;
                         announce(`${count} of ${total} footnotes read.`);
                     }
@@ -1081,11 +1225,14 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 },
                 async finish() {
                     clearInterval(tick);
-                    const step = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 140;
-                    for (let i = Math.max(current, 1); i <= STAGES.length; i++) {
-                        set(i);
+                    if (cache.size && spotKey !== "summary") showSummary();
+                    const step = still ? 0 : 160;
+                    for (let i = Math.max(current, 2); i < STAGES.length; i++) {
+                        setStatus(i);
                         if (step) await new Promise(r => setTimeout(r, step));
                     }
+                    meter.style.setProperty("--p", 1);
+                    if (step) await new Promise(r => setTimeout(r, 450));
                     stop();
                 },
             };
@@ -1209,7 +1356,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             // Things to check that aren't on a footnote's row: general notes and body-text checks
             const bodyChecks = (data.body_fixes || []).filter(b => b.applied === false);
             const outside = [
-                ...general.map(m => escapeHtml(humanNote(m))),
+                ...general.map(noteHtml),
                 ...bodyChecks.map(b => (b.footnote ? `<span class="where">In the text, near footnote ${b.footnote}</span>` : `<span class="where">In the text</span>`)
                     + escapeHtml(sentence(b.message))),
             ];
@@ -1240,8 +1387,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         }
 
         function resultCell(e, i) {
-            const notes = e.notes.map(humanNote);
-            const notesHtml = notes.length ? `<div class="notes">${notes.map(m => `<p><span>${escapeHtml(m)}</span></p>`).join("")}</div>` : "";
+            const notes = e.notes;
+            const notesHtml = notes.length ? `<div class="notes">${notes.map(m => `<p><span>${noteHtml(m)}</span></p>`).join("")}</div>` : "";
             const whyLines = whyHtml(e);
             if (e.unread) return `<p class="placeholder">Left as written. The AI model couldn't read this footnote.</p>`;
             if (e.locked) return `<p class="placeholder">${ICON_LOCK}<span>Result hidden until you unlock</span></p>${notesHtml}`;
@@ -1263,7 +1410,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         function whyHtml(e) {
             if (!Array.isArray(e.changes)) {
                 const chips = rulesFor(e);
-                return chips.length ? `<div class="chips">${chips.map(([r, name]) => `<span class="chip" title="AGLC4 rule ${r}: ${RULE_TITLES[r]}">r ${r} ${escapeHtml(name)}</span>`).join("")}</div>` : "";
+                return chips.length ? `<div class="chips">${chips.map(([r, name]) => ruleLink(`r ${r}`, `r ${r} ${name}`)).join("")}</div>` : "";
             }
             if (!e.changes.length) return "";
             return `<ul class="why" aria-label="What changed">${e.changes.map(c => `<li>${whyLine(c)}</li>`).join("")}</ul>`;
@@ -1273,12 +1420,68 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         function whyLine({ text, rule }) {
             if (!rule) return escapeHtml(text);
             const at = text.lastIndexOf(" ") + 1;
-            return `${escapeHtml(text.slice(0, at))}<span class="nowrap">${escapeHtml(text.slice(at))}<span class="chip" title="${ruleTitle(rule)}">${escapeHtml(rule)}</span></span>`;
+            return `${escapeHtml(text.slice(0, at))}<span class="nowrap">${escapeHtml(text.slice(at))}${ruleLink(rule)}</span>`;
         }
 
         // "r 3.1.2" -> "AGLC4 rule 3.1.2"; "rr 1.1.6–1.1.7" -> "AGLC4 rules 1.1.6–1.1.7"; "ch 5" -> "AGLC4 chapter 5"
         function ruleTitle(rule) {
             return "AGLC4 " + rule.replace(/^rr /, "rules ").replace(/^r /, "rule ").replace(/^ch /, "chapter ");
+        }
+
+        // The section a rule opens at: its first number, or the closest section above it with a
+        // bookmark in the PDF ("2.5.9" -> "2.5"), as section() in aglc/guide_pdf.py
+        function ruleSection(rule) {
+            const m = String(rule).trim().match(/^(?:AGLC4\s+)?(?:rr?|ch)?\s*(\d+(?:\.\d+)*)/);
+            if (!m) return null;
+            const parts = m[1].split(".");
+            for (; parts.length; parts.pop()) {
+                if (RULE_PAGES.sections[parts.join(".")]) return parts.join(".");
+            }
+            return null;
+        }
+
+        // The link to a rule in the official PDF, opened at its page, and a tooltip naming the
+        // section and its printed page (Safari on iPhone ignores #page and opens page 1)
+        function ruleHref(rule) {
+            const key = ruleSection(rule);
+            if (!key || !RULE_PAGES.pdf) return null;
+            const [page, printed, heading] = RULE_PAGES.sections[key];
+            const name = /^\d/.test(rule) ? `AGLC4 ${rule.includes(".") ? "rule" : "chapter"} ${rule}` : ruleTitle(rule);
+            const exact = String(rule).match(/\d[\d.]*/)[0] === key && !/[–-]/.test(rule);
+            return {
+                href: `${RULE_PAGES.pdf}#page=${page}`,
+                title: exact ? `${name}: ${heading}. Opens the Guide at page ${printed}`
+                    : `${name}. Opens the Guide at ${key} ${heading}, page ${printed}`,
+            };
+        }
+
+        // A rule chip that opens the Guide at the rule ("r 3.1.2", or "ch 5"), or a plain chip
+        // when the rule isn't in the table
+        function ruleLink(rule, label = rule, className = "chip") {
+            const link = ruleHref(rule);
+            if (!link) return `<span class="${className}" title="${escapeHtml(ruleTitle(rule))}">${escapeHtml(label)}</span>`;
+            return `<a class="${className}" href="${escapeHtml(link.href)}" target="_blank" rel="noopener" title="${escapeHtml(link.title)}">${escapeHtml(label)}</a>`;
+        }
+
+        // Rules written into the page itself (the sample results, the rules table): <a data-rule="1.1.6">
+        function linkStaticRules() {
+            document.querySelectorAll("a[data-rule]").forEach(a => {
+                const link = ruleHref(a.dataset.rule);
+                if (!link) return a.replaceWith(...a.childNodes);
+                Object.assign(a, { href: link.href, title: link.title, target: "_blank", rel: "noopener" });
+            });
+        }
+
+        // "... (AGLC4 r 1.1.6)" at the end of a formatter note -> "r 1.1.6"
+        function noteRule(message) {
+            const m = message.match(/\(AGLC4 (rr? [\d.]+)\)/);
+            return m ? m[1] : null;
+        }
+
+        // A note in plain words, with a link to its rule when the note names one
+        function noteHtml(message) {
+            const rule = noteRule(message);
+            return escapeHtml(humanNote(message)) + (rule ? ruleLink(rule) : "");
         }
 
         // Rule chips, only where the result or a warning says which rule applied
@@ -1367,7 +1570,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     <summary>
                         <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
                         <span class="fix-title">${escapeHtml(kind.title)}</span>
-                        ${kind.rule ? `<span class="fix-rule">AGLC4 ${escapeHtml(kind.rule)}</span>` : ""}
+                        ${kind.rule ? ruleLink(kind.rule, `AGLC4 ${kind.rule}`, "fix-rule") : ""}
                         <span class="fix-count" aria-label="${plural(total, "change", "changes")}">${total}</span>
                         ${kind.why ? `<span class="fix-why">${escapeHtml(kind.why)}</span>` : ""}
                     </summary>

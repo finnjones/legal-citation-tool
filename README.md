@@ -42,7 +42,7 @@ cp .env.example .env    # then edit it
 
 ```bash
 # .env: recommended, cheap and fast via OpenRouter (https://openrouter.ai/keys)
-AGLC_LLM=openrouter:deepseek/deepseek-v4.1-flash-1017
+# AGLC_LLM is optional: the default is the OpenRouter preset "aglc" (openrouter:@preset/aglc)
 OPENROUTER_API_KEY=sk-or-...
 ```
 
@@ -188,7 +188,7 @@ The demo essay (`examples/test_essay.docx`), used by "Try a sample essay".
 
 #### `GET /api/providers`
 ```json
-{"providers": ["anthropic", "fake", "gemini", "openai", "openai-compatible", "openrouter"], "default": "openrouter:deepseek/deepseek-v4.1-flash-1017"}
+{"providers": ["anthropic", "fake", "gemini", "openai", "openai-compatible", "openrouter"], "default": "openrouter:@preset/aglc"}
 ```
 
 #### `POST /api/process`
@@ -340,6 +340,14 @@ uv run pytest tests/ -xvs
 ```
 
 Formatter examples come from `reference/AGLC4.pdf` and live in `tests/aglc4_examples/`.
+
+Rule chips on the results page (eg "r 3.1.2") link to the official AGLC4 PDF, opened at the
+rule's page. The pages come from the PDF's bookmarks, in `aglc/data/aglc4_pages.json`; if the
+official PDF changes, rebuild the table from the new copy:
+
+```bash
+uv run --no-project --with pypdf --with cryptography python scripts/build_aglc4_pages.py reference/AGLC4.pdf
+```
 
 ## References
 

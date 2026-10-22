@@ -345,9 +345,10 @@ class _Job:
 
 @app.get("/api/progress/{session_id}")
 async def get_progress(session_id: str) -> dict:
-    """How far a document started with `progress=true` has got: footnote numbers read so far
-    (never their text), the stage, what the tool is doing about any problem, and at the end
-    the result (`status: "done"`) or the error (`status: "failed"`)."""
+    """How far a document started with `progress=true` has got: footnote numbers read so far,
+    the text of the few footnotes the page is about to show (with the citations read in
+    them), the stage, what the tool is doing about any problem, and at the end the result
+    (`status: "done"`) or the error (`status: "failed"`)."""
     snapshot = jobs.snapshot(session_id)
     if snapshot is None:
         raise HTTPException(status_code=404, detail="That document isn't being processed (it may have finished a while ago).")

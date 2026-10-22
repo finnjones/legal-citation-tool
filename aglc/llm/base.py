@@ -28,7 +28,7 @@ from pydantic import BaseModel, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
-DEFAULT_SPEC = "openrouter:deepseek/deepseek-v4.1-flash-1017"
+DEFAULT_SPEC = "openrouter:@preset/aglc"  # the model itself is chosen in the OpenRouter dashboard (Settings > Presets)
 
 log = logging.getLogger("aglc")
 

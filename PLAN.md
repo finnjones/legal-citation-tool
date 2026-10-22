@@ -40,7 +40,7 @@ aglc/llm/providers/
 - To add a vendor, write a subclass decorated with `@register_provider("name")`, then import it in
   `providers/__init__.py`.
 - Provider selection, in order: the CLI's `--model`, then the API's `model` field, then `$AGLC_LLM`,
-  then the default `openrouter:deepseek/deepseek-v4.1-flash-1017`.
+  then the default `openrouter:@preset/aglc`.
 - Vendor SDKs are optional extras (`pip install aglc[openai]`) and are imported lazily.
 
 ## Paid hosting (optional)
