@@ -373,7 +373,7 @@ class ExplanatoryMemorandumSource(_SourceBase):
 
 
 class NewspaperSource(_SourceBase):
-    """AGLC4 r 7.10."""
+    """AGLC4 r 7.11."""
 
     type: Literal["newspaper"] = "newspaper"
     authors: list[str] = Field(default_factory=list)

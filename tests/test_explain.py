@@ -167,3 +167,18 @@ def test_render_document_explains_each_footnote():
     assert data["footnotes"][0]["changes"] == [
         {"kind": "span", "text": "Page range shortened to ‘648–9’, with an en dash", "rule": "r 1.1.7"}]
     assert data["footnotes"][1]["changes"][0]["rule"] == "r 1.4.3"
+
+
+def test_a_research_paper_change_names_its_rule():
+    # Footnote 36 of a real essay: both lines came without a rule, so no link to the AGLC4 PDF
+    before = "Tom Gotsis and Rowena Johns, ‘Protest Law in New South Wales’, *Parliament of NSW* (Research Paper, 2024)."
+    after = "Tom Gotsis and Rowena Johns, ‘Protest Law in New South Wales’ (Research Paper, Parliament of NSW, 2024)."
+    assert _explain(before, after, "research_paper") == [("roman", "r 7.2"), ("other", "r 7.2")]
+
+
+def test_every_kind_of_source_has_a_rule():
+    from aglc.explain import _CHAPTERS
+    from aglc.formatters.base import _REGISTRY
+    from aglc.formatters import _load_all  # noqa: F401  (populates the registry)
+
+    assert set(_REGISTRY) - {"other"} <= set(_CHAPTERS)

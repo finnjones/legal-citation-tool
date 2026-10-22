@@ -34,6 +34,12 @@ _CHAPTERS = {
     "newspaper": ("a newspaper article", "r 7.11"),
     "website": ("a web page", "r 7.15"),
     "treaty": ("a treaty", "ch 8"),
+    "research_paper": ("a research paper", "r 7.2"),
+    "parliamentary_debates": ("parliamentary debates", "r 7.5.1"),
+    "submission": ("a submission to an inquiry", "r 7.5.2"),
+    "committee_evidence": ("evidence to a parliamentary committee", "r 7.5.3"),
+    "convention_debates": ("the Constitutional Convention Debates", "r 7.5.4"),
+    "explanatory_memorandum": ("an explanatory memorandum", "r 3.7"),
 }
 
 # Reference-manager type labels AGLC4 never prints, eg Zotero's '(Journal Article, 2010)'
@@ -258,7 +264,7 @@ def _made_italic(ctx: _Context, text: str, prev: _Token | None) -> tuple[str, st
         return "title_italic", "The website’s name is italic", "r 7.15"
     if "journal_article" in ctx.types:
         return "title_italic", "The journal’s name is italic", "r 5.5"
-    return "title_italic", "Titles are italic", None
+    return "title_italic", "Titles are italic", _source_rule(ctx)
 
 
 def _made_roman(ctx: _Context, text: str, j0: int) -> tuple[str, str, str | None]:
@@ -271,7 +277,14 @@ def _made_roman(ctx: _Context, text: str, j0: int) -> tuple[str, str, str | None
         return "roman", "Article and chapter titles go in single quotes, not italics", "r 5.2"
     if "case" in ctx.types and re.search(r"[\d\[\]()]", text):
         return "roman", "Only the case name is italic, not the year or report details", "ch 2"
-    return "roman", "Set upright: only titles are italic", None
+    return "roman", "Set upright: only titles are italic", _source_rule(ctx)
+
+
+def _source_rule(ctx: _Context) -> str | None:
+    """The rule for the footnote's kind of source, when it cites only one kind: where a
+    general styling change ('only titles are italic') is set out for that source."""
+    rules = {_CHAPTERS[t][1] for t in ctx.types if t in _CHAPTERS}
+    return rules.pop() if len(rules) == 1 and ctx.types <= set(_CHAPTERS) else None
 
 
 def _case_number(ctx: _Context) -> None:
