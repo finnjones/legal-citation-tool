@@ -164,6 +164,7 @@ _WARNING_KINDS = (
     "left out of the AGLC citation",
     "kept text the extraction skipped",
     "trailing text not covered",
+    "not in the footnote",
     "formatter omitted",
     "has no pinpoint",
     "has missing data",

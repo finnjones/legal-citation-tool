@@ -3,6 +3,7 @@ extractor uses them: repair round, then leave-unchanged fallback."""
 
 import json
 
+from aglc import pipeline
 from aglc import validate as V
 from aglc.extract import Extractor
 from aglc.formatters import formatter_for
@@ -14,6 +15,7 @@ from aglc.models import (
     Citation,
     CitationSegment,
     Footnote,
+    OtherSource,
     Pinpoint,
     ReportSource,
     RichText,
@@ -155,3 +157,103 @@ def test_reference_footnote_numbers_are_not_reported_missing():
     out = ex.extract([_fn(1, "Perre v Apand Pty Ltd (1999) 198 CLR 180."), _fn(4, "Perre, above n 1, 225.")])
     assert out[1].segments[0].citation.source.type == "case"
     assert ex.warnings == [] and len(provider.calls) == 1
+
+
+# ---- 4. preservation: every segment is the footnote's own text ---------------------- #
+
+MABO = "Mabo v Queensland (1992) 175 CLR 1"
+
+
+def _text(*texts: str) -> dict:
+    return {"kind": "text", "text": "".join(texts)}
+
+
+def _joined(segments) -> str:
+    return "".join(s.text.text for s in segments if isinstance(s, TextSegment))
+
+
+def test_unclassified_source_keeps_its_original_text_through_the_pipeline():
+    # The model classified nothing and put garbage in `text`; the footnote's own text is
+    # what gets emitted, not 'x'.
+    raw = _batch(1, _seg({"source": {"type": "other", "text": "x"}}, MABO))
+    result = pipeline.process_footnotes([_fn(1, MABO + ".")], get_provider("fake:x", responses=[raw]), bibliography=False)
+    assert result.footnotes[0].formatted.text == MABO + "."
+
+
+def test_unclassified_source_text_is_kept_with_its_italics_and_without_a_repeated_pinpoint():
+    footnote = Footnote(number=1, original=RichText(runs=[]).append("See ").append("Some Inquiry", True)
+                        .append(" (Final Report, 2020) 12"))
+    citation = {"source": {"type": "other", "text": "Inquiry Report"}, "signal": "See", "pinpoints": [{"value": "12"}]}
+    raw = _batch(1, _seg(citation, footnote.original.text))
+    ex = Extractor(get_provider("fake:x", responses=[raw]))
+    seg = ex.extract([footnote])[0].segments[0]
+    assert isinstance(seg.citation.source, OtherSource)
+    assert seg.citation.source.rich.to_markup() == "*Some Inquiry* (Final Report, 2020) 12"
+    assert seg.citation.pinpoints == [] and seg.citation.signal == "See"
+    assert ex.warnings == []
+
+
+def test_unclassified_source_covering_only_part_of_its_citation_is_caught():
+    # 'Mabo' is the footnote's text, but the rest of the citation is gone: coverage counts
+    # what is rendered, not the model's `original`
+    raw = _batch(1, _seg({"source": {"type": "other", "text": "Mabo"}}, MABO))
+    ex = Extractor(get_provider("fake:x", responses=[raw]))
+    out = ex.extract([_fn(1, MABO + ".")])
+    assert out[0].segments == [TextSegment(text=RichText.plain(MABO + "."))]  # left as written
+    assert any("left unchanged" in w and "'175'" in w for w in ex.warnings)
+
+
+def test_invented_commentary_is_not_emitted():
+    raw = _batch(1, _text("Hello world. INVENTED."))
+    ex = Extractor(get_provider("fake:x", responses=[raw]))
+    out = ex.extract([_fn(1, "Hello world.")])
+    assert _joined(out[0].segments) == "Hello world."
+    assert any("not in the footnote: 'Hello world. INVENTED.'" in w for w in ex.warnings)
+
+
+def test_text_already_covered_is_not_matched_again():
+    raw = _batch(1, _text("Hello "), _text("Hello world."))
+    ex = Extractor(get_provider("fake:x", responses=[raw]))
+    out = ex.extract([_fn(1, "Hello world.")])
+    assert _joined(out[0].segments) == "Hello world."
+
+
+def test_repeated_text_maps_to_successive_occurrences():
+    raw = _batch(1, _text("Yes. "), _text("Yes. "), _text("No."))
+    out = Extractor(get_provider("fake:x", responses=[raw])).extract([_fn(1, "Yes. Yes. No.")])
+    assert [s.text.text for s in out[0].segments] == ["Yes. ", "Yes. ", "No."]
+
+
+def test_text_the_model_skipped_before_commentary_is_kept():
+    raw = _batch(1, _text("Jones disagrees."))
+    ex = Extractor(get_provider("fake:x", responses=[raw]))
+    out = ex.extract([_fn(1, "Smith argues this. Jones disagrees.")])
+    assert _joined(out[0].segments) == "Smith argues this. Jones disagrees."
+    assert any("kept text the extraction skipped: 'Smith argues this.'" in w for w in ex.warnings)
+
+
+def test_citation_not_in_the_footnote_is_repaired():
+    invented = _batch(1, _text("Hello world."), _seg({"source": {"type": "other", "text": MABO}}, MABO))
+    fixed = _batch(1, _text("Hello world."))
+    provider = get_provider("fake:x", responses=[invented, fixed])
+    ex = Extractor(provider)
+    out = ex.extract([_fn(1, "Hello world.")])
+    assert out[0].segments == [TextSegment(text=RichText.plain("Hello world."))]
+    assert len(provider.calls) == 2 and repr(MABO) in provider.calls[1]["user"]  # the repair names it
+    assert ex.warnings == []
+
+
+def test_citation_not_in_the_footnote_leaves_it_unchanged_when_repair_fails():
+    invented = _batch(1, _text("Hello world."), _seg({"source": {"type": "other", "text": MABO}}, MABO))
+    ex = Extractor(get_provider("fake:x", responses=[invented]))
+    out = ex.extract([_fn(1, "Hello world.")])
+    assert out[0].segments == [TextSegment(text=RichText.plain("Hello world."))]
+    assert any("left unchanged" in w and "not in the footnote" in w for w in ex.warnings)
+
+
+def test_citation_repeating_text_already_covered_is_not_in_the_footnote():
+    # the citation's text was already given as commentary: matching it again would print it twice
+    raw = _batch(1, _text(MABO + "."), _seg({"source": {"type": "other", "text": MABO}}, MABO))
+    ex = Extractor(get_provider("fake:x", responses=[raw]), strict=False)
+    ex.extract([_fn(1, MABO + ".")])
+    assert any("citation text not in the footnote" in w for w in ex.warnings)

@@ -129,19 +129,24 @@ def _display_name(source: Source) -> str:
 _SIGNALS = {str(v).lower().rstrip(","): v for v in get_args(Signal)} | {"eg": "Eg,", "see eg": "See, eg,", "see, eg": "See, eg,"}
 
 
-def _split_leading_commentary(original: str, citation: Citation, out: list[Segment]) -> None:
+def _signal_in(text: str, citation: Citation) -> re.Match | None:
+    """Where the citation's signal word appears in `text` ('see ' in '..., see Dworkin')."""
+    if not citation.signal:
+        return None
+    word = citation.signal.rstrip(",").lower()
+    return re.search(rf"(?i)(?:^|\s){re.escape(word)}\b[:,]?\s", text)
+
+
+def _split_leading_commentary(span: RichText, citation: Citation, out: list[Segment]) -> None:
     """If the model put commentary inside the citation's original text ('For a strong
     statement of this view, see Ronald Dworkin, ...') while also setting the signal, keep
     the commentary as text so it isn't lost."""
-    if not citation.signal:
-        return
-    word = citation.signal.rstrip(",").lower()
-    m = re.search(rf"(?i)(?:^|\s){re.escape(word)}\b[:,]?\s", original)
+    m = _signal_in(span.text, citation)
     if m and m.start() > 0:
-        prefix = original[: m.start()].rstrip() + " "
+        prefix = span.slice(0, len(span.text[: m.start()].rstrip())).append(" ")
         if out and isinstance(out[-1], TextSegment) and out[-1].text.text.strip():
             return  # the model already gave the commentary as its own text segment
-        out.append(TextSegment(text=RichText.plain(prefix)))
+        out.append(TextSegment(text=prefix))
 
 
 def _keep_only_real_short_title(citation: Citation) -> Citation:
@@ -202,6 +207,27 @@ def _keep_italics(citation: Citation, span: RichText) -> Citation:
     if found is None:
         return citation
     return citation.model_copy(update={"source": src.model_copy(update={"text": found.text, "rich": found})})
+
+
+def _keep_original_text(citation: Citation, span: RichText) -> Citation:
+    """An unclassified source is emitted verbatim, so what's emitted must be the footnote's
+    own text. When the model's `text` isn't part of the citation's span ('x' for 'Mabo v
+    Queensland ...'), use the span itself, after any signal (which the signal already prints).
+    The span carries its own pinpoint and short title, so the separate ones are dropped
+    rather than printed twice."""
+    src = citation.source
+    if not isinstance(src, OtherSource) or src.rich is not None or _TextMapper(span).find(src.text) is not None:
+        return citation
+    m = _signal_in(span.text, citation)
+    rest = span.text[m.end():] if m else span.text
+    start = len(span.text) - len(rest.lstrip())
+    rich = span.slice(start, len(span.text.rstrip()))
+    if not rich.text:
+        return citation
+    return citation.model_copy(update={
+        "source": src.model_copy(update={"text": rich.text, "rich": rich}),
+        "pinpoints": [], "pinpoint_judges": None, "short_title": None,
+    })
 
 
 def _keep_et_al(citation: Citation, original: str) -> Citation:
@@ -304,8 +330,9 @@ def _norm_char(ch: str) -> str:
 
 
 class _TextMapper:
-    """Slices substrings out of a `RichText`, preserving italics, walking forward so repeated
-    substrings resolve to successive occurrences rather than always the first.
+    """Slices substrings out of a `RichText`, preserving italics, walking forward so the
+    slices are ordered, non-overlapping spans of the original: repeated substrings resolve to
+    successive occurrences, and text an earlier slice already took is never matched again.
 
     Matching ignores differences in whitespace (Word footnotes contain tabs and line breaks
     the LLM normalises away) and between curly and straight quotes."""
@@ -346,12 +373,12 @@ class _TextMapper:
         end = self._index[k + len(needle) - 1] + 1
         return begin, end
 
-    def slice(self, text: str) -> RichText:
-        if not text:
-            return RichText()
-        span = self._find(text, self.cursor) or self._find(text, 0)
+    def slice(self, text: str) -> RichText | None:
+        """The next occurrence of `text` at or after the cursor, moving the cursor past it,
+        or None (cursor unchanged) when the rest of the original doesn't contain it."""
+        span = self._find(text, self.cursor) if text else None
         if span is None:
-            return RichText.plain(text)  # not found at all: fall back to plain, don't move cursor
+            return None
         idx, end = span
         self.skipped = RichText()
         for ch, italic in self._chars[self.cursor : idx]:
@@ -359,7 +386,7 @@ class _TextMapper:
         out = RichText()
         for ch, italic in self._chars[idx:end]:
             out.append(ch, italic)
-        self.cursor = max(self.cursor, end)
+        self.cursor = end
         return out
 
     def find(self, text: str) -> RichText | None:
@@ -569,35 +596,47 @@ class Extractor:
     def _convert_verified(
         self, fn: Footnote, llm_fn: LLMFootnote, resolved: dict[int, Footnote], system_prompt: str
     ) -> list[Segment]:
-        """Convert, then check nothing in the footnote was dropped. If something was, ask the
-        model once more naming exactly what it missed; if it still can't account for it,
-        keep the footnote as written (strict) so no information is ever lost."""
-        segments, missing = self._convert_and_check(fn, llm_fn, resolved)
-        if not missing or not self.verify:
+        """Convert, then check nothing in the footnote was dropped and every citation is in it.
+        If not, ask the model once more naming exactly what went wrong; if it still can't get
+        it right, keep the footnote as written (strict) so nothing is lost or invented."""
+        segments, missing, unlocated = self._convert_and_check(fn, llm_fn, resolved)
+        if not (missing or unlocated) or not self.verify:
             return segments
 
-        log.info("  footnote %d: extraction left out %d pieces of text; asking again", fn.number, len(missing))
+        log.info("  footnote %d: extraction left out %d pieces of text and %d citations aren't in it; asking again",
+                 fn.number, len(missing), len(unlocated))
         self._report("note", {"kind": "repair", "number": fn.number})
-        repaired = self._repair(fn, missing, resolved, system_prompt)
+        repaired = self._repair(fn, missing, unlocated, resolved, system_prompt)
         if repaired is not None:
-            segments2, missing2 = self._convert_and_check(fn, repaired, resolved)
-            if not missing2:
+            segments2, missing2, unlocated2 = self._convert_and_check(fn, repaired, resolved)
+            if not (missing2 or unlocated2):
                 return segments2
-            segments, missing = segments2, missing2
+            segments, missing, unlocated = segments2, missing2, unlocated2
 
-        gaps = ", ".join(repr(t) for t in missing)
+        problems = []
+        if missing:
+            problems.append("dropping " + ", ".join(repr(t) for t in missing))
+        if unlocated:
+            problems.append("giving citation text not in the footnote: " + ", ".join(repr(t) for t in unlocated))
         if self.strict:
             self.warnings.append(
-                f"footnote {fn.number}: left unchanged for manual review; the extraction kept dropping {gaps}"
+                f"footnote {fn.number}: left unchanged for manual review; the extraction kept {' and '.join(problems)}"
             )
             return [TextSegment(text=fn.original.model_copy(deep=True))]
-        self.warnings.append(f"footnote {fn.number}: may have dropped {gaps}; check it")
+        if missing:
+            self.warnings.append(f"footnote {fn.number}: may have dropped {', '.join(repr(t) for t in missing)}; check it")
+        if unlocated:
+            self.warnings.append(
+                f"footnote {fn.number}: citation text not in the footnote: {', '.join(repr(t) for t in unlocated)}; check it"
+            )
         return segments
 
     def _convert_and_check(
         self, fn: Footnote, llm_fn: LLMFootnote, resolved: dict[int, Footnote]
-    ) -> tuple[list[Segment], list[str]]:
-        segments = self._convert_footnote(fn, llm_fn, resolved)
+    ) -> tuple[list[Segment], list[str], list[str]]:
+        """The segments, the words of the footnote they leave out, and the citations whose
+        `original` isn't in the footnote."""
+        segments, unlocated = self._convert_footnote(fn, llm_fn, resolved)
         # footnote numbers in '(n 4)' / 'above n 4' are captured as refers_to_footnote
         accounted = [str(s.refers_to_footnote) for s in llm_fn.segments
                      if isinstance(s, LLMCitationSegment) and s.refers_to_footnote is not None]
@@ -606,18 +645,27 @@ class Extractor:
             note = f"footnote {fn.number}: left out of the AGLC citation: {text.strip()!r}"
             if note not in self.warnings:
                 self.warnings.append(note)
-        return segments, validate.missing_from_extraction(fn.original.text, segments, extra=accounted)
+        return segments, validate.missing_from_extraction(fn.original.text, segments, extra=accounted), unlocated
 
     def _repair(
-        self, fn: Footnote, missing: list[str], resolved: dict[int, Footnote], system_prompt: str
+        self, fn: Footnote, missing: list[str], unlocated: list[str], resolved: dict[int, Footnote], system_prompt: str
     ) -> LLMFootnote | None:
-        user = (
-            self._build_user_prompt([fn], self._build_index(resolved))
-            + "\n\nYour previous extraction of this footnote left out these words/numbers from the "
-            f"original: {', '.join(repr(t) for t in missing)}. Every part of the footnote must be "
-            "captured: in a citation field, a pinpoint, pinpoint_judges, the signal, or a text "
-            "segment for commentary. Extract the footnote again."
-        )
+        user = self._build_user_prompt([fn], self._build_index(resolved))
+        if missing:
+            user += (
+                "\n\nYour previous extraction of this footnote left out these words/numbers from the "
+                f"original: {', '.join(repr(t) for t in missing)}. Every part of the footnote must be "
+                "captured: in a citation field, a pinpoint, pinpoint_judges, the signal, or a text "
+                "segment for commentary."
+            )
+        if unlocated:
+            user += (
+                "\n\nIn your previous extraction of this footnote, the `original` of these citations "
+                f"is not text of the footnote: {', '.join(repr(t) for t in unlocated)}. Each "
+                "segment must copy its text exactly, in the order it appears, without repeating text "
+                "another segment already covers."
+            )
+        user += " Extract the footnote again."
         response = self._request(user, system_prompt, [fn.number])
         if isinstance(response, LLMError):
             return None
@@ -659,36 +707,57 @@ class Extractor:
 
     # ---- conversion ---------------------------------------------------------- #
 
-    def _convert_footnote(self, footnote: Footnote, llm_fn: LLMFootnote, resolved: dict[int, Footnote]) -> list[Segment]:
+    def _convert_footnote(
+        self, footnote: Footnote, llm_fn: LLMFootnote, resolved: dict[int, Footnote]
+    ) -> tuple[list[Segment], list[str]]:
+        """The footnote's segments, and the `original` of each citation that couldn't be found
+        in the footnote (in order, after the segments before it)."""
         if not llm_fn.segments:
             text = footnote.original.text
             if text.strip():
                 self.warnings.append(f"footnote {footnote.number}: LLM returned no segments; kept original text as-is")
-                return [TextSegment(text=footnote.original.model_copy(deep=True))]
-            return []
+                return [TextSegment(text=footnote.original.model_copy(deep=True))], []
+            return [], []
 
+        # Every segment's text is a span of the original, in order and never reused: text the
+        # model wrote that isn't next in the footnote is never emitted, and the original text
+        # it should have covered is kept as skipped or trailing text instead.
         mapper = _TextMapper(footnote.original)
         out: list[Segment] = []
+        unlocated: list[str] = []
         for seg in llm_fn.segments:
             if isinstance(seg, LLMTextSegment):
-                out.append(TextSegment(text=mapper.slice(seg.text)))
+                span = mapper.slice(seg.text)
+                if span is None:
+                    if seg.text.strip():
+                        self.warnings.append(
+                            f"footnote {footnote.number}: ignored extracted text not in the footnote: {seg.text.strip()!r}"
+                        )
+                    continue
+                self._keep_skipped(footnote.number, mapper.skipped, out)
+                out.append(TextSegment(text=span))
             else:
                 citation = self._resolve_citation(footnote.number, seg, resolved)
-                span = footnote.original
-                if seg.original:
-                    span = mapper.slice(seg.original)  # also advances the cursor past this span
+                span = mapper.slice(seg.original)  # also advances the cursor past this span
+                if span is not None:
                     citation = self._recover_skipped(footnote.number, mapper.skipped, citation, out)
-                    _split_leading_commentary(seg.original, citation, out)
+                    _split_leading_commentary(span, citation, out)
+                    if seg.refers_to_footnote is None:
+                        citation = _keep_original_text(citation, span)
+                else:
+                    # Nowhere to anchor it: the citation may not be in the footnote at all
+                    unlocated.append(seg.original)
+                    span = RichText.plain(seg.original) if seg.original else footnote.original
                 citation = _keep_italics(citation, span)
                 if seg.refers_to_footnote is None:
                     citation = _keep_et_al(citation, span.text)
                 citation = _keep_title_italics(citation, span)
                 citation = _dedupe_signal(citation, out)
-                citation = _drop_repeated_start_page(citation, seg.original)
+                citation = _drop_repeated_start_page(citation, span.text if seg.original else "")
                 if self.verify and seg.refers_to_footnote is None:  # references carry earlier footnotes' data
                     citation, notes = validate.remove_invented_numbers(citation, footnote.original.text)
                     self.warnings += [f"footnote {footnote.number}: {n}" for n in notes]
-                out.append(CitationSegment(citation=citation, original=seg.original))
+                out.append(CitationSegment(citation=citation, original=span.text if seg.original else ""))
 
         if mapper.cursor < len(mapper.plain):
             leftover = mapper.remainder()
@@ -699,7 +768,16 @@ class Extractor:
                     f"footnote {footnote.number}: trailing text not covered by extraction; appended verbatim"
                 )
                 out.append(TextSegment(text=leftover))
-        return out
+        return out, unlocated
+
+    def _keep_skipped(self, number: int, skipped: RichText, out: list[Segment]) -> None:
+        """Text the model left out of every segment, just before a text segment: kept as text
+        (a separator or full stop quietly, words with a warning)."""
+        if not skipped.text.strip():
+            return
+        out.append(TextSegment(text=skipped))
+        if any(ch.isalnum() for ch in skipped.text):
+            self.warnings.append(f"footnote {number}: kept text the extraction skipped: {skipped.text.strip()!r}")
 
     def _recover_skipped(self, number: int, skipped: RichText, citation: Citation, out: list[Segment]) -> Citation:
         """Text the model left out of every segment, just before a citation: a bare signal

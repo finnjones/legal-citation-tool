@@ -97,7 +97,8 @@ def _strings(value: Any) -> Iterable[str]:
 
 def extracted_text(segments: list, extra: Iterable[str] = ()) -> str:
     """Everything an extraction captured, as one string: text segments verbatim plus every
-    field of every citation (resolved sources included)."""
+    field of every citation (resolved sources included). Only what is rendered counts, never
+    a citation's `original`: an unclassified source is covered by its own text."""
     parts: list[str] = list(extra)
     for seg in segments:
         if isinstance(seg, TextSegment):
@@ -105,7 +106,6 @@ def extracted_text(segments: list, extra: Iterable[str] = ()) -> str:
         elif isinstance(seg, CitationSegment):
             parts.extend(_strings(seg.citation))
             parts.append(_IMPLIED_BY_TYPE.get(seg.citation.source.type, ""))
-            parts.append(seg.original if seg.citation.source.type == "other" else "")
     return " ".join(parts)
 
 

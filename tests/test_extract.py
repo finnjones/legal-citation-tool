@@ -741,15 +741,15 @@ def test_italics_preserved_in_text_segment():
     assert segs[2].text.runs[0].italic is False
 
 
-def test_italics_fallback_to_plain_when_text_not_found_verbatim():
+def test_text_not_found_verbatim_is_replaced_by_the_original_text():
     footnote = fn_rich(1, [("Mabo", True), (" is a case.", False)])
     provider = CannedProvider(
         [
             batch_json(
                 [
                     {
-                        # LLM mis-copies "Mabo" as "Mabo " (typo/extra space) which is not a
-                        # substring of the original text -> must fall back to plain, not crash.
+                        # LLM mis-copies "Mabo" as "Maboo", which is not in the original: its
+                        # text is never emitted; the original's "Mabo" is kept in its place.
                         "number": 1,
                         "segments": [text_seg("Maboo"), text_seg(" is a case.")],
                     }
@@ -757,10 +757,11 @@ def test_italics_fallback_to_plain_when_text_not_found_verbatim():
             )
         ]
     )
-    result = Extractor(provider, verify=False).extract([footnote])
-    segs = result[0].segments
-    assert segs[0].text.text == "Maboo"
-    assert segs[0].text.runs[0].italic is False  # fell back to plain, not the original's italic run
+    extractor = Extractor(provider, verify=False)
+    segs = extractor.extract([footnote])[0].segments
+    assert "".join(s.text.text for s in segs) == "Mabo is a case."
+    assert segs[0].text.runs[0].italic is True  # the original's own italic run
+    assert any("not in the footnote: 'Maboo'" in w for w in extractor.warnings)
 
 
 def test_trailing_uncovered_text_is_appended_verbatim():
