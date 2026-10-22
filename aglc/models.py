@@ -730,12 +730,21 @@ class Extraction(BaseModel):
     provider_down: bool = False
 
 
+class FoundCase(BaseModel):
+    """A cited case found among the courts' published decisions (aglc/verify.py)."""
+    footnote: int = Field(description="Where it is first cited")
+    title: str = Field(description="The decision's title as the court gives it")
+    citation: str | None = Field(default=None, description="Its medium neutral citation, if the index has one")
+    url: str | None = Field(default=None, description="The judgment on AustLII")
+
+
 class CaseCheckSummary(BaseModel):
     """How many of the document's cases (each counted once) the case index could check
-    (aglc/verify.py), and how many of those it flagged."""
+    (aglc/verify.py), how many of those it flagged, and the ones it found."""
     total: int = 0
     checked: int = 0
     flagged: int = 0
+    found: list[FoundCase] = Field(default_factory=list)
 
 
 class ProcessResult(BaseModel):

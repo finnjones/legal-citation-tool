@@ -117,13 +117,27 @@ def _reported(name: str, year: str, report: str = "CLR") -> Citation:
     return Citation(source=CaseSource(name=name, year=year, volume="95", report=report, starting_page="1"))
 
 
-@pytest.mark.parametrize("name, year", [
-    ("Muir v Open Brethren", "1956"),
-    ("Muir v Open Brethren", "1957"),  # decided the year before it was reported
-    ("Federal Commissioner of Taxation v Westfield Ltd", "1991"),  # a title without a number
+@pytest.mark.parametrize("name, year, found", [
+    ("Muir v Open Brethren", "1956", V.Decision("Muir v Open Brethren", "HCA", "1956", "14")),
+    # decided the year before it was reported
+    ("Muir v Open Brethren", "1957", V.Decision("Muir v Open Brethren", "HCA", "1956", "14")),
+    # a title without a number
+    ("Federal Commissioner of Taxation v Westfield Ltd", "1991", V.Decision("Commissioner of Taxation (Cth) v Westfield Ltd")),
 ])
-def test_reported_case_found_by_name_is_checked(name, year):
-    assert V.check_citation(_reported(name, year)) == V.CaseCheck(True)
+def test_reported_case_found_by_name_is_checked(name, year, found):
+    assert V.check_citation(_reported(name, year)) == V.CaseCheck(True, found=found)
+
+
+def test_found_decision_links_to_austlii():
+    assert V.Decision("Muir v Open Brethren", "HCA", "1956", "14").url == \
+        "https://www.austlii.edu.au/cgi-bin/viewdoc/au/cases/cth/HCA/1956/14.html"
+    assert V.Decision("Kvelde v State of New South Wales", "NSWSC", "2023", "1560").url.endswith("/au/cases/nsw/NSWSC/2023/1560.html")
+    assert V.Decision("Commissioner of Taxation (Cth) v Westfield Ltd").url is None
+
+
+def test_medium_neutral_citation_found_gives_the_decision():
+    check = V.check_citation(_case("Muir v Open Brethren", "1956", "HCA", "14"))
+    assert check.found.citation == "[1956] HCA 14" and check.found.title == "Muir v Open Brethren"
 
 
 @pytest.mark.parametrize("citation", [
@@ -202,5 +216,20 @@ def test_each_case_is_counted_and_flagged_once():
     footnotes = [Footnote(number=n, original=RichText.plain(t)) for n, t in texts.items()]
     result = pipeline.process_footnotes(footnotes, get_provider("fake:x", responses=[raw]), bibliography=False)
     assert [w.footnote for w in result.warnings if w.message.startswith("Case not found")] == [1]
-    assert result.case_check.model_dump() == {"total": 2, "checked": 1, "flagged": 1}
-    assert api._result_json("s", result)["case_check"] == {"total": 2, "checked": 1, "flagged": 1}
+    expected = {"total": 2, "checked": 1, "flagged": 1, "found": []}
+    assert result.case_check.model_dump() == expected
+    assert api._result_json("s", result)["case_check"] == expected
+
+
+def test_found_cases_are_listed_at_their_first_footnote():
+    real = {"type": "case", "name": "Muir v Open Brethren", "year": "1956", "volume": "95", "report": "CLR", "starting_page": "1"}
+    texts = {1: "See Muir v Open Brethren (1956) 95 CLR 1.", 2: "Muir v Open Brethren (1956) 95 CLR 1, 4."}
+    raw = json.dumps({"footnotes": [
+        {"number": n, "segments": [{"kind": "citation", "original": t, "citation": {"source": real}}]} for n, t in texts.items()
+    ]})
+    footnotes = [Footnote(number=n, original=RichText.plain(t)) for n, t in texts.items()]
+    result = pipeline.process_footnotes(footnotes, get_provider("fake:x", responses=[raw]), bibliography=False)
+    assert [f.model_dump() for f in result.case_check.found] == [{
+        "footnote": 1, "title": "Muir v Open Brethren", "citation": "[1956] HCA 14",
+        "url": "https://www.austlii.edu.au/cgi-bin/viewdoc/au/cases/cth/HCA/1956/14.html",
+    }]

@@ -65,9 +65,31 @@ def _last(numbers: dict) -> int:
     return max(int(n) for n in numbers)
 
 
+class Decision(NamedTuple):
+    """A decision in the index: its title as the court gives it, and its medium neutral
+    citation where the title has one."""
+    title: str
+    court: str | None = None
+    year: str | None = None
+    number: str | None = None
+
+    @property
+    def citation(self) -> str | None:
+        return f"[{self.year}] {self.court} {self.number}" if self.number else None
+
+    @property
+    def url(self) -> str | None:
+        """The judgment on AustLII, for the student to read (the tool never fetches it)."""
+        if not self.number:
+            return None
+        jurisdiction = "nsw" if self.court.startswith("NSW") else "nf" if self.court == "NFSC" else "cth"
+        return f"https://www.austlii.edu.au/cgi-bin/viewdoc/au/cases/{jurisdiction}/{self.court}/{self.year}/{self.number}.html"
+
+
 class CaseCheck(NamedTuple):
     checked: bool  # the index could say whether the citation is right
     warning: str | None = None  # what's wrong with it, if anything
+    found: Decision | None = None  # the decision it is, when it's right
 
 
 def check_citation(citation: Citation) -> CaseCheck | None:
@@ -87,9 +109,10 @@ def check_citation(citation: Citation) -> CaseCheck | None:
     mnc = f"[{year}] {court} {number}"
     if number in numbers:
         names = numbers[number] if isinstance(numbers[number], list) else [numbers[number]]
-        if not any(same_case(source.name, name) for name in names):
+        same = [name for name in names if same_case(source.name, name)]
+        if not same:
             return CaseCheck(True, f"Case name mismatch: {mnc} is '{names[0]}', not '{source.name}'")
-        return CaseCheck(True)
+        return CaseCheck(True, found=Decision(same[0], court, year, number))
     # Well past the year's last decision, not just past the last one the Corpus has
     last = _last(numbers)
     if index_covers(court, year) and int(number) > last + max(3, last // 20):
@@ -124,20 +147,23 @@ def _check_reported(source: CaseSource) -> CaseCheck:
     if not courts or not year.isdigit() or not _parties(source.name):
         return CaseCheck(False)
     years = [str(int(year) - 1), year]
-    return CaseCheck(any(plausible_name(source.name, title) for title in _titles(courts, years)))
+    found = next((d for d in _decisions(courts, years) if plausible_name(source.name, d.title)), None)
+    return CaseCheck(found is not None, found=found)
 
 
-def _titles(courts: tuple[str, ...], years: list[str]):
-    """Every title the index has for `courts` in `years`, including those without a number."""
+def _decisions(courts: tuple[str, ...], years: list[str]):
+    """Every decision the index has for `courts` in `years`, those without a number last."""
     index = _index()
     for court in courts:
         for y in years:
-            for names in index["courts"].get(court, {}).get("years", {}).get(y, {}).values():
-                yield from names if isinstance(names, list) else [names]
-    for site in {_SITE.get(c, "NSW") for c in courts}:
+            for number, names in index["courts"].get(court, {}).get("years", {}).get(y, {}).items():
+                for name in names if isinstance(names, list) else [names]:
+                    yield Decision(name, court, y, number)
+    for site in sorted({_SITE.get(c, "NSW") for c in courts}):
         unnumbered = index.get("unnumbered", {}).get(site, {})
         for y in [*years, "?"]:
-            yield from unnumbered.get(y, [])
+            for title in unnumbered.get(y, []):
+                yield Decision(title)
 
 
 # --------------------------------------------------------------------------- #
