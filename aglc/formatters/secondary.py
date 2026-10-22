@@ -69,8 +69,8 @@ def _quoted(title: str, rich: RichText | None) -> RichText:
 # Heuristic used to tell a personal name (invert/take-last-word-as-surname)
 # from a corporate/institutional author (r 4.1.4) - "Australian Law Reform
 # Commission" should never be inverted or have its last word treated as a
-# surname. Only a fallback: a source with a single `author` usually carries the
-# extraction model's own `author_is_body` answer, which knows bodies no word list
+# surname. Only a fallback: sources usually carry the extraction model's own
+# `author_is_body`/`authors_are_bodies` answer, which knows bodies no word list
 # does ("Mobil Oil Australia", "Ambulance Victoria").
 _ORG_WORDS = {
     "commission", "committee", "department", "authority", "institute",
@@ -94,16 +94,34 @@ def is_corporate_author(name: str, is_body: bool | None = None) -> bool:
     return bool(words & _ORG_WORDS)
 
 
+# Lower-case words that begin a surname rather than end the given names:
+# 'Paul de Jersey' -> 'de Jersey', 'Ursula von der Leyen' -> 'von der Leyen'.
+_PARTICLES = {
+    "de", "da", "di", "del", "della", "der", "den", "des", "du", "dos", "das",
+    "van", "von", "ter", "ten", "le", "la", "bin", "binti", "ibn", "al", "el",
+}
+
+
+def _split_name(name: str) -> tuple[str, str]:
+    """(given names, surname). Particles before the last word belong to the
+    surname, but never the first word ('Van Morrison' stays 'Morrison')."""
+    parts = name.split()
+    start = len(parts) - 1
+    while start > 1 and parts[start - 1].lower() in _PARTICLES:
+        start -= 1
+    return " ".join(parts[:start]), " ".join(parts[start:])
+
+
 def surname(name: str, is_body: bool | None = None) -> str:
     """The default short title for an individual author (r 1.4.1): their
     surname. Copes with multi-word given names ('Ian M Ramsay' -> 'Ramsay'),
-    'Sir'/'Dame'/peerage prefixes ('Sir Anthony Mason' -> 'Mason'), and
-    corporate authors (returned unchanged, per r 4.1.4)."""
+    'Sir'/'Dame'/peerage prefixes ('Sir Anthony Mason' -> 'Mason'), surname
+    particles ('Paul de Jersey' -> 'de Jersey'), and corporate authors
+    (returned unchanged, per r 4.1.4)."""
     name = name.strip()
     if not name or is_corporate_author(name, is_body):
         return name
-    parts = name.split()
-    return parts[-1] if parts else name
+    return _split_name(name)[1]
 
 
 def invert_name(name: str, is_body: bool | None = None) -> str:
@@ -112,13 +130,22 @@ def invert_name(name: str, is_body: bool | None = None) -> str:
     name = name.strip()
     if not name or is_corporate_author(name, is_body):
         return name
-    parts = name.split()
-    if len(parts) < 2:
-        return name
-    return f"{parts[-1]}, {' '.join(parts[:-1])}"
+    given, last = _split_name(name)
+    return f"{last}, {given}" if given else name
 
 
-def format_names(names: list[str], *, invert_first: bool = False, et_al: bool = False) -> str:
+def author_flag(source) -> bool | None:
+    """The extraction's person-or-body answer for the source's author(s), if any."""
+    if getattr(source, "authors", None):
+        return getattr(source, "authors_are_bodies", None)
+    if getattr(source, "author", None):
+        return getattr(source, "author_is_body", None)
+    return None
+
+
+def format_names(
+    names: list[str], *, invert_first: bool = False, et_al: bool = False, is_body: bool | None = None
+) -> str:
     """r 4.1.2: one -> 'A'; two/three -> 'A, B and C'; more than three -> the
     first-listed name followed by 'et al' (also applied in subsequent
     references, r 1.4.1). `et_al`: the footnote itself gave the first author
@@ -128,7 +155,7 @@ def format_names(names: list[str], *, invert_first: bool = False, et_al: bool = 
         return ""
     names = list(names)
     if invert_first:
-        names[0] = invert_name(names[0])
+        names[0] = invert_name(names[0], is_body)
     if et_al or len(names) > 3:
         return f"{names[0]} et al"
     if len(names) == 1:
@@ -138,10 +165,10 @@ def format_names(names: list[str], *, invert_first: bool = False, et_al: bool = 
     return f"{', '.join(names[:-1])} and {names[-1]}"
 
 
-def surname_list(names: list[str], *, et_al: bool = False) -> str:
+def surname_list(names: list[str], *, et_al: bool = False, is_body: bool | None = None) -> str:
     """The r 1.4.1 default short title for multiple authors: their surnames,
     joined the same way as r 4.1.2 (eg 'Edelman and Bant', 'Rishworth et al')."""
-    return format_names([surname(n) for n in names], et_al=et_al)
+    return format_names([surname(n, is_body) for n in names], et_al=et_al)
 
 def _names(source) -> list[str]:
     if getattr(source, "authors", None):
@@ -157,10 +184,25 @@ def _title_based(citation: Citation) -> bool:
     is a body and a short title was introduced ('*Traditional Rights and Freedoms* (n 52)').
     A personal author's work keeps the surname even with a short title; the title is then
     only added to tell apart several works by that author (the document pass does that)."""
-    source = citation.source
-    names = _names(source)
-    is_body = getattr(source, "author_is_body", None) if getattr(source, "author", None) else None
+    names = _names(citation.source)
+    is_body = author_flag(citation.source)
     return not names or (bool(citation.short_title) and all(is_corporate_author(n, is_body) for n in names))
+
+
+def full_names(citation: Citation) -> str:
+    """r 1.4.1: 'where works by different authors with the same surname are cited, the
+    authors' full names - as they appear on the source - should be included in place of
+    the author's surname'. Empty when the source is referred to by title instead."""
+    src = citation.source
+    if _title_based(citation):
+        return ""
+    if getattr(src, "authors", None):
+        return format_names(list(src.authors), et_al=getattr(src, "et_al", False))
+    if getattr(src, "author", None):
+        return src.author
+    if getattr(src, "editors", None):
+        return format_editors(list(src.editors))
+    return ""
 
 
 
@@ -252,7 +294,7 @@ class JournalArticleFormatter(Formatter):
         src = citation.source
         assert isinstance(src, JournalArticleSource)
         out = RichText()
-        authors = format_names(src.authors, invert_first=invert_author, et_al=src.et_al) if src.authors else missing("authors")
+        authors = format_names(src.authors, invert_first=invert_author, et_al=src.et_al, is_body=src.authors_are_bodies) if src.authors else missing("authors")
         out.append(f"{authors}, ")
         out.extend(_quoted(src.title, src.title_rich))
         if src.part:
@@ -275,7 +317,7 @@ class JournalArticleFormatter(Formatter):
             return citation.short_title
         src = citation.source
         assert isinstance(src, JournalArticleSource)
-        return surname_list(src.authors, et_al=src.et_al) if src.authors else src.title
+        return surname_list(src.authors, et_al=src.et_al, is_body=src.authors_are_bodies) if src.authors else src.title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         src = citation.source
@@ -321,7 +363,7 @@ class BookFormatter(Formatter):
         # an editor instead leads with the author and puts ", ed Editor"
         # after the title (handled below).
         if src.authors:
-            out.append(format_names(src.authors, invert_first=invert_author, et_al=src.et_al) + ", ")
+            out.append(format_names(src.authors, invert_first=invert_author, et_al=src.et_al, is_body=src.authors_are_bodies) + ", ")
         elif src.editors:
             out.append(format_editors(src.editors, invert_first=invert_author) + ", ")
         else:
@@ -355,7 +397,7 @@ class BookFormatter(Formatter):
         src = citation.source
         assert isinstance(src, BookSource)
         if src.authors:
-            return surname_list(src.authors, et_al=src.et_al)
+            return surname_list(src.authors, et_al=src.et_al, is_body=src.authors_are_bodies)
         if src.editors:
             return format_editors([surname(e) for e in src.editors])
         return src.title
@@ -399,7 +441,7 @@ class BookChapterFormatter(Formatter):
         src = citation.source
         assert isinstance(src, BookChapterSource)
         out = RichText()
-        authors = format_names(src.authors, invert_first=invert_author, et_al=src.et_al) if src.authors else missing("authors")
+        authors = format_names(src.authors, invert_first=invert_author, et_al=src.et_al, is_body=src.authors_are_bodies) if src.authors else missing("authors")
         out.append(f"{authors}, ")
         out.extend(_quoted(src.chapter_title, src.chapter_title_rich))
         if src.translators:
@@ -431,7 +473,7 @@ class BookChapterFormatter(Formatter):
         assert isinstance(src, BookChapterSource)
         # r 6.6.1 note: subsequent references use the chapter's own author(s),
         # not the book's editor(s).
-        return surname_list(src.authors, et_al=src.et_al) if src.authors else src.chapter_title
+        return surname_list(src.authors, et_al=src.et_al, is_body=src.authors_are_bodies) if src.authors else src.chapter_title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         src = citation.source
@@ -539,7 +581,7 @@ class ResearchPaperFormatter(Formatter):
         assert isinstance(src, ResearchPaperSource)
         out = RichText()
         if src.authors:
-            out.append(format_names(src.authors, invert_first=invert_author) + ", ")
+            out.append(format_names(src.authors, invert_first=invert_author, is_body=src.authors_are_bodies) + ", ")
         out.append(f"{_LQ}{src.title}{_RQ}")
         doc_type = src.document_type or missing("document_type")
         parts = [f"{doc_type} No {src.document_number}" if src.document_number else doc_type]
@@ -562,7 +604,7 @@ class ResearchPaperFormatter(Formatter):
             return citation.short_title
         src = citation.source
         assert isinstance(src, ResearchPaperSource)
-        return surname_list(src.authors) if src.authors else src.title
+        return surname_list(src.authors, is_body=src.authors_are_bodies) if src.authors else src.title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         out = RichText()
@@ -599,7 +641,7 @@ class NewspaperFormatter(Formatter):
         assert isinstance(src, NewspaperSource)
         out = RichText()
         if src.authors:
-            out.append(format_names(src.authors, invert_first=invert_author, et_al=src.et_al) + ", ")
+            out.append(format_names(src.authors, invert_first=invert_author, et_al=src.et_al, is_body=src.authors_are_bodies) + ", ")
         out.extend(_quoted(src.title, src.title_rich))
         date = src.date or missing("date")
         if src.periodical:
@@ -636,7 +678,7 @@ class NewspaperFormatter(Formatter):
             return citation.short_title
         src = citation.source
         assert isinstance(src, NewspaperSource)
-        return surname_list(src.authors, et_al=src.et_al) if src.authors else src.title
+        return surname_list(src.authors, et_al=src.et_al, is_body=src.authors_are_bodies) if src.authors else src.title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:
         src = citation.source
@@ -680,7 +722,7 @@ class WebsiteFormatter(Formatter):
         # r 7.15: author omitted if identical to the web page title.
         authors = [a for a in src.authors if a != src.website_name]
         if authors:
-            out.append(format_names(authors, invert_first=invert_author, et_al=src.et_al) + ", ")
+            out.append(format_names(authors, invert_first=invert_author, et_al=src.et_al, is_body=src.authors_are_bodies) + ", ")
         out.extend(_quoted(src.title, src.title_rich)).append(", ")
         out.append(src.website_name or missing("website_name"), italic=True)
         # r 7.15: 'Web Page' is the guide's default when the document type is
@@ -703,7 +745,7 @@ class WebsiteFormatter(Formatter):
         src = citation.source
         assert isinstance(src, WebsiteSource)
         if src.authors:
-            return surname_list(src.authors, et_al=src.et_al)
+            return surname_list(src.authors, et_al=src.et_al, is_body=src.authors_are_bodies)
         return src.website_name or src.title
 
     def subsequent(self, citation: Citation, short_title: str, first_footnote: int) -> RichText:

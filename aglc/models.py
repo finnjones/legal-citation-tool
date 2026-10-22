@@ -176,6 +176,11 @@ class JournalArticleSource(_SourceBase):
     type: Literal["journal_article"] = "journal_article"
     authors: list[str] = Field(default_factory=list)
     et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
+    authors_are_bodies: bool | None = Field(
+        default=None,
+        description="True if the authors are bodies (organisations, governments, committees), false if "
+        "people; leave out if mixed or unsure. Decides whether repeat references shorten them to surnames",
+    )
     title: str
     #: `title` with the italics it had in the footnote, for a case or Act name inside the
     #: quoted title. Filled in by extraction, never by the model.
@@ -203,6 +208,11 @@ class BookSource(_SourceBase):
     type: Literal["book"] = "book"
     authors: list[str] = Field(default_factory=list)
     et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
+    authors_are_bodies: bool | None = Field(
+        default=None,
+        description="True if the authors are bodies (organisations, governments, committees), false if "
+        "people; leave out if mixed or unsure. Decides whether repeat references shorten them to surnames",
+    )
     editors: list[str] = Field(default_factory=list, description="Only when the book itself is edited (no authors)")
     title: str
     translators: list[str] = Field(default_factory=list, description="r 6.7: ', tr Joan Riviere'")
@@ -218,6 +228,11 @@ class BookChapterSource(_SourceBase):
     type: Literal["book_chapter"] = "book_chapter"
     authors: list[str] = Field(default_factory=list)
     et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
+    authors_are_bodies: bool | None = Field(
+        default=None,
+        description="True if the authors are bodies (organisations, governments, committees), false if "
+        "people; leave out if mixed or unsure. Decides whether repeat references shorten them to surnames",
+    )
     chapter_title: str
     #: `chapter_title` with the italics it had in the footnote, for a case or Act name inside the
     #: quoted title. Filled in by extraction, never by the model.
@@ -253,6 +268,11 @@ class ResearchPaperSource(_SourceBase):
 
     type: Literal["research_paper"] = "research_paper"
     authors: list[str] = Field(default_factory=list)
+    authors_are_bodies: bool | None = Field(
+        default=None,
+        description="True if the authors are bodies (organisations, governments, committees), false if "
+        "people; leave out if mixed or unsure. Decides whether repeat references shorten them to surnames",
+    )
     title: str
     document_type: str | None = Field(
         default=None, description="As it appears on the source, eg 'Research Paper', 'Working Paper', 'Research Note', 'e-brief'"
@@ -358,6 +378,11 @@ class NewspaperSource(_SourceBase):
     type: Literal["newspaper"] = "newspaper"
     authors: list[str] = Field(default_factory=list)
     et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
+    authors_are_bodies: bool | None = Field(
+        default=None,
+        description="True if the authors are bodies (organisations, governments, committees), false if "
+        "people; leave out if mixed or unsure. Decides whether repeat references shorten them to surnames",
+    )
     title: str
     #: `title` with the italics it had in the footnote, for a case or Act name inside the
     #: quoted title. Filled in by extraction, never by the model.
@@ -381,6 +406,11 @@ class WebsiteSource(_SourceBase):
     type: Literal["website"] = "website"
     authors: list[str] = Field(default_factory=list, description="Person or organisation author, if any")
     et_al: bool = Field(default=False, description="The authors are followed by 'et al' in the footnote (r 4.1.2)")
+    authors_are_bodies: bool | None = Field(
+        default=None,
+        description="True if the authors are bodies (organisations, governments, committees), false if "
+        "people; leave out if mixed or unsure. Decides whether repeat references shorten them to surnames",
+    )
     title: str
     #: `title` with the italics it had in the footnote, for a case or Act name inside the
     #: quoted title. Filled in by extraction, never by the model.

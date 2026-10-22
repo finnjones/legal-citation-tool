@@ -548,6 +548,28 @@ def test_same_author_multiple_works_are_disambiguated_with_the_title():
     assert not any(run.italic for run in result.footnotes[4].formatted.runs)
 
 
+def test_different_authors_sharing_a_surname_get_their_full_names():
+    # AGLC4 r 1.4.1: "where works by different authors with the same surname are cited,
+    # the authors' full names ... should be included in place of the author's surname".
+    # The title is still added for an author with several works.
+    george = article(authors=["George Williams"], title="Bills of Rights", pinpoints=[pin("10")])
+    daryl = article(authors=["Daryl Williams"], title="Courts", pinpoints=[pin("4")])
+    george2 = article(authors=["George Williams"], title="Human Rights", pinpoints=[pin("2")])
+    result = render_document(
+        [
+            footnote(1, cseg(george)),
+            footnote(2, cseg(daryl)),
+            footnote(3, cseg(george2)),
+            footnote(4, cseg(case())),
+            footnote(5, cseg(daryl.model_copy(update={"pinpoints": [pin("5")]}))),
+            footnote(6, cseg(george.model_copy(update={"pinpoints": [pin("11")]}))),
+        ],
+        bibliography=False,
+    )
+    assert result.footnotes[4].formatted.text == "Daryl Williams (n 2) 5."
+    assert result.footnotes[5].formatted.text == f"George Williams, {OPEN_Q}Bills of Rights{CLOSE_Q} (n 1) 11."
+
+
 def test_single_author_work_is_not_disambiguated():
     a1 = article(authors=["Jane Smith"], title="On Trusts", pinpoints=[pin("10")])
     interrupt = case()

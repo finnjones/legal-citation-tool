@@ -93,6 +93,19 @@ carries, alongside the source:
   - **"et al"** (any source with `authors`): copy only the names actually given, and set
     `et_al: true`. Never drop it. Example: `David Hamer et al, Laying Down the Law (LexisNexis
     Butterworths, 12th ed, 2023)` → `authors: ["David Hamer"]`, `et_al: true`.
+  - **Person or body**: `author_is_body` (on `report` and `submission`, which have one `author`)
+    and `authors_are_bodies` (on every source with `authors`) are `true` when the author is a
+    body — an organisation, company, government, agency, committee, or a code name like
+    `"Anonymous 489"` — and `false` when it is a person. Repeat references cut a person's name to
+    the surname and the bibliography inverts it, but use a body's name whole, so a wrong answer
+    turns `"Ambulance Victoria"` into "Victoria". Decide from what the name is, not its words:
+    `"Mobil Oil Australia"` and `"Human Rights Watch"` are bodies, `"Jonathan Law"` and
+    `"Sarah Bank"` people. Leave it out when there is no author, when `authors` mixes people and
+    bodies, or when you can't tell. Example: `Human Rights Watch, World Report 2020 (Seven
+    Stories Press, 2020)` → `authors: ["Human Rights Watch"]`, `authors_are_bodies: true`,
+    `title: "World Report 2020"`, `publisher: "Seven Stories Press"`, `year: "2020"`.
+  - **Copy author names as written**, including titles and post-nominals like "Professor",
+    "Dr", "the Hon", "AO" or "SC". The tool removes the ones AGLC leaves out (r 4.1.1).
 - **`book_chapter`** (r 6.6) — `authors`, `chapter_title`, `editors`, `book_title`, `publisher`,
   `edition`, `year`, `starting_page`.
   - Example: `Jane Smith, 'Native Title' in John Doe (ed), Land Law (Federation Press, 2015) 55` →
@@ -101,13 +114,6 @@ carries, alongside the source:
 - **`report`** (r 7.1) — `author` (person or body, eg `"Australian Law Reform Commission"`),
   `author_is_body`, `title`, `document_type` (eg `"Report"`, `"Discussion Paper"`),
   `document_number`, `date`.
-  - **`author_is_body`** (`report` and `submission`): `true` when the `author` is a body — an
-    organisation, company, government, agency, committee, or a code name like `"Anonymous 489"` —
-    and `false` when it is a person. Repeat references cut a person's name to the surname and the
-    bibliography inverts it, but use a body's name whole, so a wrong answer turns
-    `"Ambulance Victoria"` into "Victoria". Decide from what the name is, not its words: `"Mobil
-    Oil Australia"` is a body, `"Jonathan Law"` a person. Leave it out when there is no `author`
-    or you can't tell.
   - Example: `Australian Law Reform Commission, Traditional Rights and Freedoms (Report No 129,
     December 2015)` → `author: "Australian Law Reform Commission"`, `author_is_body: true`,
     `title: "Traditional Rights and Freedoms"`, `document_type: "Report"`, `document_number: "129"`,
@@ -143,7 +149,7 @@ carries, alongside the source:
 - **`submission`** (r 7.5.2) — a written submission to a parliamentary committee, inquiry,
   government agency or royal commission. The word "Submission" is implied by the type and goes in
   no field. `author` (the person or body that made it; leave it out for an anonymous submission,
-  but keep a code name like `"Anonymous 489"`), `author_is_body` (see `report`), `submission_number` (the number only, if there is
+  but keep a code name like `"Anonymous 489"`), `author_is_body` (see "Person or body" above), `submission_number` (the number only, if there is
   one), `body` (the committee, agency or royal commission it was made to, without "to"),
   `legislature` (for a parliamentary committee, eg `"Parliament of Victoria"`), `inquiry` (the
   name of the inquiry, if given), `date`.
