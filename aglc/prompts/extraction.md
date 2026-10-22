@@ -187,7 +187,7 @@ carries, alongside the source:
   - Example: `Explanatory Notes, Adoption Bill 2009 (Qld) 5-6` →
     `document_type: "Explanatory Notes"`, `title: "Adoption Bill"`, `year: "2009"`,
     `jurisdiction: "Qld"`, pinpoint page `5-6`.
-- **`newspaper`** (r 7.10) — `authors`, `title` (article headline), `newspaper` (publication name),
+- **`newspaper`** (r 7.11) — `authors`, `title` (article headline), `newspaper` (publication name),
   `place`, `date`, `page`, `url`.
 - **`website`** (r 7.15) — `authors`, `title` (page title), `website_name`, `date`, `url`.
 - **`treaty`** (r 8.1–8.2) — `title`, `parties` (bilateral treaties only), `opened_for_signature`,

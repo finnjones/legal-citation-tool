@@ -461,7 +461,7 @@ def _mark_paragraph_deleted(p, author: str, date: str, id_gen) -> None:
 
 
 def _delete_paragraph_mark(p, author: str, date: str, id_gen) -> None:
-    """Mark the paragraph mark as a tracked deletion, per r 17.13.5.15 (w:pPr/w:rPr/w:del):
+    """Mark the paragraph mark as a tracked deletion, per ECMA-376 §17.13.5.15 (w:pPr/w:rPr/w:del):
     accepting it joins the next paragraph onto this one."""
     ppr = p.find(qn("w:pPr"))
     if ppr is None:
