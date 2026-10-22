@@ -96,10 +96,16 @@ The AI model's output is checked deterministically (no second AI involved, see
 1. **Coverage:** every meaningful word and number in the original footnote must be captured
    somewhere in the extraction. If anything is missing, the model is asked once more with
    the exact gaps named; if it still can't account for them, **that footnote is left exactly
-   as written** and listed in the warnings for you to fix by hand.
-2. **Grounding:** every number the model returns (year, volume, page, edition...) must
+   as written** and listed in the warnings for you to fix by hand. Only what will be rendered
+   counts: an unclassified source is covered by the text it will be emitted as.
+2. **Preservation:** every piece of commentary and every citation must be found in the
+   original, in order, with no part of the footnote used twice. Commentary that isn't there is
+   never emitted (the footnote's own text is kept in its place); a citation that isn't there
+   gets the same repair round and leave-unchanged fallback as a dropped word. An unclassified
+   source is emitted as the footnote's own text, italics included.
+3. **Grounding:** every number the model returns (year, volume, page, edition...) must
    appear in the original; invented values are removed and show as `[MISSING: ...]`.
-3. **Rendering:** every field of a source must appear in its formatted citation; anything
+4. **Rendering:** every field of a source must appear in its formatted citation; anything
    the formatter omits is reported as a warning.
 
 ### Try it
