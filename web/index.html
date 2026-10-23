@@ -256,6 +256,22 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .found .decision { font-family: var(--font-serif); font-size: 0.9375rem; color: var(--ink); overflow-wrap: anywhere; }
         .found .decision em { font-style: italic; }
         .found .link { white-space: nowrap; }
+        .found.unchecked p::before { content: "Not checked"; color: var(--muted); }
+        /* Report a problem: a quiet link under each footnote, opening a short form */
+        .report { margin-top: 10px; font-size: 0.875rem; }
+        .report > .link-button { color: var(--muted); font-weight: 400; }
+        .report > .link-button:hover { color: var(--accent); }
+        .report .sent { color: var(--muted); }
+        .report-form { display: grid; gap: 8px; max-width: 60ch; }
+        .report-form label { font-size: 0.8125rem; font-weight: 500; }
+        .report-form textarea {
+            width: 100%; font: inherit; font-size: 0.9375rem; line-height: 1.5; padding: 8px 10px; resize: vertical;
+            color: var(--ink); background: var(--sheet); border: 1px solid var(--hairline-strong); border-radius: 6px;
+        }
+        .report-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .report-form .consent { color: var(--muted); font-size: 0.8125rem; }
+        .report-form .report-error { color: var(--ink); font-weight: 500; }
+        .report-form .actions { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
         .chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
         /* What changed and why: one quiet line per kind of change, with its rule */
         .why { list-style: none; margin-top: 10px; display: grid; gap: 4px; font-size: 0.875rem; line-height: 1.5; color: var(--muted); }
@@ -1311,8 +1327,9 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             entries = data.footnotes.map(fn => {
                 const notes = notesFor.get(fn.number) || [];
                 const found = (data.case_check?.found || []).filter(f => f.footnote === fn.number);
+                const unchecked = (data.case_check?.unchecked || []).filter(u => u.footnote === fn.number);
                 const unread = failed.has(fn.number);
-                return { ...fn, notes, found, unread, state: unread || notes.length ? "check" : fn.changed ? "amended" : "unchanged" };
+                return { ...fn, notes, found, unchecked, unread, state: unread || notes.length ? "check" : fn.changed ? "amended" : "unchanged" };
             });
 
             showView("results");
@@ -1356,7 +1373,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 flagged ? `${flagged === 1 ? "Its footnote is" : "Their footnotes are"} marked Check, saying why.` : "",
                 found ? "Found cases are marked on their footnotes, with a link to read the judgment on AustLII." : "",
                 others ? `${others === total ? (total === 1 ? "It wasn't checked" : "None were checked") : others === 1 ? "One wasn't checked" : `${others} weren't checked`}: `
-                    + "only High Court, Federal Court and NSW cases can be, and a few of their decisions aren't in our list." : "",
+                    + "only High Court, Federal Court and NSW cases can be, and a few of their decisions aren't in our list. "
+                    + `${others === 1 ? "Its footnote has" : "Their footnotes have"} a link to search for ${others === 1 ? "it" : "them"} on AustLII and Jade.` : "",
             ].filter(Boolean).join(" ");
             return banner(kind, title, text);
         }
@@ -1368,6 +1386,14 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             return `<div class="found">${e.found.map(f => `<p><span><span class="decision"><em>${escapeHtml(f.title)}</em>`
                 + `${f.citation ? ` ${escapeHtml(f.citation)}` : ""}</span>`
                 + `${f.url ? ` <span class="link">· <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener">Read on AustLII</a></span>` : ""}</span></p>`).join("")}</div>`;
+        }
+
+        // Cases on this footnote the case index couldn't check, with a search for them on
+        // AustLII and Jade so the student can check them
+        function uncheckedHtml(e) {
+            if (!e.unchecked.length) return "";
+            return `<div class="found unchecked">${e.unchecked.map(u => `<p><span>We couldn't check <span class="decision"><em>${escapeHtml(u.name)}</em></span>`
+                + ` <span class="link">· <a href="${escapeHtml(u.search_url)}" target="_blank" rel="noopener">Search AustLII and Jade</a></span></span></p>`).join("")}</div>`;
         }
 
         function renderBanners(data, general, failed) {
@@ -1427,11 +1453,60 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             const notes = e.notes;
             const notesHtml = notes.length ? `<div class="notes">${notes.map(m => `<p><span>${noteHtml(m)}</span></p>`).join("")}</div>` : "";
             const whyLines = whyHtml(e);
-            const found = foundHtml(e);
-            if (e.unread) return `<p class="placeholder">Left as written. The AI model couldn't read this footnote.</p>`;
-            if (e.locked) return `<p class="placeholder">${ICON_LOCK}<span>Result hidden until you unlock</span></p>${notesHtml}${found}`;
-            if (!e.changed) return `<p class="placeholder">${notes.length ? "Left as written" : "No change needed"}</p>${notesHtml}${found}`;
-            return `<p class="cite now" data-index="${i}"></p>${notesHtml}${found}${whyLines}`;
+            const found = foundHtml(e) + uncheckedHtml(e);
+            const report = reportHtml(e);
+            if (e.unread) return `<p class="placeholder">Left as written. The AI model couldn't read this footnote.</p>${report}`;
+            if (e.locked) return `<p class="placeholder">${ICON_LOCK}<span>Result hidden until you unlock</span></p>${notesHtml}${found}${report}`;
+            if (!e.changed) return `<p class="placeholder">${notes.length ? "Left as written" : "No change needed"}</p>${notesHtml}${found}${report}`;
+            return `<p class="cite now" data-index="${i}"></p>${notesHtml}${found}${whyLines}${report}`;
+        }
+
+        // ---- Problem reports (aglc/reports.py) -------------------------------------
+        // A quiet link under each footnote; the form says what is sent before anything is.
+
+        function reportHtml(e) {
+            return `<div class="report" id="report-${e.number}"><button type="button" class="link-button" data-report="${e.number}">Report a problem</button></div>`;
+        }
+
+        function openReport(n) {
+            const box = document.getElementById(`report-${n}`);
+            box.innerHTML = `<form class="report-form" data-report-form="${n}">
+                <label for="report-text-${n}">What's wrong with footnote ${n}? (optional)</label>
+                <textarea id="report-text-${n}" rows="3" maxlength="1000"></textarea>
+                <p class="consent">This sends us footnote ${n} as you wrote it and our result, so we can fix the tool. Nothing else from your essay is sent. We keep reports for {{report_days}} days.</p>
+                <p class="report-error" role="alert" hidden></p>
+                <div class="actions"><button type="submit" class="btn btn-secondary">Send report</button><button type="button" class="link-button" data-report-cancel="${n}">Cancel</button></div>
+            </form>`;
+            box.querySelector("textarea").focus();
+        }
+
+        function closeReport(n) {
+            document.getElementById(`report-${n}`).outerHTML = reportHtml({ number: n });
+            document.querySelector(`[data-report="${n}"]`).focus();
+        }
+
+        async function sendReport(form) {
+            const n = Number(form.dataset.reportForm);
+            const button = form.querySelector("[type=submit]");
+            const error = form.querySelector(".report-error");
+            button.disabled = true;
+            button.textContent = "Sending…";
+            error.hidden = true;
+            try {
+                const response = await fetch(`/api/report/${encodeURIComponent(result.id)}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ footnote: n, comment: form.querySelector("textarea").value.trim() || null }),
+                });
+                if (!response.ok) throw new Error(await detailOf(response, "The report couldn't be sent. Please try again."));
+                document.getElementById(`report-${n}`).innerHTML = `<p class="sent" tabindex="-1">Thanks. Your report on footnote ${n} has been sent.</p>`;
+                document.querySelector(`#report-${n} .sent`).focus();
+            } catch (err) {
+                error.textContent = err.message;
+                error.hidden = false;
+                button.disabled = false;
+                button.textContent = "Send report";
+            }
         }
 
         function renderCitationBodies() {
@@ -1553,6 +1628,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             m = m.replace(/^Unknown court identifier: '(.+)'$/, "‘$1’ isn't a court we recognise. Check the medium neutral citation.");
             m = m.replace(/^Unknown jurisdiction: '(.+)'$/, "‘$1’ isn't a jurisdiction we recognise.");
             m = m.replace(/^Case not found: (.+) is past the court's last decision that year, (.+)$/, "The court's last decision that year was $2, so there is no $1. Check the citation: this case may not exist.");
+            m = m.replace(/^Legislation year: the (.+) in force is from (.+), not (\d{4})$/, "The $1 in force is from $2, not $3. Check the year, unless you mean an earlier Act of that name that has since been repealed.");
             m = m.replace(/^Case name mismatch: (.+) is '(.+)', not '(.+)'$/, "$1 is ‘$2’, not ‘$3’. Check the citation is for the case you mean.");
             return m.charAt(0).toUpperCase() + m.slice(1);
         }
@@ -1730,6 +1806,14 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 if (e.target.closest("[data-download]")) downloadDocument();
                 const copy = e.target.closest("[data-copy-link]");
                 if (copy) copyText(reDownloadLink(), copy, "Link copied");
+                const report = e.target.closest("[data-report]");
+                if (report) openReport(Number(report.dataset.report));
+                const cancel = e.target.closest("[data-report-cancel]");
+                if (cancel) closeReport(Number(cancel.dataset.reportCancel));
+            });
+            document.addEventListener("submit", (e) => {
+                const form = e.target.closest("[data-report-form]");
+                if (form) { e.preventDefault(); sendReport(form); }
             });
         }
 

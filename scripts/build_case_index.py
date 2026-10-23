@@ -1,9 +1,12 @@
 """Build aglc/data/case_index.json.gz, the medium neutral citations of every decision in the
-Open Australian Legal Corpus, so aglc/verify.py can flag a cited case that doesn't exist.
+Open Australian Legal Corpus, so aglc/verify.py can flag a cited case that doesn't exist,
+and the titles and years of its Acts and instruments, so it can catch an Act's wrong year.
 
 The Corpus has every decision published by the High Court, the Federal Court and NSW Caselaw
 when it was scraped. Each decision's `citation` is its title ending in its medium neutral
-citation ('Muir v Open Brethren [1956] HCA 14'); only that is kept, never the text.
+citation ('Muir v Open Brethren [1956] HCA 14'); only that is kept, never the text. Its
+legislation is what was in force in the Commonwealth, NSW, Queensland, WA, SA and Tasmania
+('Evidence Act 1995 (Cth)'); likewise only the titles are kept.
 
     uv run python scripts/build_case_index.py                 # streams the 9.4 GB file
     uv run python scripts/build_case_index.py corpus.jsonl    # or reads a local copy
@@ -39,17 +42,31 @@ _MNC = re.compile(r"\s*[\[(]?\s*(\d{4})\s*[\])]\s*([A-Za-z]+)\s+(\d+)\s*$")
 MIN_DECISIONS = 50
 
 
+_KEPT = (b'"type":"decision"', b'"type":"primary_legislation"', b'"type":"secondary_legislation"')
+
+
 def records(lines):
-    """The fields before `text` of each decision (parsing the whole line would mean parsing
-    every judgment's text). `text` is the last field."""
+    """The fields before `text` of each decision and Act or instrument (parsing the whole
+    line would mean parsing every document's text). `text` is the last field."""
     for line in lines:
-        if b'"type":"decision"' not in line[:200]:
+        if not any(kind in line[:200] for kind in _KEPT):
             continue
         head = line[: line.find(b',"text":')] + b"}"
         try:
             yield json.loads(head)
         except ValueError:
             continue
+
+
+# An Act's or instrument's title: 'Evidence Act 1995 (Cth)', 'Railway Discontinuance Act (No. 2)
+# 2006 (WA)', 'Lord Howe Island Regulation 2014 (2014-497) (NSW)', '... Act 2009 (Repealed) (Tas)'
+_LEGISLATION = re.compile(r"^(?P<title>.+?)\s+(?P<year>\d{4})(?:\s*\(\d{4}-\d+\))?(?:\s*\(Repealed\))?\s*\((?P<jurisdiction>[A-Za-z ]+)\)\s*$")
+
+
+def legislation_key(title: str) -> str:
+    """'Railway Discontinuance Act (No. 2)' -> 'railway discontinuance act no 2'. aglc/verify.py
+    keys the cited title the same way."""
+    return " ".join(re.findall(r"[a-z0-9]+", title.lower().replace("&", " and ")))
 
 
 #: Where a decision without a medium neutral citation came from, for matching a reported
@@ -61,8 +78,16 @@ def build(lines) -> dict:
     cases: dict[str, dict[str, dict[str, str | list[str]]]] = defaultdict(lambda: defaultdict(dict))
     unnumbered: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     scraped: dict[str, str] = {}
+    # jurisdiction -> legislation_key(title) -> [title as the register gives it, years]
+    legislation: dict[str, dict[str, list]] = defaultdict(dict)
     seen = 0
     for rec in records(lines):
+        if rec.get("type") != "decision":
+            if m := _LEGISLATION.match(rec.get("citation") or ""):
+                entry = legislation[m["jurisdiction"]].setdefault(legislation_key(m["title"]), [m["title"].replace("(No. ", "(No "), []])
+                if m["year"] not in entry[1]:
+                    entry[1] = sorted(entry[1] + [m["year"]])
+            continue
         seen += 1
         m = _MNC.search(rec.get("citation") or "")
         if not m:
@@ -97,6 +122,9 @@ def build(lines) -> dict:
         "courts": courts,
         # decisions whose title has no medium neutral citation: site -> year decided -> titles
         "unnumbered": {site: {y: sorted(t) for y, t in sorted(years.items())} for site, years in sorted(unnumbered.items())},
+        # Acts and instruments in force when scraped (and Tasmania's repealed ones):
+        # jurisdiction -> legislation_key(title) -> [title, years]
+        "legislation": {j: dict(sorted(titles.items())) for j, titles in sorted(legislation.items())},
     }
 
 
@@ -110,7 +138,8 @@ def main() -> None:
     with gzip.open(OUT, "wt", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, separators=(",", ":"))
     total = sum(len(v) for c in index["courts"].values() for v in c["years"].values())
-    print(f"wrote {OUT} ({total} decisions, {len(index['courts'])} courts)")
+    acts = sum(len(titles) for titles in index["legislation"].values())
+    print(f"wrote {OUT} ({total} decisions, {len(index['courts'])} courts, {acts} Acts and instruments)")
 
 
 if __name__ == "__main__":

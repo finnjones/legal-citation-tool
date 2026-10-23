@@ -30,6 +30,7 @@ SQUARE_LOCATION_ID=...
 SQUARE_WEBHOOK_SIGNATURE_KEY=...
 SQUARE_WEBHOOK_URL=https://<your domain>/api/webhooks/square
 # AGLC_RETENTION_HOURS=24   # quoted by /api/config for the privacy page
+# AGLC_REPORT_DAYS=90       # problem reports ($AGLC_DATA_DIR/reports); quoted on the privacy page
 # AGLC_MAX_UPLOAD_MB=10
 ```
 
@@ -49,9 +50,9 @@ a plain copy taken mid-write can be corrupt):
 15 3 * * * aglc sqlite3 /var/lib/aglc/aglc.db ".backup '/var/backups/aglc/aglc-$(date +\%F).db'" && find /var/backups/aglc -name 'aglc-*.db' -mtime +30 -delete
 ```
 
-Back up the database only, not `sessions/`: documents are deleted after
-`AGLC_RETENTION_HOURS` anyway, and copying them into backups would keep students' work
-longer than the privacy page says. Check a restore once (`sqlite3 <backup> 'PRAGMA integrity_check'`).
+Back up the database only, not `sessions/` or `reports/`: documents are deleted after
+`AGLC_RETENTION_HOURS` and reports after `AGLC_REPORT_DAYS` anyway, and copying them into
+backups would keep students' work longer than the privacy page says. Check a restore once (`sqlite3 <backup> 'PRAGMA integrity_check'`).
 
 ## 3. Cloudflare Tunnel
 

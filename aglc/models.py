@@ -738,13 +738,22 @@ class FoundCase(BaseModel):
     url: str | None = Field(default=None, description="The judgment on AustLII")
 
 
+class UncheckedCase(BaseModel):
+    """A cited case the case index couldn't check, and where the student can look for it."""
+    footnote: int = Field(description="Where it is first cited")
+    name: str = Field(description="The case name as cited")
+    search_url: str = Field(description="A web search for it on AustLII and Jade")
+
+
 class CaseCheckSummary(BaseModel):
     """How many of the document's cases (each counted once) the case index could check
-    (aglc/verify.py), how many of those it flagged, and the ones it found."""
+    (aglc/verify.py), how many of those it flagged, the ones it found and the ones it
+    couldn't check."""
     total: int = 0
     checked: int = 0
     flagged: int = 0
     found: list[FoundCase] = Field(default_factory=list)
+    unchecked: list[UncheckedCase] = Field(default_factory=list)
 
 
 class ProcessResult(BaseModel):

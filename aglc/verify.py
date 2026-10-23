@@ -15,6 +15,9 @@ years the Corpus is missing some decisions (about 8% of the High Court's, 1-3% o
 Federal Court's and NSW courts'), so a gap can't tell a fake case from a real one. Other
 courts, years after the index was built and years the court's site barely has are not
 checked either.
+
+The same index has the Acts and instruments in force in the Commonwealth, NSW, Queensland,
+WA, SA and Tasmania, so an Act cited with the wrong year is flagged (check_legislation).
 """
 
 from __future__ import annotations
@@ -22,11 +25,12 @@ from __future__ import annotations
 import gzip
 import json
 import re
+from urllib.parse import quote_plus
 from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
-from .models import CaseSource, Citation
+from .models import CaseSource, Citation, LegislationSource
 
 _INDEX = Path(__file__).resolve().parent / "data" / "case_index.json.gz"
 
@@ -90,6 +94,38 @@ class CaseCheck(NamedTuple):
     checked: bool  # the index could say whether the citation is right
     warning: str | None = None  # what's wrong with it, if anything
     found: Decision | None = None  # the decision it is, when it's right
+
+
+def check_legislation(citation: Citation) -> str | None:
+    """A warning if an Act or instrument is in the index for its jurisdiction under a
+    different year ('Evidence Act 1993 (Cth)': the one in force is 1995), else None.
+
+    The index has only what was in force (and Tasmania's repealed Acts), so an Act it lacks
+    is never flagged, and the warning allows for an earlier Act of the same name that has
+    since been repealed ('Mental Health Act 1990 (NSW)' before the 2007 Act)."""
+    source = citation.source
+    if not isinstance(source, LegislationSource) or source.kind not in ("act", "delegated"):
+        return None
+    year, jurisdiction = (source.year or "").strip(), (source.jurisdiction or "").strip()
+    entry = _index().get("legislation", {}).get(jurisdiction, {}).get(legislation_key(source.title or ""))
+    if not year or not entry or year in entry[1]:
+        return None
+    title, years = entry
+    return f"Legislation year: the {title} ({jurisdiction}) in force is from {' or '.join(years)}, not {year}"
+
+
+def legislation_key(title: str) -> str:
+    """'Railway Discontinuance Act (No. 2)' -> 'railway discontinuance act no 2', as
+    scripts/build_case_index.py keys the index."""
+    return " ".join(re.findall(r"[a-z0-9]+", title.lower().replace("&", " and ")))
+
+
+def search_url(name: str) -> str:
+    """A web search for a case on AustLII and Jade, for the student to check one the index
+    couldn't. Neither site's own search can be linked to: AustLII's turns away automated
+    checks of the link, and Jade's needs signing in."""
+    query = f'"{name}" site:austlii.edu.au OR site:jade.io'
+    return f"https://www.google.com/search?q={quote_plus(query)}"
 
 
 def check_citation(citation: Citation) -> CaseCheck | None:

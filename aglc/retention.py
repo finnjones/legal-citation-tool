@@ -34,6 +34,8 @@ from pathlib import Path
 
 from fastapi.concurrency import run_in_threadpool
 
+from . import reports
+
 log = logging.getLogger("aglc")
 
 DEFAULT_HOURS = 24.0
@@ -118,6 +120,7 @@ def _sweep_paid(sessions: Path, cutoff: datetime) -> int:
 def sweep_safely(temp_dir: Path | None) -> None:
     try:
         sweep(temp_dir)
+        reports.purge()  # problem reports have their own, longer window (aglc/reports.py)
     except Exception:  # never let the sweeper take the server down; try again next time
         log.exception("retention sweep failed")
 

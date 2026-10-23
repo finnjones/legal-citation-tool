@@ -9,6 +9,7 @@ and analytics are set in one place:
     {{base_url}}      $AGLC_PUBLIC_URL or the request's own origin (for Open Graph URLs)
     {{analytics}}     the Plausible script, only when $AGLC_PLAUSIBLE_DOMAIN is set
     {{retention_hours}} how long documents are kept: $AGLC_RETENTION_HOURS (aglc/retention.py)
+    {{report_days}}     how long problem reports are kept: $AGLC_REPORT_DAYS (aglc/reports.py)
     {{policy_date}}   POLICY_DATE below: when the policy pages last changed
     {{owner}} {{abn}} {{state}} {{contact}} {{owner_about}} {{log_retention}}
                       who runs the site, from $AGLC_OWNER_NAME, $AGLC_ABN, $AGLC_STATE,
@@ -37,13 +38,13 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
-from . import billing, guide_pdf, retention
+from . import billing, guide_pdf, reports, retention
 
 #: The product's name ("aforecited": cited above, which is what Ibid and (n x) do). Set here only.
 BRAND = "Aforecite"
 
 #: When the policy pages (privacy, terms, refunds) last changed: update it with them.
-POLICY_DATE = "18 October 2026"
+POLICY_DATE = "23 October 2026"
 
 #: Who runs the site: placeholder -> (environment variable, what to set)
 OWNER_SETTINGS = {
@@ -180,6 +181,7 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "base_url": escape(base_url(request)),
         "analytics": analytics_tag(),
         "retention_hours": f"{retention.retention_hours():g}",
+        "report_days": f"{reports.report_days():g}",
         "policy_date": POLICY_DATE,
         **{key: _setting(var, what) for key, (var, what) in OWNER_SETTINGS.items()},
         "owner_about": owner_about(),
