@@ -21,8 +21,9 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from lxml.etree import XMLSyntaxError
+from pydantic import BaseModel, Field
 
-from . import __version__, billing, guards, pipeline, retention, site
+from . import __version__, billing, guards, pipeline, reports, retention, site
 from .progress import Progress, jobs, safe
 from .docx_io import UnsafeDocxError
 from .llm.base import LLMError, available_providers, default_spec, get_provider
@@ -430,6 +431,28 @@ def _result_json(session_id: str, result: ProcessResult) -> dict:
         # "title", "citation", "url"}]} (aglc/verify.py)
         "case_check": result.case_check.model_dump(),
     }
+
+
+class ProblemReport(BaseModel):
+    footnote: int
+    comment: str | None = Field(default=None, max_length=reports.MAX_COMMENT)
+
+
+@app.post("/api/report/{session_id}")
+async def report_problem(session_id: str, report: ProblemReport) -> dict:
+    """Report a footnote the tool got wrong (aglc/reports.py). The report is built from the
+    result saved on the server; the page sends only the footnote's number and a comment."""
+    session_id = billing.check_session_id(session_id)
+    try:
+        await run_in_threadpool(reports.save, _sessions_dir() / session_id, session_id, report.footnote, report.comment)
+    except FileNotFoundError:
+        raise HTTPException(status_code=410, detail="This document has been deleted, so its footnotes can't be reported. "
+                                                    "Check it again to report a problem.") from None
+    except LookupError:
+        raise HTTPException(status_code=404, detail="That footnote isn't in this document.") from None
+    except reports.TooManyReports:
+        raise HTTPException(status_code=429, detail="This document has had as many reports as we can take. Thank you.") from None
+    return {"ok": True}
 
 
 @app.get("/api/download/{session_id}")

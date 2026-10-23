@@ -129,6 +129,29 @@ its initials ('ACCC'). Finding it counts the case as checked; not finding it doe
 it, since the Corpus lacks some of the most cited decisions (*Pape*, *Momcilovic*).
 The results page says how many of the document's cases were found, and marks each one
 found on its footnote with the court's own title and a link to the judgment on AustLII.
+A case it couldn't check is marked "Not checked", with a web search for it on AustLII and
+Jade (neither site's own search can be linked to: AustLII turns away automated checks of
+the link, and Jade's search needs signing in).
+
+### Acts with the wrong year
+
+The same index has the title and year of every Act and instrument in force in the
+Commonwealth, NSW, Queensland, WA, SA and Tasmania. An Act cited with a year that doesn't
+match is flagged with the right one ("the Evidence Act (Cth) in force is from 1995, not
+1993"), allowing for an earlier Act of the same name since repealed. An Act the index
+doesn't have (repealed, or Victorian, ACT or NT) is never flagged.
+
+### Problem reports
+
+Each footnote on the results page has a "Report a problem" link. The student can add a
+comment; the report is built from the result saved on the server (the footnote as
+written, the result, its notes, and what the AI model read) and kept in
+`$AGLC_DATA_DIR/reports` for `$AGLC_REPORT_DAYS` days (default 90), apart from the
+documents. Nothing else from the essay is kept. Read them with:
+
+```bash
+uv run aglc reports            # newest 20; --json for everything in each
+```
 
 ### Try it
 
@@ -260,6 +283,12 @@ Multipart form submission (e.g., from the web UI or `curl`).
 
 #### `GET /api/download/{session_id}`
 Download the processed `.docx` file from a session.
+
+#### `POST /api/report/{session_id}`
+Report a footnote the tool got wrong: JSON `{"footnote": 3, "comment": "optional, up to 1,000
+characters"}`. The report is built from the saved result (see "Problem reports" above).
+404 for a footnote the document doesn't have, 410 once the document has been deleted, 429
+after 20 reports on one document.
 
 ### Web UI
 

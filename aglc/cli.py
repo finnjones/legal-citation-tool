@@ -178,6 +178,32 @@ def format_json(
         raise typer.Exit(code=1)
 
 
+@app.command("reports")
+def list_reports(
+    limit: Annotated[int, typer.Option("--limit", "-n", help="How many, newest first")] = 20,
+    as_json: Annotated[bool, typer.Option("--json", help="Print the reports in full, as JSON")] = False,
+) -> None:
+    """List the problems students reported from the results page ($AGLC_DATA_DIR/reports)."""
+    from . import reports
+
+    found = reports.load(limit)
+    if as_json:
+        print(json.dumps(found, ensure_ascii=False, indent=2))
+        return
+    if not found:
+        rprint(f"No reports in {reports.reports_dir()}")
+        return
+    for r in found:
+        rprint(f"[bold]{r['created_at']}[/bold]  document {r['document']}, footnote {r['footnote']}  [dim]{r['file']}[/dim]")
+        if r.get("comment"):
+            rprint(f"  [italic]“{r['comment']}”[/italic]")
+        rprint(f"  As written: {r.get('original')}")
+        rprint(f"  Result:     {r.get('formatted')}")
+        for message in r.get("warnings", []):
+            rprint(f"  [yellow]Check:[/yellow] {message}")
+        rprint("")
+
+
 @app.command()
 def serve(
     host: Annotated[str, typer.Option("--host", help="Host to bind to")] = "127.0.0.1",

@@ -13,12 +13,21 @@ from .document import render_document
 from .docx_io import read_footnotes, write_document
 from .extract import Extractor
 from .llm.base import LLMProvider, get_provider
-from .models import CaseCheckSummary, CitationSegment, Extraction, Footnote, FoundCase, ProcessResult, Warning_
+from .models import (
+    CaseCheckSummary,
+    CitationSegment,
+    Extraction,
+    Footnote,
+    FoundCase,
+    ProcessResult,
+    UncheckedCase,
+    Warning_,
+)
 from .formatters import formatter_for
 from .normalise import normalise_citation, unify_source_keys
 from .progress import Progress, footnote_texts, found_in, safe
 from .validate import check_footnote_rendering
-from .verify import check_citation
+from .verify import check_citation, check_legislation, search_url
 
 log = logging.getLogger("aglc")
 
@@ -97,8 +106,9 @@ def _render(extraction: Extraction, *, bibliography: bool, progress: Progress | 
 
 
 def _check_cases(footnotes: list[Footnote]) -> tuple[CaseCheckSummary, list[Warning_]]:
-    """Check each case cited exists (offline index, aglc/verify.py). Each case counts once,
-    and a wrong one is flagged where it is first cited, not at every later reference."""
+    """Check each case cited exists, and each Act's year (offline index, aglc/verify.py).
+    Each source counts once, and a wrong one is flagged where it is first cited, not at
+    every later reference."""
     first: dict[str, tuple[int, CitationSegment]] = {}
     for fn in footnotes:
         for seg in fn.segments:
@@ -106,6 +116,8 @@ def _check_cases(footnotes: list[Footnote]) -> tuple[CaseCheckSummary, list[Warn
                 first.setdefault(seg.citation.source_key or f"{fn.number}:{id(seg)}", (fn.number, seg))
     summary, warnings = CaseCheckSummary(), []
     for number, seg in first.values():
+        if msg := check_legislation(seg.citation):
+            warnings.append(Warning_(footnote=number, message=msg))
         check = check_citation(seg.citation)
         if check is None:
             continue
@@ -117,6 +129,9 @@ def _check_cases(footnotes: list[Footnote]) -> tuple[CaseCheckSummary, list[Warn
         if check.found:
             found = check.found
             summary.found.append(FoundCase(footnote=number, title=found.title, citation=found.citation, url=found.url))
+        elif not check.checked:
+            name = seg.citation.source.name
+            summary.unchecked.append(UncheckedCase(footnote=number, name=name, search_url=search_url(name)))
     return summary, warnings
 
 
@@ -201,6 +216,7 @@ _WARNING_KINDS = (
     "unknown court identifier",
     "case not found",
     "case name mismatch",
+    "legislation year",
     "unknown jurisdiction",
     "missing year",
     "missing jurisdiction",

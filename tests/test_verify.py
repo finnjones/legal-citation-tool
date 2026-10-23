@@ -32,6 +32,11 @@ INDEX = {
         },
     },
     "unnumbered": {"HCA": {"?": ["Commissioner of Taxation (Cth) v Westfield Ltd"]}},
+    "legislation": {
+        "Cth": {"evidence act": ["Evidence Act", ["1995"]]},
+        "WA": {"railway discontinuance act no 2": ["Railway Discontinuance Act (No 2)", ["2006"]],
+               "road traffic act": ["Road Traffic Act", ["1974", "2008"]]},
+    },
 }
 
 
@@ -128,6 +133,13 @@ def test_reported_case_found_by_name_is_checked(name, year, found):
     assert V.check_citation(_reported(name, year)) == V.CaseCheck(True, found=found)
 
 
+def test_search_url_looks_for_the_exact_name_on_austlii_and_jade():
+    assert V.search_url("Pape v Federal Commissioner of Taxation") == (
+        "https://www.google.com/search?q=%22Pape+v+Federal+Commissioner+of+Taxation%22"
+        "+site%3Aaustlii.edu.au+OR+site%3Ajade.io"
+    )
+
+
 def test_found_decision_links_to_austlii():
     assert V.Decision("Muir v Open Brethren", "HCA", "1956", "14").url == \
         "https://www.austlii.edu.au/cgi-bin/viewdoc/au/cases/cth/HCA/1956/14.html"
@@ -216,7 +228,9 @@ def test_each_case_is_counted_and_flagged_once():
     footnotes = [Footnote(number=n, original=RichText.plain(t)) for n, t in texts.items()]
     result = pipeline.process_footnotes(footnotes, get_provider("fake:x", responses=[raw]), bibliography=False)
     assert [w.footnote for w in result.warnings if w.message.startswith("Case not found")] == [1]
-    expected = {"total": 2, "checked": 1, "flagged": 1, "found": []}
+    tame = V.search_url("Tame v New South Wales")
+    expected = {"total": 2, "checked": 1, "flagged": 1, "found": [],
+                "unchecked": [{"footnote": 3, "name": "Tame v New South Wales", "search_url": tame}]}
     assert result.case_check.model_dump() == expected
     assert api._result_json("s", result)["case_check"] == expected
 
@@ -233,3 +247,47 @@ def test_found_cases_are_listed_at_their_first_footnote():
         "footnote": 1, "title": "Muir v Open Brethren", "citation": "[1956] HCA 14",
         "url": "https://www.austlii.edu.au/cgi-bin/viewdoc/au/cases/cth/HCA/1956/14.html",
     }]
+
+
+# --------------------------------------------------------------------------- #
+# Acts' years
+# --------------------------------------------------------------------------- #
+
+
+def _act(title: str, year: str | None, jurisdiction: str | None, kind: str = "act") -> Citation:
+    return Citation(source=LegislationSource(title=title, year=year, jurisdiction=jurisdiction, kind=kind))
+
+
+def test_act_with_the_wrong_year_is_flagged():
+    assert V.check_legislation(_act("Evidence Act", "1993", "Cth")) == \
+        "Legislation year: the Evidence Act (Cth) in force is from 1995, not 1993"
+
+
+def test_every_year_an_act_of_that_title_has_is_named():
+    assert V.check_legislation(_act("Road Traffic Act", "1961", "WA")).endswith("in force is from 1974 or 2008, not 1961")
+
+
+@pytest.mark.parametrize("citation", [
+    _act("Evidence Act", "1995", "Cth"),                         # right
+    _act("Railway Discontinuance Act (No. 2)", "2006", "WA"),    # right, written differently
+    _act("Evidence Act", "2008", "Vic"),                          # a jurisdiction the index lacks
+    _act("Trade Practices Act", "1974", "Cth"),                   # not in force, so not in the index
+    _act("Evidence Act", None, "Cth"),                            # no year to check
+    _act("Evidence Act", "1993", "Cth", kind="bill"),             # bills aren't in the index
+])
+def test_acts_the_index_cant_fault_are_not_flagged(citation):
+    assert V.check_legislation(citation) is None
+
+
+def test_a_wrong_act_is_flagged_once_at_its_first_footnote():
+    act = {"type": "legislation", "title": "Evidence Act", "year": "1993", "jurisdiction": "Cth"}
+    texts = {1: "Evidence Act 1993 (Cth) s 55.", 2: "Evidence Act 1993 (Cth) s 56."}
+    raw = json.dumps({"footnotes": [
+        {"number": n, "segments": [{"kind": "citation", "original": t, "citation": {
+            "source": act, "pinpoints": [{"kind": "section", "value": t.split()[-1].rstrip(".")}]}}]}
+        for n, t in texts.items()
+    ]})
+    footnotes = [Footnote(number=n, original=RichText.plain(t)) for n, t in texts.items()]
+    result = pipeline.process_footnotes(footnotes, get_provider("fake:x", responses=[raw]), bibliography=False)
+    assert [w.footnote for w in result.warnings if w.message.startswith("Legislation year")] == [1]
+    assert pipeline.warning_kinds(result)["legislation year"] == 1
