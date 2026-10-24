@@ -18,6 +18,7 @@
       "abbrev": "NSWLR",
       "full_name": "New South Wales Law Reports",
       "year_style": "round",
+      "square_before": 1985,
       "authorised": true,
       "variants": ["N.S.W.L.R.", "NSWLR.", "New South Wales Law Reports"]
     },
@@ -25,6 +26,7 @@
       "abbrev": "VR",
       "full_name": "Victorian Reports",
       "year_style": "round",
+      "square_before": 2000,
       "authorised": true,
       "variants": ["V.R.", "VR.", "Victorian Reports"]
     },

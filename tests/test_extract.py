@@ -259,7 +259,7 @@ def test_ibid_resolves_source_from_immediately_preceding_footnote():
     assert seg2.citation.pinpoints[0].value == "45"
 
 
-def test_ibid_bare_has_no_new_pinpoint():
+def test_ibid_bare_takes_the_pinpoint_before_it():
     footnotes = [
         fn(1, "Mabo v Queensland [No 2] (1992) 175 CLR 1, 42."),
         fn(2, "Ibid."),
@@ -292,7 +292,8 @@ def test_ibid_bare_has_no_new_pinpoint():
     result = Extractor(provider, verify=False).extract(footnotes)
     seg2 = result[1].segments[0]
     assert seg2.citation.source.name == "Mabo v Queensland [No 2]"
-    assert seg2.citation.pinpoints == []
+    # r 1.4.3: a bare 'Ibid' means the same pinpoint, not the whole source
+    assert [p.value for p in seg2.citation.pinpoints] == ["42"]
 
 
 def test_n_x_reference_disambiguated_by_short_title():

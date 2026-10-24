@@ -78,6 +78,14 @@ def test_case_name_the_queen_untouched_as_respondent():
     assert c.source.name == "Honeysett v The Queen"
 
 
+@pytest.mark.parametrize("name", ["King v King", "Smith v King", "Jones v Queen", "Queen v Smith"])
+def test_case_name_party_named_king_or_queen_is_not_the_crown(name):
+    # A bare 'King' or 'Queen' is a surname: AGLC4 r 2.2.1 example 58 is '[1974] Qd R 253',
+    # which became 'R v The King'
+    c, _ = normalise_citation(make_citation(CaseSource(name=name, report="CLR")))
+    assert c.source.name == name
+
+
 def test_case_name_no_2_parens_to_brackets():
     c, _ = normalise_citation(make_citation(CaseSource(name="Mabo v Queensland (No. 2)", report="CLR")))
     assert c.source.name == "Mabo v Queensland [No 2]"
@@ -124,6 +132,18 @@ def test_report_vr_round_not_square():
     c, _ = normalise_citation(make_citation(CaseSource(name="A v B", report="V.R.")))
     assert c.source.report == "VR"
     assert c.source.year_style == "round"
+
+
+@pytest.mark.parametrize("report, year, style", [
+    # NSWLR volumes were organised by year to 1984, then numbered from 1985 (AGLC4 r 2.2.1
+    # examples '[1976] 2 NSWLR 72', '[1980] 2 NSWLR 398', '(1986) 6 NSWLR 534')
+    ("N.S.W.L.R.", "1976", "square"), ("NSWLR", "1984", "square"), ("NSWLR", "1985", "round"),
+    # VR volumes were organised by year to 1999, then numbered from 2000 ('(2002) 6 VR 317')
+    ("VR", "1999", "square"), ("V.R.", "2000", "round"),
+])
+def test_report_series_that_changed_to_numbered_volumes_uses_the_style_of_its_year(report, year, style):
+    c, _ = normalise_citation(make_citation(CaseSource(name="A v B", report=report, year=year, volume="2")))
+    assert c.source.year_style == style
 
 
 def test_report_qd_r_square():

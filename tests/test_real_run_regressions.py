@@ -692,6 +692,23 @@ def test_the_full_stop_before_commentary_is_kept():
     assert result.footnotes[0].formatted.text == text
 
 
+def test_bare_ibid_means_the_same_pinpoint_not_the_whole_source():
+    # A bare 'Ibid' after '..., 42' (AGLC4 r 1.4.3) came back from the model with no pinpoint,
+    # so the document pass read it as citing the whole case and wrote 'Mabo (n 1)'
+    mabo = {"type": "case", "name": "Mabo v Queensland [No 2]", "year": "1992", "volume": "175",
+            "report": "CLR", "starting_page": "1"}
+    result = _process([_rich(1, "*Mabo v Queensland [No 2]* (1992) 175 CLR 1, 42."), _rich(2, "Ibid."),
+                       _rich(3, "See ibid."), _rich(4, "Ibid 50.")], [
+        {"number": 1, "segments": [_cite("Mabo v Queensland [No 2] (1992) 175 CLR 1, 42", mabo,
+                                         pinpoints=[{"kind": "page", "value": "42"}]), _DOT]},
+        {"number": 2, "segments": [_cite("Ibid", {"type": "other", "text": "Ibid"}, 1), _DOT]},
+        {"number": 3, "segments": [_cite("ibid", {"type": "other", "text": "ibid"}, 2, signal="See"), _DOT]},
+        {"number": 4, "segments": [_cite("Ibid 50", {"type": "other", "text": "Ibid 50"}, 3,
+                                         pinpoints=[{"kind": "page", "value": "50"}]), _DOT]},
+    ])
+    assert [f.formatted.text for f in result.footnotes[1:]] == ["Ibid.", "See ibid.", "Ibid 50."]
+
+
 def test_ibid_keeps_the_judge_when_there_is_no_pinpoint():
     result = _process([_rich(1, "*Mabo v Queensland [No 2]* (1992) 175 CLR 1."), _rich(2, "Ibid (Brennan J).")], [
         {"number": 1, "segments": [_mabo(), _DOT]},
