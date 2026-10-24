@@ -900,13 +900,13 @@ class Extractor:
 
     def _ibid_target(
         self, footnote_number: int, seg: LLMCitationSegment, resolved: dict[int, Footnote], earlier: list[Citation]
-    ) -> tuple[tuple[Source, str | None] | None, int]:
+    ) -> tuple[Citation | None, int]:
         """r 1.4.3: 'Ibid' means the citation immediately before it: the one before it in its
         own footnote, or the sole citation of the footnote before, whatever footnote the model
         named. Otherwise no match, and the footnote for the ordinary lookup to search (with a
         warning, as the reading can't be checked)."""
         if earlier:
-            return (earlier[-1].source, earlier[-1].short_title), footnote_number
+            return earlier[-1], footnote_number
         previous = footnote_number - 1
         prev_fn = resolved.get(previous)
         cites = [s.citation for s in prev_fn.segments if isinstance(s, CitationSegment)] if prev_fn else []
@@ -916,7 +916,7 @@ class Extractor:
                     f"footnote {footnote_number}: 'Ibid' points to footnote {previous}, the one before it, "
                     f"not footnote {seg.refers_to_footnote} as the extraction read it"
                 )
-            return (cites[0].source, cites[0].short_title), previous
+            return cites[0], previous
         if cites:
             self.warnings.append(
                 f"footnote {footnote_number}: 'Ibid' follows a footnote citing {len(cites)} sources, so "
@@ -961,11 +961,16 @@ class Extractor:
             return citation
         ref = seg.refers_to_footnote
         if _IBID.match(seg.original):
-            ibid, ref = self._ibid_target(footnote_number, seg, resolved, earlier)
-            if ibid is not None:
-                source, short_title = ibid
-                return _keep_only_real_short_title(citation.model_copy(
-                    update={"source": source, "short_title": citation.short_title or short_title}))
+            target, ref = self._ibid_target(footnote_number, seg, resolved, earlier)
+            if target is not None:
+                update = {"source": target.source, "short_title": citation.short_title or target.short_title}
+                if not citation.pinpoints:
+                    # r 1.4.3: a bare 'Ibid' means the same pinpoint as the citation before it
+                    # (the model is told to leave its pinpoints empty), not the whole source
+                    update["pinpoints"] = target.pinpoints
+                    if not citation.pinpoint_judges:
+                        update["pinpoint_judges"] = target.pinpoint_judges
+                return _keep_only_real_short_title(citation.model_copy(update=update))
         if not citation.short_title:
             # The author's own short title is right there in the text of the subsequent
             # reference ("Adoption Act (n 2) s 24", "Maynard, above n 1"); read it rather

@@ -17,6 +17,7 @@ import pytest
 
 from aglc.formatters.base import formatter_for
 from aglc.models import Citation
+from aglc.normalise import normalise_citation
 
 EXAMPLES_DIR = Path(__file__).parent / "aglc4_examples"
 
@@ -50,4 +51,16 @@ def test_golden_example(entry: dict) -> None:
     assert actual == entry["expected_full"], (
         f"AGLC4 r {entry['rule']} (guide p {entry['page']}, {entry['_file']}#{entry['id']}): "
         f"expected {entry['expected_full']!r}, got {actual!r}"
+    )
+
+
+@pytest.mark.parametrize("entry", EXAMPLES, ids=_id)
+def test_golden_example_survives_normalisation(entry: dict) -> None:
+    """The pipeline normalises every citation before formatting it, so a correct citation
+    must come through normalisation unchanged ('King v King' became 'R v The King')."""
+    citation, _ = normalise_citation(Citation.model_validate(entry["citation"]))
+    actual = formatter_for(citation).full(citation).to_markup()
+    assert actual == entry["expected_full"], (
+        f"AGLC4 r {entry['rule']} (guide p {entry['page']}, {entry['_file']}#{entry['id']}): "
+        f"expected {entry['expected_full']!r}, got {actual!r} after normalisation"
     )

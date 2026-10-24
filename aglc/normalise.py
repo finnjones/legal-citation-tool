@@ -214,8 +214,9 @@ _ABBREV_STOPS = re.compile(
 )
 _V_PATTERN = re.compile(r"\s+(?:vs\.?|V\.?)\s+", re.IGNORECASE)
 _NO_PATTERN = re.compile(r"[\(\[]?\s*No\.?\s*(\d+(?:\s*(?:,|and)\s*\d+)*)\s*[\)\]]?\s*$", re.IGNORECASE)
-_CROWN_QUEEN = {"the queen", "regina", "queen"}
-_CROWN_KING = {"the king", "rex", "king"}
+# Not a bare 'King' or 'Queen': that is a party's surname ('King v King' [1974] Qd R 253)
+_CROWN_QUEEN = {"the queen", "regina"}
+_CROWN_KING = {"the king", "rex"}
 
 
 def _clean_case_name(name: str) -> str:
@@ -307,11 +308,18 @@ def _clean_pinpoint(p: Pinpoint, last: bool = True) -> Pinpoint:
 # --------------------------------------------------------------------------- #
 
 
-def _canon_report(report: str) -> tuple[str | None, str | None, bool]:
-    """Returns (canonical abbrev, year_style, matched)."""
+def _canon_report(report: str, year: str | None = None) -> tuple[str | None, str | None, bool]:
+    """Returns (canonical abbrev, year_style, matched). A series that changed from volumes
+    organised by year to numbered volumes has `square_before`, the first year of the
+    numbered volumes (r 2.2.1: use the system of the volume cited): NSWLR from 1985, VR
+    from 2000."""
     entry = _report_series_index().get(_norm_key(report))
     if entry:
-        return entry["abbrev"], entry.get("year_style"), True
+        style = entry.get("year_style")
+        first = re.match(r"\d{4}", year or "")
+        if entry.get("square_before") and first and int(first[0]) < entry["square_before"]:
+            style = "square"
+        return entry["abbrev"], style, True
     return None, None, False
 
 
@@ -371,7 +379,7 @@ def _normalise_case(source: CaseSource) -> tuple[CaseSource, list[str]]:
         data["court_name"] = None if us == "supreme_court" or not court else re.sub(r"(?<=[A-Za-z])\.", "", court)
         data["court_id"] = None
     if source.report:
-        abbrev, year_style, matched = _canon_report(source.report)
+        abbrev, year_style, matched = _canon_report(source.report, data.get("year"))
         if matched:
             data["report"] = abbrev
             data["year_style"] = year_style
