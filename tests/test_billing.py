@@ -111,18 +111,18 @@ def test_process_returns_locked_preview(paid, client):
 
     full = json.loads((billing.sessions_dir() / data["id"] / "result.json").read_text())
     changed = [f for f in full["footnotes"] if f["changed"]]
-    assert len(changed) > billing.PREVIEW_FULL  # the fixture is a meaningful test
+    assert len(changed) == 10  # the fixture is a meaningful test
 
-    # Every footnote is listed (for its stamp); only the first 3 changed ones in full.
+    # Every footnote is listed (for its stamp); only the first changed one in full (10% of 10).
     assert [f["number"] for f in data["footnotes"]] == [f["number"] for f in full["footnotes"]]
     shown = [f for f in data["footnotes"] if f["changed"] and not f.get("locked")]
-    assert [f["number"] for f in shown] == [f["number"] for f in changed[:3]]
+    assert [f["number"] for f in shown] == [f["number"] for f in changed[:1]]
     by_number = {f["number"]: f for f in full["footnotes"]}
     for f in data["footnotes"]:
         if f.get("locked"):  # the student's original is shown, never the result
             assert set(f) == {"number", "changed", "locked", "original", "original_html"}
             assert f["original_html"] == by_number[f["number"]]["original_html"]
-    assert data["locked_count"] == len(changed) - 3
+    assert (data["changed_count"], data["preview_count"], data["locked_count"]) == (10, 1, 9)
     # All warnings; the bibliography is withheld but counted.
     assert data["warnings"] == full["warnings"]
     assert data["bibliography"] == [] and data["bibliography_entries"] > 0

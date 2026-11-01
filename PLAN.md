@@ -46,8 +46,9 @@ aglc/llm/providers/
 ## Paid hosting (optional)
 
 Off unless `AGLC_PAYMENTS` is set, so local use is unchanged. With it on, `/api/process`
-returns a redacted preview (`locked: true`: every stamp, all warnings, the first 3 changed
-footnotes in full) and keeps the full result server-side; paying unlocks it: A$5 for an
+returns a redacted preview (`locked: true`: every original and stamp, all warnings, the
+number of corrections, and the first 1 to 3 changed footnotes in full: a tenth of them,
+rounded up; see docs/paywall-audit.md) and keeps the full result server-side; paying unlocks it: A$5 for an
 essay (up to 150 footnotes), A$9 for a long document (151 to 400), or credits from a pack
 (A$12 for 3, A$35 for 10; an essay takes 1 credit, a long document 2).
 

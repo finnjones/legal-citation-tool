@@ -10,7 +10,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 <head>
     {{> head}}
     <title>AGLC4 Footnote Generator &amp; Citation Checker for Word | {{brand}}</title>
-    <meta name="description" content="AGLC4 referencing generator for your Word essay: every footnote is fixed to AGLC4, with Ibid, (n x), short titles and an optional bibliography, returned as Word tracked changes. {{price}} per essay, {{price_long}} for a long document, or credit packs; a free preview first.">
+    <meta name="description" content="AGLC4 referencing generator for your Word essay: every footnote is fixed to AGLC4, with Ibid, (n x), short titles and an optional bibliography, returned as Word tracked changes. Free preview of up to {{preview_full}} fixes, then {{price}} per essay ({{price_long}} for a long document) or credit packs.">
     <link rel="canonical" href="{{base_url}}/">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{brand}}">
@@ -414,6 +414,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .bib-entry { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.6; padding-left: 2em; text-indent: -2em; max-width: 75ch; }
         .bib-entry + .bib-entry { margin-top: 8px; }
         .bibliography .placeholder { color: var(--muted); font-size: 0.9375rem; }
+        .fixes .placeholder { color: var(--muted); font-size: 0.9375rem; padding: 16px 20px; }
 
         .paybar {
             position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
@@ -652,7 +653,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <p class="price">{{price}} <span>per essay</span></p>
                             <p class="sub">Up to {{essay_max}} footnotes. A longer document (up to {{max_footnotes}}) is {{price_long}}. No account, no subscription.</p>
                             <ul>
-                                <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Free first: every footnote's status, every Check item, how many corrections were found, and the first {{preview_full}} in full.</span></li>
+                                <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Free first: every footnote's status, every Check item, how many corrections were found, and a few in full (one for every ten, up to {{preview_full}}).</span></li>
                                 <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Pay once to unlock every correction, the bibliography and the .docx with tracked changes. The price is set by how many footnotes your document has.</span></li>
                                 <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>If the AI model can't read more than a few of your footnotes, you aren't asked to pay until it has. Re-reading them is free.</span></li>
                             </ul>
@@ -1382,7 +1383,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             document.querySelectorAll(".filter").forEach(btn => {
                 btn.disabled = btn.dataset.filter !== "all" && counts[btn.dataset.filter] === 0;
             });
-            const bodyFixed = (data.body_fixes || []).filter(b => b.applied !== false).length;
+            const bodyFixed = (data.body_fixes || []).filter(b => b.applied !== false).length + (data.body_fixes_locked || 0);
             document.getElementById("summary").innerHTML =
                 `${plural(entries.length, "footnote")} · ${counts.amended} amended · ${counts.check} to check · ${counts.unchanged} unchanged`
                 + (bodyFixed ? ` · <a href="#bodyWrap">${plural(bodyFixed, "fix", "fixes")} in the body text</a>` : "");
@@ -1410,7 +1411,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 : ["", `Couldn't check your ${total === 1 ? "case" : "cases"}`];
             const text = [
                 flagged ? `${flagged === 1 ? "Its footnote is" : "Their footnotes are"} marked Check, saying why.` : "",
-                found ? "Found cases are marked on their footnotes, with a link to read the judgment on AustLII." : "",
+                found ? "Found cases are marked on their footnotes, with a link to read the judgment on AustLII"
+                    + (check.found_locked ? " (on locked footnotes, once you unlock)." : ".") : "",
                 others ? `${others === total ? (total === 1 ? "It wasn't checked" : "None were checked") : others === 1 ? "One wasn't checked" : `${others} weren't checked`}: `
                     + "only High Court, Federal Court and NSW cases can be, and a few of their decisions aren't in our list. "
                     + `${others === 1 ? "Its footnote has" : "Their footnotes have"} a link to search for ${others === 1 ? "it" : "them"} on AustLII and Jade.` : "",
@@ -1448,9 +1450,11 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
             const locked = Boolean(data.locked);
             const bib = data.bibliography_entries;
-            setBanner("preview", locked && data.payable !== false ? banner("", "Free preview",
+            const found = data.changed_count ?? data.footnotes.filter(f => f.changed).length;
+            setBanner("preview", locked && data.payable !== false ? banner("", `Free preview: ${plural(found, "correction")} found`,
                 `Every footnote's status and every Check item is shown. `
-                + (data.locked_count ? `The first ${config.preview_footnotes ?? 3} corrections are in full; the other ${data.locked_count} show your original with the result hidden. ` : "Every correction is shown in full. ")
+                + (data.locked_count ? `${data.preview_count === 1 ? "The first correction is" : `The first ${data.preview_count} corrections are`} in full; the other ${data.locked_count} show your original with the result hidden. ` : "Every correction is shown in full. ")
+                + (data.body_fixes_locked ? `${plural(data.body_fixes_locked, "fix", "fixes")} to the body text ${data.body_fixes_locked === 1 ? "unlocks" : "unlock"} with them. ` : "")
                 + (bib ? `The bibliography (${plural(bib, "entry", "entries")}) unlocks with them. ` : "")
                 + `Unlock to see everything and download the .docx.`) : "");
 
@@ -1701,7 +1705,13 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         function renderBodyFixes(data) {
             const fixes = (data.body_fixes || []).filter(b => b.applied !== false);
             const wrap = document.getElementById("bodyWrap");
-            wrap.hidden = !fixes.length;
+            const lockedFixes = data.locked ? data.body_fixes_locked || 0 : 0;
+            wrap.hidden = !fixes.length && !lockedFixes;
+            if (lockedFixes) {
+                document.getElementById("bodyLede").textContent = "";
+                document.getElementById("bodyOut").innerHTML = `<p class="placeholder">${plural(lockedFixes, "change", "changes")} to the text of your essay, outside the footnotes, unlocked with the full results.</p>`;
+                return;
+            }
             if (!fixes.length) return;
             const groups = new Map();
             for (const fix of fixes) {
@@ -1796,7 +1806,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 button.textContent = left ? "Try again (free)" : "Check another document";
                 button.dataset.action = left ? "rerun" : "home";
             } else {
-                const total = entries.filter(e => e.changed).length;
+                const total = data.changed_count ?? entries.filter(e => e.changed).length;
                 const shown = total - (data.locked_count || 0);
                 text.innerHTML = `Free preview: <strong>${shown} of ${plural(total, "correction")}</strong> shown.`;
                 const price = data.price?.display || config.price?.display;

@@ -1,10 +1,12 @@
 """Pay per document, or with credits. Off unless $AGLC_PAYMENTS names a provider (`square`,
 `stripe`, or `fake`).
 
-When it is on, processing is free but returns a redacted preview: every footnote's
-stamp, all warnings, and only the first PREVIEW_FULL changed footnotes in full. The full
-result is kept server-side; paying for the document (v1: the processing session id is
-the entitlement) unlocks it and the .docx download.
+When it is on, processing is free but returns a redacted preview (see `preview`): every
+footnote's original and stamp, all warnings, how many corrections were found, and only the
+first `preview_size` changed footnotes in full (a tenth of them, 1 to PREVIEW_FULL). The
+full result is kept server-side; paying for the document (v1: the processing session id is
+the entitlement) unlocks it and the .docx download. docs/paywall-audit.md lists every path
+checked for leaks.
 
 What can be bought is in PRODUCTS (prices live there only): a document is an `essay` (up to
 ESSAY_MAX_FOOTNOTES footnotes) or a `long` document (up to $AGLC_MAX_FOOTNOTES), chosen
@@ -39,6 +41,7 @@ import hashlib
 import ipaddress
 import json
 import logging
+import math
 import os
 import re
 import secrets
@@ -85,7 +88,9 @@ ESSAY_MAX_FOOTNOTES = 150  # an essay up to this many footnotes; a long document
 TIER_CREDITS = {"essay": 1, "long": 2}  # credits a document of each tier takes
 PACK_CREDITS = {"pack3": 3, "pack10": 10}
 
-PREVIEW_FULL = 3  # changed footnotes shown in full before paying
+PREVIEW_FULL = 3  # at most this many changed footnotes are shown in full before paying,
+PREVIEW_SHARE = 0.10  # ... a tenth of them, rounded up,
+PREVIEW_MIN = 1  # ... and at least this many (see preview_size)
 MAX_RERUNS = 2  # free re-runs of failed footnotes per document
 ANON_COOKIE = "aglc_anon"
 _REFUND_OUTCOMES = {"duplicate_payment", "files_missing"}
@@ -369,27 +374,49 @@ def claim_rerun(session_id: str) -> None:
         raise HTTPException(429, f"This document has had its {MAX_RERUNS} free re-reads. Please check it again later.")
 
 
+def preview_size(changed: int) -> int:
+    """How many changed footnotes a preview shows in full: a tenth of them rounded up, at
+    least PREVIEW_MIN and at most PREVIEW_FULL, so a short essay can't be fixed whole for free."""
+    return min(PREVIEW_FULL, max(PREVIEW_MIN, math.ceil(round(PREVIEW_SHARE * changed, 9))))
+
+
 def preview(full: dict) -> dict:
-    """Every footnote's status and all warnings; only the first PREVIEW_FULL changed
-    footnotes in full. Unchanged footnotes, and the original of a locked one, are the
-    student's own text, so they are shown; a locked footnote's result is not."""
+    """What an unpaid page may see. Every footnote's original text and status, all warnings
+    (they describe problems, never the corrected citation), how many corrections there are,
+    and the corrected text of only the first `preview_size` changed footnotes: always the
+    same ones for the same document. Withheld until paid for: every other correction (with
+    its explanation), the bibliography's entries (counted), the body-text fixes that were
+    made (counted; the checks left for the student are shown, like warnings), and the cases
+    found or not checked on the footnotes that are locked (counted). No .docx."""
     tier = tier_for(len(full["footnotes"]))
-    footnotes, shown, locked = [], 0, 0
+    changed = [fn["number"] for fn in full["footnotes"] if fn["changed"]]
+    shown = set(changed[:preview_size(len(changed))])
+    footnotes = []
     for fn in full["footnotes"]:
-        if not fn["changed"] or shown < PREVIEW_FULL:
-            shown += fn["changed"]
-            footnotes.append(fn)
-        else:
-            locked += 1
+        if fn["changed"] and fn["number"] not in shown:
             footnotes.append({"number": fn["number"], "changed": True, "locked": True,
                               "original": fn["original"], "original_html": fn["original_html"]})
+        else:
+            footnotes.append(fn)
+    visible = {fn["number"] for fn in footnotes if not fn.get("locked")}
+    check = dict(full.get("case_check") or {})
+    for key in ("found", "unchecked"):
+        entries = check.get(key) or []
+        check[key] = [e for e in entries if e["footnote"] in visible]
+        check[f"{key}_locked"] = len(entries) - len(check[key])
+    body_fixes = full.get("body_fixes") or []
     return {
         **full,
         "footnotes": footnotes,
         "bibliography": [],
         "bibliography_entries": sum(len(s["entries"]) for s in full["bibliography"]),
+        "body_fixes": [b for b in body_fixes if b.get("applied") is False],
+        "body_fixes_locked": sum(1 for b in body_fixes if b.get("applied") is not False),
+        "case_check": check,
         "locked": True,
-        "locked_count": locked,
+        "changed_count": len(changed),
+        "preview_count": len(shown),
+        "locked_count": len(changed) - len(shown),
         "tier": tier,
         "credits_needed": TIER_CREDITS[tier],
         "price": _price(tier),
@@ -694,7 +721,8 @@ async def get_config() -> dict:
         "prices": prices(),  # every product: the page renders prices from these, never its own
         "essay_max_footnotes": ESSAY_MAX_FOOTNOTES,
         "max_footnotes": max_footnotes(),
-        "preview_footnotes": PREVIEW_FULL,
+        "preview_footnotes": PREVIEW_FULL,  # the most a preview shows in full (preview_size)
+        "preview_share": PREVIEW_SHARE,
         "email_codes": mailer.enabled(),  # whether a pack's code is also emailed
     }
 
