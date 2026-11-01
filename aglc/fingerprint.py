@@ -78,6 +78,32 @@ def matches(new, earlier, share: float) -> bool:
     return share > 0 and found >= MIN_MATCHES and fraction >= share
 
 
+def footnote_hash(text: str, key: str) -> str | None:
+    """One footnote's hash, or None if it doesn't count for matching."""
+    normalised = normalise(text)
+    return _mac(key, normalised) if counts(normalised) else None
+
+
+NEW_SHARE = 0.5  # a revision may add at most this share of the paid document's footnotes
+
+
+def is_revision(new, paid: list[list[str]], share: float) -> bool:
+    """Whether an upload (its counted hashes) is a revision of a paid document, given as one
+    group of hashes per counted footnote (as written, and as corrected). Both ways round, so
+    a few of its footnotes can't stand in for the essay, nor the essay for a new one:
+    - at least `share` of the upload's footnotes, and MIN_MATCHES, are the paid document's;
+    - at least `share` of the paid document's footnotes are in the upload;
+    - it adds no more than NEW_SHARE as many new footnotes as the paid document had."""
+    new, groups = set(new), [set(g) for g in paid if g]
+    if share <= 0 or not new or not groups:
+        return False
+    known = set().union(*groups)
+    found = len(new & known)
+    present = sum(1 for g in groups if g & new)
+    return (found >= MIN_MATCHES and found / len(new) >= share and present / len(groups) >= share
+            and len(new) - found <= NEW_SHARE * len(groups))
+
+
 def _float_env(name: str, default: float) -> float:
     try:
         return float(os.environ.get(name) or default)

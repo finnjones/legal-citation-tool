@@ -526,22 +526,35 @@ def _active(ent: sqlite3.Row | None) -> bool:
     return ent is not None and not ent["revoked_at"] and ent["expires_at"] > now()
 
 
-def _session_hashes(session_id: str, key: str) -> set[str]:
-    """A document's footnote hashes, as written and (if its result is still kept) as
-    corrected, so a revision with the corrections accepted is still recognised."""
-    store = get_store()
-    hashes = set(store.fingerprint(session_id) or ())
-    d = _session_dir(session_id)
-    if not hashes and (d / "input.docx").is_file():  # paid for before fingerprints were kept
-        try:
-            hashes = set(fingerprint.compute([fn.original.text for fn in read_footnotes(d / "input.docx")], key).hashes)
-        except Exception:  # noqa: BLE001 - an old upload that can't be read just isn't recognised
-            log.warning("couldn't fingerprint the earlier upload of %s", session_id[:8])
+def _paid_groups(session_id: str, key: str) -> tuple[list[list[str]], bool] | None:
+    """The paid document's fingerprint: for each counted footnote, its hash as written and
+    (when the result is kept) as corrected, so a revision with the corrections accepted is
+    still recognised. With whether it came from the full result. None if nothing is left."""
     full = _load_result(session_id)
     if full:
-        corrected = [_plain(fn.get("formatted_html", "")) for fn in full["footnotes"] if fn.get("changed")]
-        hashes |= set(fingerprint.compute(corrected, key).hashes)
-    return hashes
+        groups = []
+        for fn in full["footnotes"]:
+            forms = [_plain(fn.get("original_html", ""))] + ([_plain(fn.get("formatted_html", ""))] if fn.get("changed") else [])
+            group = list(dict.fromkeys(h for h in (fingerprint.footnote_hash(t, key) for t in forms) if h))
+            if group:
+                groups.append(group)
+        return groups, True
+    d = _session_dir(session_id)
+    if (d / "input.docx").is_file():  # a seen document not yet run, or paid for before fingerprints
+        try:
+            texts = [fn.original.text for fn in read_footnotes(d / "input.docx")]
+            return [[h] for h in (fingerprint.footnote_hash(t, key) for t in texts) if h], False
+        except Exception:  # noqa: BLE001 - an old upload that can't be read just isn't recognised
+            log.warning("couldn't fingerprint the earlier upload of %s", session_id[:8])
+    hashes = get_store().fingerprint(session_id)
+    return ([[h] for h in hashes], False) if hashes else None
+
+
+def _groups(stored: str | None) -> list[list[str]]:
+    """An entitlement's stored fingerprint as groups (a flat list is one hash per footnote)."""
+    if not stored:
+        return []
+    return [g if isinstance(g, list) else [g] for g in json.loads(stored)]
 
 
 def _plain(html: str) -> str:
@@ -551,22 +564,21 @@ def _plain(html: str) -> str:
 
 
 def refresh_entitlement(ent_id: str | None, session_id: str) -> None:
-    """Add `session_id`'s footnotes (the paid document, or a re-scan of it) to the
-    entitlement's fingerprint, while its files are still kept."""
+    """Record the paid document's fingerprint on its entitlement, while its files are kept:
+    from its full result once there is one (a seen document's paid run adds the corrected
+    forms). Only the paid document itself: a re-scan never widens what later re-scans are
+    measured against, so an entitlement can't drift to cover other essays."""
     if not ent_id:
         return
-    key = get_store().secret("fingerprint_key")
-    hashes = _session_hashes(session_id, key)
-    if not hashes:
-        return
-    with get_store().transaction() as conn:
+    with get_store().read() as conn:
         ent = _entitlement(conn, ent_id)
-        if ent is None:
-            return
-        known = set(json.loads(ent["fingerprint"])) if ent["fingerprint"] else set()
-        if not hashes <= known:
-            conn.execute("UPDATE entitlements SET fingerprint = ? WHERE id = ?",
-                         (json.dumps(sorted(known | hashes)), ent_id))
+    if ent is None or ent["session_id"] != session_id or ent["revoked_at"]:
+        return
+    found = _paid_groups(session_id, get_store().secret("fingerprint_key"))
+    if not found or (ent["fingerprint"] and not found[1]):
+        return  # nothing better than what is stored
+    with get_store().transaction() as conn:
+        conn.execute("UPDATE entitlements SET fingerprint = ? WHERE id = ?", (json.dumps(found[0]), ent_id))
 
 
 def rescan_info(ent: sqlite3.Row | None) -> dict | None:
@@ -622,10 +634,12 @@ def rescan_candidates(tokens: list[str] | None) -> list[sqlite3.Row]:
 
 
 def choose_rescan(candidates: list[sqlite3.Row], fp: fingerprint.Fingerprint, footnote_count: int) -> Rescan:
-    """The entitlement whose paid document this upload is a revision of, if any: at least
-    AGLC_RESCAN_OVERLAP of its counted footnotes (and 5) in the paid document as written or
-    corrected (the same containment rule as the seen check). An essay-tier entitlement
-    doesn't cover a version that has grown into a long document: that is a new purchase."""
+    """The entitlement whose paid document this upload is a revision of, if any
+    (fingerprint.is_revision, with AGLC_RESCAN_OVERLAP): at least that share of the upload's
+    counted footnotes (and 5) are the paid document's as written or corrected, at least that
+    share of the paid document's are in the upload, and it adds no more new footnotes than
+    half the paid document's. An essay-tier entitlement doesn't cover a version that has
+    grown into a long document: that is a new purchase."""
     note = None
     for ent in candidates:
         if not _active(ent) or ent["rescans_remaining"] <= 0:
@@ -636,8 +650,7 @@ def choose_rescan(candidates: list[sqlite3.Row], fp: fingerprint.Fingerprint, fo
             refresh_entitlement(ent["id"], ent["session_id"])
             with get_store().read() as conn:
                 ent = _entitlement(conn, ent["id"])
-        known = json.loads(ent["fingerprint"]) if ent["fingerprint"] else []
-        if not fingerprint.matches(fp.hashes, known, rescan_overlap()):
+        if not fingerprint.is_revision(fp.hashes, _groups(ent["fingerprint"]), rescan_overlap()):
             note = note or ("This looks like a different essay from the one you paid for, so it isn't a free "
                             "re-scan. Here is its free preview.")
             continue

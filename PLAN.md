@@ -75,8 +75,10 @@ aglc/mailer.py            email (off unless RESEND_API_KEY + AGLC_EMAIL_FROM): a
 - Paying (card or credits) creates an entitlement (`entitlements`, migration 6; documents paid
   for earlier were given one): the paid document, its tier, its fingerprint as written and as
   corrected, a hashed re-scan token and 3 free re-scans for 14 days (`FREE_RESCANS`,
-  `RESCAN_DAYS`). An upload carrying the token that is mostly the same essay
-  (`AGLC_RESCAN_OVERLAP`, default 0.5, at least 5 footnotes) is checked in full, unlocked, and
+  `RESCAN_DAYS`). An upload carrying the token that is a revision of the paid document, both
+  ways round (`AGLC_RESCAN_OVERLAP`, default 0.5, of the upload's and of the paid document's
+  footnotes, at least 5, and no more new footnotes than half the paid document's; measured
+  against the paid document only, never a re-scan) is checked in full, unlocked, and
   the re-scan count drops in the same transaction; an essay-tier entitlement doesn't cover a
   version grown past 150 footnotes. Separate from `MAX_RERUNS`.
 - A pack's webhook makes a random code, stores only its hash with the credits, and holds the

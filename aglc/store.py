@@ -186,7 +186,7 @@ MIGRATIONS: list[str] = [
         session_id         TEXT NOT NULL UNIQUE REFERENCES documents(session_id),
         tier               TEXT NOT NULL,          -- essay | long
         source             TEXT NOT NULL,          -- the order id, or credit:<code id>
-        fingerprint        TEXT,                   -- JSON list of hashes: the paid document as written and as corrected
+        fingerprint        TEXT,                   -- JSON: per paid footnote, its hashes as written and as corrected
         token_hash         TEXT UNIQUE,            -- the re-scan token's SHA-256, NULL until one is made
         rescans_remaining  INTEGER NOT NULL CHECK (rescans_remaining >= 0),
         paid_at            TEXT NOT NULL,

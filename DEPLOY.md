@@ -222,8 +222,13 @@ token are made the first time they are needed), so existing paid links keep work
   localStorage and offers a copyable link (`/#rescan=<token>`: in the fragment, so it never
   reaches the server's access log). Asking again makes a new token and the old one stops
   working; whoever has the results link already has the document.
-- An upload sent with the token, mostly the same essay (`AGLC_RESCAN_OVERLAP`, default 0.5 of
-  its distinctive footnotes, at least 5) and within the tier, is processed in full and
+- An upload sent with the token that is a revision of the paid document, measured both ways
+  (`fingerprint.is_revision`): at least `AGLC_RESCAN_OVERLAP` (default 0.5) of the upload's
+  distinctive footnotes, and at least 5, are the paid document's (as written or as
+  corrected); at least that share of the paid document's footnotes are in the upload; and
+  it adds no more new footnotes than half as many as the paid document had. It is measured
+  against the paid document only: a re-scan never widens the entitlement's fingerprint, so
+  re-scans can't drift to a different essay. Within the tier, it is processed in full and
   unlocked; the re-scan count is decremented in the same transaction that records it. It
   isn't held to the free limits. A different essay, an expired or used-up token, or an
   essay-tier entitlement and a version grown past 150 footnotes: the upload is treated as a

@@ -55,8 +55,9 @@ def test_paying_creates_an_entitlement_with_the_documents_fingerprint(paid, clie
     assert (ent["tier"], ent["rescans_remaining"], ent["source"]) == ("essay", 3, get_store().orders_for(sid)[0]["id"])
     paid_at = datetime.fromisoformat(ent["paid_at"])
     assert datetime.fromisoformat(ent["expires_at"]) - paid_at == timedelta(days=billing.RESCAN_DAYS)
-    hashes = set(json.loads(ent["fingerprint"]))
-    assert set(get_store().fingerprint(sid)) < hashes  # as written, and as corrected
+    groups = json.loads(ent["fingerprint"])  # one group per counted footnote: as written, as corrected
+    assert len(groups) == 8 and sum(len(g) == 2 for g in groups) >= 5  # most read differently once corrected
+    assert set(get_store().fingerprint(sid)) == {g[0] for g in groups}
     assert get_store().document(sid)["entitlement_id"] == ent["id"] and ent["token_hash"] is None
     info = client.get(f"/api/results/{sid}").json()["rescan"]
     assert info == {"remaining": 3, "total": 3, "expires_at": ent["expires_at"], "tier": "essay", "active": True,
@@ -167,7 +168,10 @@ def test_a_revision_with_the_corrections_accepted_is_still_recognised(paid, clie
 
 
 @pytest.mark.parametrize("paid_footnotes,new_footnotes,rescanned", [
-    (5, 5, True),  # 50%: enough
+    (8, 4, True),  # all the paid footnotes, and 4 new ones (half as many as the paid document had)
+    (6, 4, True),  # 6 of 8 paid footnotes, 60% of the upload
+    (8, 5, False),  # too many new footnotes: more than half the paid document's 8
+    (5, 5, False),  # 50% of the upload is the paid essay, but 5 new footnotes is too many
     (5, 6, False),  # 45%
     (4, 0, False),  # 100%, but fewer than 5 footnotes in common
 ])
@@ -309,3 +313,41 @@ def test_a_paid_documents_fingerprint_and_token_go_when_its_rescans_end(paid, cl
 def test_privacy_page_describes_the_rescan_record():
     text = TestClient(api.app).get("/privacy").text
     assert "one-way hash of your re-scan link" in text and "14 days after you pay" in text
+
+
+# ---- a re-scan token can't be used on other essays (review finding) ----------------- #
+
+
+def test_one_payment_doesnt_check_an_unrelated_essay(paid, client, fake, tmp_path):
+    """Regression: half of an upload's footnotes from the paid essay was enough, so an
+    unrelated essay padded with five of the paid footnotes was checked in full, free."""
+    sid, _ = _pay(client, fake)
+    token = _token(client, sid)
+    unrelated = NEW_TEXTS + ["Mabo v Queensland (No 1) (1988) 166 CLR 186.", "Re Wakim; Ex parte McNally (1999) 198 CLR 511."]
+    data = _rescan(client, token, _docx(tmp_path, COUNTED[:5] + unrelated[:5])).json()
+    assert data["locked"] is True and "different essay" in data["rescan_note"]
+    assert _ent(sid)["rescans_remaining"] == 3
+
+
+def test_rescans_dont_widen_what_later_rescans_are_measured_against(paid, client, fake, tmp_path):
+    """Regression: each re-scan's footnotes joined the entitlement's fingerprint, so a
+    chain of re-scans could drift from the paid essay to a different one."""
+    sid, _ = _pay(client, fake)
+    token = _token(client, sid)
+    before = _ent(sid)["fingerprint"]
+    step_one = COUNTED[:6] + NEW_TEXTS[:4]  # a fair revision: 6 of 8 kept, 4 added
+    assert _rescan(client, token, _docx(tmp_path, step_one, "one.docx")).json()["locked"] is False
+    assert _ent(sid)["fingerprint"] == before
+    extra = ["Mabo v Queensland (No 1) (1988) 166 CLR 186.", "Re Wakim; Ex parte McNally (1999) 198 CLR 511."]
+    step_two = NEW_TEXTS[:4] + COUNTED[:2] + NEW_TEXTS[4:] + extra  # mostly the first re-scan's new footnotes
+    data = _rescan(client, token, _docx(tmp_path, step_two, "two.docx")).json()
+    assert data["locked"] is True and _ent(sid)["rescans_remaining"] == 2
+
+
+def test_revision_measure_is_symmetric():
+    paid = [[f"p{i}", f"c{i}"] for i in range(12)]
+    assert fingerprint.is_revision([f"p{i}" for i in range(12)], paid, 0.5)
+    assert fingerprint.is_revision([f"c{i}" for i in range(6)], paid, 0.5)  # corrected forms, half the essay
+    assert not fingerprint.is_revision([f"p{i}" for i in range(5)], paid, 0.5)  # 5 of 12: not the essay
+    assert fingerprint.is_revision([f"p{i}" for i in range(12)] + [f"n{i}" for i in range(6)], paid, 0.5)
+    assert not fingerprint.is_revision([f"p{i}" for i in range(12)] + [f"n{i}" for i in range(7)], paid, 0.5)
