@@ -351,3 +351,32 @@ def test_revision_measure_is_symmetric():
     assert not fingerprint.is_revision([f"p{i}" for i in range(5)], paid, 0.5)  # 5 of 12: not the essay
     assert fingerprint.is_revision([f"p{i}" for i in range(12)] + [f"n{i}" for i in range(6)], paid, 0.5)
     assert not fingerprint.is_revision([f"p{i}" for i in range(12)] + [f"n{i}" for i in range(7)], paid, 0.5)
+
+
+# ---- smaller review findings ------------------------------------------------------- #
+
+
+def test_a_failed_rescan_isnt_a_free_use(paid, client, fake, monkeypatch):
+    monkeypatch.setenv("AGLC_FREE_PER_DAY", "1")
+    sid, _ = _pay(client, fake)
+    token = _token(client, sid)
+    works, paid.side_effect = paid.side_effect, RuntimeError("model down")
+    assert _rescan(client, token).status_code == 500
+    paid.side_effect = works
+    assert get_store().free_uses_today(ip_hash=None, anon_id=None)[2] == 0
+    assert _process(client).status_code == 200  # the day's free preview is still there
+
+
+def test_seen_candidates_are_found_in_one_query_however_common_a_citation(paid):
+    store = get_store()
+    with store.transaction() as conn:
+        conn.executemany("INSERT INTO fingerprints (session_id, doc_hash, hashes, indexed, created_at)"
+                         " VALUES (?, 'd', '[]', 1, ?)", [(f"s{i}", f"2026-10-01T00:00:{i % 60:02d}+00:00")
+                                                          for i in range(2000)])
+        conn.executemany("INSERT INTO fingerprint_index (hash, session_id) VALUES ('common', ?)",
+                         [(f"s{i}",) for i in range(2000)])
+        conn.executemany("INSERT INTO fingerprint_index (hash, session_id) VALUES (?, 's7')",
+                         [(f"h{i}",) for i in range(5)])
+    upload = tuple(["common"] + [f"h{i}" for i in range(5)] + [f"x{i}" for i in range(1500)])
+    assert store.fingerprint_candidates(upload, 5) == [("s7", 6)]
+    assert len(store.fingerprint_candidates(upload, 1)) == 50  # capped

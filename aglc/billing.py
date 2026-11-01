@@ -936,7 +936,10 @@ def _mark_refunded(conn: sqlite3.Connection, order: sqlite3.Row, event: WebhookE
     if order["status"] == "refunded":
         return "already_refunded"
     is_pack = order["product"] in PACK_CREDITS
-    if event is not None and not event.full and not is_pack:
+    # A refund is full only if the provider says so and it covers the order: Square reports each
+    # refund's own amount, with no flag, so a partial one is told apart here.
+    full = event is None or (event.full and (event.amount <= 0 or event.amount >= order["amount"]))
+    if not full and not is_pack:
         return "partial_refund"
     get_store().update_order(order["id"], conn, status="refunded", refunded_at=now())
     if is_pack:

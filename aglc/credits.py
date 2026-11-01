@@ -96,8 +96,12 @@ def give_back(conn: sqlite3.Connection, code_id: str, session_id: str) -> int:
     ).fetchone()[0])
     if spent <= 0:
         return 0
-    conn.execute("UPDATE credit_codes SET credits_remaining = credits_remaining + ? WHERE id = ? AND revoked_at IS NULL",
-                 (spent, code_id))
+    returned = conn.execute(
+        "UPDATE credit_codes SET credits_remaining = credits_remaining + ? WHERE id = ? AND revoked_at IS NULL",
+        (spent, code_id),
+    ).rowcount
+    if not returned:  # the pack was refunded: nothing goes back on it, and the ledger says nothing did
+        return 0
     _ledger(conn, code_id, spent, "return", session_id=session_id)
     return spent
 

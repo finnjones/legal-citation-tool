@@ -415,3 +415,16 @@ def test_an_operator_can_reissue_a_lost_code(paid, client, fake):
     assert client.post("/api/credits", json={"code": old}).status_code == 404
     assert client.post("/api/credits", json={"code": new}).json()["credits_remaining"] == 2
     assert CliRunner().invoke(cli, ["reissue-code", "0" * 32]).exit_code == 1
+
+
+def test_giving_credits_back_to_a_refunded_pack_writes_no_ledger_row(paid, client, fake):
+    order_id, poid, _ = _buy_pack(client, fake)
+    code = _code(client, order_id)["code"]
+    sid = _process(client).json()["id"]
+    client.post("/api/redeem", json={"session_id": sid, "code": code})
+    _webhook(client, fake, poid, status="refunded")
+    with get_store().transaction() as conn:
+        code_id = conn.execute("SELECT id FROM credit_codes").fetchone()["id"]
+        assert credits.give_back(conn, code_id, sid) == 0
+    with sqlite3.connect(get_store().path) as conn:
+        assert [r[0] for r in conn.execute("SELECT reason FROM credit_ledger ORDER BY id")] == ["grant", "spend", "refund"]

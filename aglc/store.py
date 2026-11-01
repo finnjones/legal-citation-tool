@@ -435,25 +435,20 @@ class Store:
                              [(h, session_id) for h in json.loads(row["hashes"])])
             conn.execute("UPDATE fingerprints SET indexed = 1 WHERE session_id = ?", (session_id,))
 
-    def fingerprint_candidates(self, hashes: tuple[str, ...], at_least: int) -> list[tuple[str, int]]:
+    def fingerprint_candidates(self, hashes: tuple[str, ...], at_least: int, limit: int = 50) -> list[tuple[str, int]]:
         """Indexed (free preview) sessions sharing at least `at_least` of `hashes`, as
-        (session id, how many), most shared first, then newest first."""
-        found: dict[str, int] = {}
+        (session id, how many), most shared first, then newest first. One query, the hashes
+        passed as a single JSON parameter and the threshold applied in SQL, so a citation
+        common to many essays can't hit SQLite's limit on parameters or slow an upload."""
         with self.read() as conn:
-            for i in range(0, len(hashes), 500):  # SQLite's limit on query parameters
-                chunk = hashes[i : i + 500]
-                rows = conn.execute(
-                    f"SELECT session_id, COUNT(*) AS n FROM fingerprint_index WHERE hash IN ({','.join('?' * len(chunk))})"
-                    " GROUP BY session_id", chunk,
-                ).fetchall()
-                for r in rows:
-                    found[r["session_id"]] = found.get(r["session_id"], 0) + r["n"]
-            created = {r["session_id"]: r["created_at"] for r in conn.execute(
-                f"SELECT session_id, created_at FROM fingerprints WHERE session_id IN ({','.join('?' * len(found))})",
-                list(found),
-            )} if found else {}
-        hits = [(sid, n) for sid, n in found.items() if n >= at_least]
-        return sorted(hits, key=lambda h: (h[1], created.get(h[0], "")), reverse=True)
+            rows = conn.execute(
+                "SELECT fi.session_id, COUNT(*) AS n, MAX(f.created_at) AS created"
+                " FROM json_each(?) AS up JOIN fingerprint_index AS fi ON fi.hash = up.value"
+                " JOIN fingerprints AS f ON f.session_id = fi.session_id"
+                " GROUP BY fi.session_id HAVING COUNT(*) >= ? ORDER BY n DESC, created DESC LIMIT ?",
+                (json.dumps(list(dict.fromkeys(hashes))), at_least, limit),
+            ).fetchall()
+        return [(r["session_id"], r["n"]) for r in rows]
 
     def end_rescans(self, at: str) -> int:
         """Forget the fingerprint and re-scan token of entitlements whose re-scans have ended

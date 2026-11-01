@@ -706,3 +706,25 @@ def test_store_upgrades_a_version_1_database(tmp_path):
         conn.execute("INSERT INTO documents (session_id, filename, day, created_at) VALUES ('s', 'f', 'd', 'c')")
     store = Store(path)
     assert store.document("s")["reruns"] == 0
+
+
+def _square_refund(client, *, amount, order_id="sq-order-1", event_id="evt-refund"):
+    body = json.dumps({
+        "merchant_id": "M1", "type": "refund.updated", "event_id": event_id,
+        "data": {"type": "refund", "id": "r1", "object": {"refund": {
+            "id": "r1", "order_id": order_id, "payment_id": "pay-1", "status": "COMPLETED",
+            "amount_money": {"amount": amount, "currency": "AUD"},
+        }}},
+    }).encode()
+    return client.post("/api/webhooks/square", content=body,
+                       headers={SIGNATURE_HEADER: square_signature("sig-key", SQUARE_URL, body)})
+
+
+def test_a_partial_square_refund_leaves_the_document_unlocked(square, client):
+    sid = _process(client).json()["id"]
+    _checkout(client, sid)
+    assert _square_webhook(client).json()["outcome"] == "unlocked"
+    assert _square_refund(client, amount=100).json()["outcome"] == "partial_refund"
+    assert client.get(f"/api/download/{sid}").status_code == 200
+    assert _square_refund(client, amount=500, event_id="evt-refund-2").json()["outcome"] == "refunded"
+    assert client.get(f"/api/download/{sid}").status_code == 402
