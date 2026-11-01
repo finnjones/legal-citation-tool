@@ -204,6 +204,10 @@ MIGRATIONS: list[str] = [
         (SELECT e.id FROM entitlements e WHERE e.session_id = documents.session_id)
         WHERE unlocked_at IS NOT NULL
     """,
+    # 7: a seen upload is shown the earlier preview only if the same browser made it
+    """
+    ALTER TABLE documents ADD COLUMN seen_shown INTEGER NOT NULL DEFAULT 0
+    """,
 ]
 
 # A document whose retention window (see aglc/retention.py) ended before :cutoff: uploaded,
@@ -296,7 +300,7 @@ class Store:
 
     def add_document(self, session_id: str, filename: str, *, ip_hash: str | None, anon_id: str | None,
                      limits: tuple[int, int, int] | None = None, footnote_count: int = 0, kind: str = "free",
-                     status: str = "processing", seen_of: str | None = None) -> str | None:
+                     status: str = "processing", seen_of: str | None = None, seen_shown: bool = False) -> str | None:
         """Record a document. With `limits` (per IP, per browser, global), only while today's
         free uses are under them: the count and the insert are one transaction, so two
         uploads at once can't both take the last free run. Returns the limit that refused it
@@ -311,8 +315,9 @@ class Store:
                     return "visitor"
             conn.execute(
                 "INSERT INTO documents (session_id, filename, ip_hash, anon_id, day, created_at, footnote_count, kind,"
-                " status, seen_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (session_id, filename, ip_hash, anon_id, today(), now(), footnote_count, kind, status, seen_of),
+                " status, seen_of, seen_shown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (session_id, filename, ip_hash, anon_id, today(), now(), footnote_count, kind, status, seen_of,
+                 int(seen_shown)),
             )
         return None
 
@@ -379,8 +384,9 @@ class Store:
     @staticmethod
     def _free_uses(conn: sqlite3.Connection, *, ip_hash: str | None, anon_id: str | None) -> tuple[int, int, int]:
         def count(where: str, *args) -> int:
-            # A "seen" upload ran no model: it isn't a free use
-            sql = f"SELECT COUNT(*) FROM documents WHERE day = ? AND unlocked_at IS NULL AND kind != 'seen' AND {where}"
+            # A re-scan is paid for (and one that failed is given back), so never a free use. A
+            # "seen" upload runs no model but is one, so the check can't be used as a lookup service.
+            sql = f"SELECT COUNT(*) FROM documents WHERE day = ? AND unlocked_at IS NULL AND kind != 'rescan' AND {where}"
             return conn.execute(sql, (today(), *args)).fetchone()[0]
 
         return (

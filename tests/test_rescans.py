@@ -82,6 +82,7 @@ def test_documents_paid_for_before_entitlements_keep_working(tmp_path, monkeypat
     with sqlite3.connect(path) as conn:  # back to how a paid document looked before migration 6
         conn.execute("DROP TABLE entitlements")
         conn.execute("ALTER TABLE documents DROP COLUMN entitlement_id")
+        conn.execute("ALTER TABLE documents DROP COLUMN seen_shown")
         conn.execute("DELETE FROM fingerprints")
         conn.execute("PRAGMA user_version = 5")
     store = Store(path)
@@ -274,7 +275,7 @@ def test_a_rescan_isnt_refused_as_a_seen_essay(paid, client, fake, monkeypatch):
     data = _rescan(client, token).json()
     assert data["locked"] is False and not data.get("seen")
     other = TestClient(api.app).post("/api/process", files={"file": ("e.docx", ESSAY.read_bytes(), DOCX)})
-    assert other.json()["seen"] is True  # without the token, it is the same essay again
+    assert other.status_code == 409 and other.json()["detail"]["seen"] is True  # without the token: seen
 
 
 def test_rescan_tokens_are_never_logged(paid, client, fake, caplog):

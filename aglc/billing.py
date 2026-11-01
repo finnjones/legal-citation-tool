@@ -38,10 +38,12 @@ files have gone, the payment is refunded automatically.
 
 One essay gets one free preview, whoever uploads it. Each upload is fingerprinted
 (aglc/fingerprint.py) and, before any LLM call, compared with earlier free previews: a
-match is a "seen" document. No model runs for it: the page gets the earlier preview again
-(the same footnotes in full), or, if that has been deleted, a 409 offering to unlock. A
-seen document can always be paid for; payment unlocks a fresh run of the new upload
-(POST /api/run/{session_id}, in aglc/api.py).
+match is a "seen" document. No model runs for it, though it counts as a free use. The
+browser that made the earlier preview gets it again (the same footnotes in full); any other
+browser, or once it has been deleted, a 409 built from the new upload alone, offering to
+unlock: nothing of one student's essay is shown to another. A seen document can always be
+paid for; payment unlocks a fresh run of the new upload (POST /api/run/{session_id}, in
+aglc/api.py).
 
 Nobody pays for footnotes the model failed to read. Failed footnotes are retried once
 before the preview; if more than $AGLC_MAX_FAILED_SHARE of them (or a whole batch) still
@@ -323,18 +325,33 @@ def _is_sample(fp: fingerprint.Fingerprint) -> bool:
     return fp.doc_hash == _sample_hash[key]
 
 
-def seen_before(fp: fingerprint.Fingerprint) -> str | None:
+@dataclass(frozen=True)
+class Seen:
+    """An upload matched an earlier free preview. `own`: the same browser uploaded that
+    one, so it may be shown its preview again; nobody else ever is."""
+    earlier: str
+    own: bool
+
+
+def seen_before(fp: fingerprint.Fingerprint, visitor: Visitor) -> Seen | None:
     """The earlier free preview this upload matches (see aglc/fingerprint.py), or None.
-    One whose result is still kept is preferred, so its preview can be shown again."""
+    The visitor's own earlier upload is preferred, one whose result is still kept first.
+    Only the anonymous browser id decides "own", never the IP address: a campus or a
+    household shares one."""
     share = fingerprint.seen_overlap()
     if share <= 0 or len(fp.hashes) < fingerprint.MIN_MATCHES or _is_sample(fp):
         return None
+    store = get_store()
     # each candidate's count is how many of this upload's counted footnotes it shares
-    hits = [sid for sid, shared in get_store().fingerprint_candidates(fp.hashes, fingerprint.MIN_MATCHES)
+    hits = [sid for sid, shared in store.fingerprint_candidates(fp.hashes, fingerprint.MIN_MATCHES)
             if shared / len(fp.hashes) >= share]
     if not hits:
         return None
-    return next((sid for sid in hits if _load_result(sid) is not None), hits[0])
+    for sid in hits:
+        doc = store.document(sid)
+        if doc is not None and visitor.anon_id and doc["anon_id"] == visitor.anon_id and _load_result(sid) is not None:
+            return Seen(sid, own=True)
+    return Seen(hits[0], own=False)
 
 
 _semaphore: tuple[int, threading.BoundedSemaphore] | None = None
@@ -389,31 +406,39 @@ def start_document(session_id: str, filename: str, visitor: Visitor, *, footnote
 
 
 SEEN_MESSAGE = "We've already checked this essay — unlock it to see every correction."
+SEEN_ELSEWHERE = "An essay with these footnotes has already had its free preview. Unlock to see every correction."
 
 
 def start_seen(session_id: str, filename: str, visitor: Visitor, *, footnote_count: int,
-               fp: fingerprint.Fingerprint, earlier: str, options: dict) -> dict:
-    """Record an upload that matched an earlier free preview, with no model run, and return
-    that preview again (the same footnotes in full) for this new session; 409, offering to
-    unlock, if the earlier result has been deleted. Paying for it runs the new upload."""
-    get_store().add_document(session_id, filename, ip_hash=visitor.ip_hash, anon_id=visitor.anon_id,
-                             footnote_count=footnote_count, kind="seen", status="seen", seen_of=earlier)
+               fp: fingerprint.Fingerprint, seen: Seen, options: dict) -> dict:
+    """Record an upload that matched an earlier free preview, with no model run. It counts
+    against the free limits like any free upload (429 over them). The browser that made
+    the earlier preview gets it again (the same footnotes in full) for this new session;
+    anyone else, or once it has been deleted, a 409 built from the new upload alone,
+    offering to unlock. Paying for it runs the new upload."""
+    limits = _free_limits()
+    refused = get_store().add_document(
+        session_id, filename, ip_hash=visitor.ip_hash, anon_id=visitor.anon_id, limits=limits,
+        footnote_count=footnote_count, kind="seen", status="seen", seen_of=seen.earlier, seen_shown=seen.own)
+    if refused:
+        _refuse(refused, limits[1])
     get_store().add_fingerprint(session_id, fp.doc_hash, fp.hashes)
     (_session_dir(session_id) / "options.json").write_text(json.dumps(options))
-    log.info("document %s matches the earlier free preview %s: no model run", session_id[:8], earlier[:8])
+    log.info("document %s matches an earlier free preview (%s): no model run", session_id[:8],
+             "the same browser's" if seen.own else "another browser's")
     return seen_view(get_store().document(session_id))
 
 
 def seen_view(doc: sqlite3.Row) -> dict:
-    """What a locked seen document shows: the earlier preview, or a 409 offering to unlock."""
+    """What a locked seen document shows: the earlier preview if the same browser made it
+    (decided once, at upload), else a 409 offering to unlock that carries nothing but the
+    new upload's own name and price."""
     tier = tier_for(doc["footnote_count"])
-    earlier = _load_result(doc["seen_of"]) if doc["seen_of"] else None
+    earlier = _load_result(doc["seen_of"]) if doc["seen_of"] and doc["seen_shown"] else None
     if earlier is None:
         raise HTTPException(409, {
-            "message": "We've already checked this essay. Its free preview has been deleted, as our privacy policy "
-                       "says, but you can unlock it to see every correction: it will be checked again in full.",
-            "seen": True, "session_id": doc["session_id"], "filename": doc["filename"], "tier": tier,
-            "credits_needed": TIER_CREDITS[tier], "price": _price(tier),
+            "message": SEEN_ELSEWHERE, "seen": True, "session_id": doc["session_id"], "filename": doc["filename"],
+            "tier": tier, "credits_needed": TIER_CREDITS[tier], "price": _price(tier),
         })
     shown = preview(earlier, footnote_count=doc["footnote_count"])
     return {**shown, "id": doc["session_id"], "filename": doc["filename"], "seen": True, "message": SEEN_MESSAGE,

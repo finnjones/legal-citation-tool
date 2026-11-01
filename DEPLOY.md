@@ -177,9 +177,13 @@ normalised (case, quotes, dashes, punctuation and spacing don't matter) and hash
 HMAC-SHA256 under a random key kept in the database (`meta.fingerprint_key`). Only the hashes
 are stored, never the text. A free upload whose distinctive footnotes are at least
 `AGLC_SEEN_OVERLAP` (default 0.6) contained in one earlier free preview, with at least 5
-matching, is "seen": no model runs, and it gets the earlier preview again (the same
-footnotes in full), or, if that preview has been deleted, a 409 offering to unlock. Paying
-for a seen essay (card or credits) runs the new upload fresh (`POST /api/run/{id}`).
+matching, is "seen": no model runs. If the same browser (the `aglc_anon` cookie, never the
+IP address, which a campus shares) made the earlier preview, it gets that preview again (the
+same footnotes in full). Anyone else, or once that preview has been deleted, gets a 409
+built only from their own upload: "An essay with these footnotes has already had its free
+preview. Unlock to see every correction." Nothing of the earlier essay is ever shown to
+another browser. Paying for a seen essay (card or credits) runs the new upload fresh
+(`POST /api/run/{id}`).
 
 - Containment of the new document, not Jaccard similarity, so cutting footnotes out of an
   essay (eg the ones the preview showed) still matches it. Bare Ibids, bare (n x) references
@@ -187,13 +191,15 @@ for a seen essay (card or credits) runs the new upload fresh (`POST /api/run/{id
   with fewer than 5 distinctive footnotes never matches, so short documents don't collide.
 - Only a preview worth having is matched against: one that finished and could be paid for.
   A run that failed, or one the model mostly couldn't read, doesn't use up the essay's preview.
-- The sample essay is never "seen". A seen upload isn't counted against the free limits.
+- The sample essay is never "seen". A seen upload counts against the free daily limits like
+  any free upload, so the check can't be used as an unlimited lookup.
 - Fingerprints are kept `AGLC_FINGERPRINT_DAYS` (default 180), well past the 24-hour
   document retention, and then deleted by the retention sweep. The privacy page says so.
-- Two students whose essays share most of their distinctive footnotes would collide; the
-  second sees the first's preview. With 60% containment of at least 5 full citations, that
-  is in practice the same essay. Lower the false-positive risk by raising
-  `AGLC_SEEN_OVERLAP`, or set it to `0` to turn the check off.
+- Two students whose essays share most of their distinctive footnotes would collide: the
+  second is told the essay has had its free preview and offered the unlock (it sees nothing
+  of the first's essay). With 60% containment of at least 5 full citations, that is in
+  practice the same essay. Lower the false-positive risk by raising `AGLC_SEEN_OVERLAP`, or
+  set it to `0` to turn the check off.
 
 ## 4d. Entitlements and free re-scans
 

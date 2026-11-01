@@ -41,10 +41,18 @@ def _docx(tmp_path, texts, name="essay.docx"):
     return build_docx(tmp_path / name, body, specs).read_bytes()
 
 
-def _upload(content=None, name="essay.docx", ip="1.1.1.1"):
-    client = TestClient(api.app)  # a new browser every time: the abuse is new cookies and addresses
+def _upload(content=None, name="essay.docx", ip="1.1.1.1", client=None):
+    """Upload from `client`, by default a new browser: the abuse is new cookies and addresses."""
+    client = client or TestClient(api.app)
     return client, client.post("/api/process", files={"file": (name, content or ESSAY.read_bytes(), DOCX)},
                                headers={"X-Forwarded-For": ip})
+
+
+def _seen(r):
+    """'preview' (the browser's own earlier preview again), 'elsewhere' (409: someone's) or None."""
+    if r.status_code == 409 and r.json()["detail"].get("seen"):
+        return "elsewhere"
+    return "preview" if r.status_code == 200 and r.json().get("seen") else None
 
 
 def _shown(data):
@@ -91,59 +99,78 @@ def test_overlap_thresholds(shared, new, expected):
 
 
 def test_the_same_essay_gets_its_free_preview_once(seen):
-    _, first = _upload()
+    client, first = _upload()
     assert first.status_code == 200 and not first.json().get("seen")
-    _, again = _upload(name="renamed.docx", ip="2.2.2.2")
+    _, again = _upload(name="renamed.docx", ip="1.1.1.1", client=client)  # the same browser, again
     data = again.json()
-    assert again.status_code == 200 and data["seen"] is True and data["message"] == billing.SEEN_MESSAGE
+    assert _seen(again) == "preview" and data["message"] == billing.SEEN_MESSAGE
     assert seen.call_count == 1  # no model run for the second upload
     assert data["id"] != first.json()["id"] and data["filename"] == "renamed.docx"
-    assert first.json()["id"] not in json.dumps(data) and "essay.docx" not in json.dumps(data)  # nothing of the earlier upload's
+    assert first.json()["id"] not in json.dumps(data)
     assert data["locked"] is True and _shown(data) == _shown(first.json())  # the same preview footnotes
     assert data["changed_count"] == 10 and data["price"]["display"] == "A$5"
     doc = get_store().document(data["id"])
-    assert (doc["kind"], doc["seen_of"], doc["status"]) == ("seen", first.json()["id"], "seen")
+    assert (doc["kind"], doc["seen_of"], doc["status"], doc["seen_shown"]) == ("seen", first.json()["id"], "seen", 1)
+    assert client.get(f"/api/results/{data['id']}").json()["seen"] is True
+
+
+def test_someone_elses_matching_upload_is_shown_nothing_of_the_earlier_essay(seen, tmp_path):
+    """Regression: five distinctive footnotes of a victim's essay used to return the victim's
+    whole preview: every footnote as written, the warnings and the corrections shown."""
+    victim, first = _upload(_docx(tmp_path, SAMPLE_TEXTS + ["Victim's own secret footnote about the case at hand."]))
+    countable = [t for t in SAMPLE_TEXTS if fingerprint.counts(fingerprint.normalise(t))]
+    runs = seen.call_count
+    attacker, r = _upload(_docx(tmp_path, countable[:5], "probe.docx"), name="probe.docx", ip="1.1.1.1")
+    assert _seen(r) == "elsewhere" and seen.call_count == runs
+    detail = r.json()["detail"]
+    assert set(detail) == {"message", "seen", "session_id", "filename", "tier", "credits_needed", "price"}
+    assert detail["message"] == billing.SEEN_ELSEWHERE and detail["filename"] == "probe.docx"
+    text = r.text + attacker.get(f"/api/results/{detail['session_id']}").text
+    assert attacker.get(f"/api/results/{detail['session_id']}").status_code == 409
+    for leak in ("Victim's own secret", "Brennan", "Wik Peoples", first.json()["id"], "essay.docx"):
+        assert leak not in text, leak
 
 
 def test_deleting_the_shown_footnotes_reveals_nothing_new(seen, tmp_path):
     """The attack: delete the footnotes the preview showed in full, upload again, see the next."""
-    _, first = _upload()
+    client, first = _upload()
     shown = _shown(first.json())
     assert shown == [1]
     rest = [t for i, t in enumerate(SAMPLE_TEXTS, start=1) if i not in shown]
-    _, again = _upload(_docx(tmp_path, rest), ip="3.3.3.3")
-    data = again.json()
-    assert data["seen"] is True and seen.call_count == 1
-    assert set(_shown(data)) <= set(shown)  # no correction the first preview didn't show
+    _, again = _upload(_docx(tmp_path, rest), client=client)  # the same browser: its own preview again
+    assert _seen(again) == "preview" and seen.call_count == 1
+    assert set(_shown(again.json())) <= set(shown)  # no correction the first preview didn't show
+    _, other = _upload(_docx(tmp_path, rest), ip="3.3.3.3")  # a new browser: nothing at all
+    assert _seen(other) == "elsewhere" and seen.call_count == 1
 
 
 def test_a_mostly_new_essay_is_not_seen(seen, tmp_path):
-    _upload()
+    client, _ = _upload()
     countable = [t for t in SAMPLE_TEXTS if fingerprint.counts(fingerprint.normalise(t))]
-    _, below = _upload(_docx(tmp_path, countable[:5] + NEW_TEXTS[:4], "b.docx"), ip="4.4.4.4")  # 5/9 < 0.6
-    assert not below.json().get("seen") and seen.call_count == 2
-    _, above = _upload(_docx(tmp_path, countable[:6] + NEW_TEXTS[:3], "a.docx"), ip="5.5.5.5")  # 6/9 >= 0.6
-    assert above.json().get("seen") is True and seen.call_count == 2
+    _, below = _upload(_docx(tmp_path, countable[:5] + NEW_TEXTS[:4], "b.docx"), client=client)  # 5/9 < 0.6
+    assert _seen(below) is None and seen.call_count == 2
+    _, above = _upload(_docx(tmp_path, countable[:6] + NEW_TEXTS[:3], "a.docx"), client=client)  # 6/9 >= 0.6
+    assert _seen(above) == "preview" and seen.call_count == 2
 
 
 def test_tiny_documents_never_match(seen, tmp_path):
     content = _docx(tmp_path, NEW_TEXTS[:4])  # 4 counted footnotes: under the minimum of 5
     _upload(content)
     _, again = _upload(content, ip="6.6.6.6")
-    assert not again.json().get("seen") and seen.call_count == 2
+    assert _seen(again) is None and seen.call_count == 2
 
 
 def test_the_threshold_comes_from_the_environment(seen, monkeypatch):
     monkeypatch.setenv("AGLC_SEEN_OVERLAP", "0")  # off
     _upload()
-    assert not _upload(ip="7.7.7.7")[1].json().get("seen")
+    assert _seen(_upload(ip="7.7.7.7")[1]) is None
 
 
 def test_a_failed_or_unreadable_first_run_doesnt_use_up_the_preview(seen):
     works, seen.side_effect = seen.side_effect, RuntimeError("model down")
     assert _upload()[1].status_code == 500
     seen.side_effect = works
-    assert not _upload(ip="8.8.8.8")[1].json().get("seen")
+    assert _seen(_upload(ip="8.8.8.8")[1]) is None
 
 
 def test_the_sample_essay_is_never_seen(seen):
@@ -152,27 +179,27 @@ def test_the_sample_essay_is_never_seen(seen):
     store.add_document("00000000-0000-4000-8000-000000000001", "s.docx", ip_hash=None, anon_id=None)
     store.add_fingerprint("00000000-0000-4000-8000-000000000001", fp.doc_hash, fp.hashes)
     store.index_fingerprint("00000000-0000-4000-8000-000000000001")
-    assert len(fp.hashes) >= fingerprint.MIN_MATCHES and billing.seen_before(fp) is None
+    visitor = billing.Visitor(ip_hash=None, anon_id="a" * 32, new_cookie=False)
+    assert len(fp.hashes) >= fingerprint.MIN_MATCHES and billing.seen_before(fp, visitor) is None
 
 
-def test_seen_uploads_dont_use_the_free_quota(seen, monkeypatch):
-    monkeypatch.setenv("AGLC_FREE_PER_DAY", "1")
+def test_seen_uploads_count_against_the_free_limits(seen, monkeypatch):
+    """So the check can't be used as an unlimited lookup service."""
+    monkeypatch.setenv("AGLC_FREE_PER_DAY", "2")
     client, first = _upload()
-    assert first.status_code == 200
-    r = client.post("/api/process", files={"file": ("e.docx", ESSAY.read_bytes(), DOCX)},
-                    headers={"X-Forwarded-For": "1.1.1.1"})
-    assert r.status_code == 429  # the one free preview of the day was the first upload
-    assert get_store().free_uses_today(ip_hash=None, anon_id=None)[2] == 1
-    _upload(ip="9.9.9.9")  # seen, from someone else: not a free use
-    assert get_store().free_uses_today(ip_hash=None, anon_id=None)[2] == 1
+    assert _seen(_upload(client=client)[1]) == "preview"
+    assert _upload(client=client)[1].status_code == 429  # two free uploads today, the seen one included
+    monkeypatch.setenv("AGLC_FREE_GLOBAL_PER_DAY", "3")
+    assert _seen(_upload(ip="9.9.9.9")[1]) == "elsewhere"
+    assert _upload(ip="10.10.10.10")[1].status_code == 429  # the global cap counts seen uploads too
 
 
 # ---- paying for a seen essay: a fresh run ------------------------------------------- #
 
 
 def test_a_seen_essay_can_be_paid_for_and_is_run_fresh(seen, fake):
-    _, first = _upload()
-    client, again = _upload(ip="2.2.2.2")
+    first_client, first = _upload()
+    client, again = _upload(client=first_client)
     sid = again.json()["id"]
     assert client.post(f"/api/run/{sid}").status_code == 402
     assert client.get(f"/api/download/{sid}").status_code == 402
@@ -192,13 +219,25 @@ def test_a_seen_essay_can_be_paid_for_and_is_run_fresh(seen, fake):
     assert get_store().order(order["order_id"])["status"] == "paid"
 
 
+def test_someone_else_can_pay_for_a_matching_essay_and_gets_their_own_run(seen, fake, tmp_path):
+    _upload()
+    countable = [t for t in SAMPLE_TEXTS if fingerprint.counts(fingerprint.normalise(t))]
+    client, r = _upload(_docx(tmp_path, countable[:6]), ip="2.2.2.2")
+    sid = r.json()["detail"]["session_id"]
+    poid = _provider_order_id(_checkout(client, sid)["order_id"])
+    fake.pay(poid)
+    _webhook(client, fake, poid)
+    data = client.post(f"/api/run/{sid}").json()
+    assert data["locked"] is False and len(data["footnotes"]) == 6  # the new upload, not the earlier essay
+
+
 def test_a_swept_preview_gets_a_409_offering_to_unlock(seen, fake):
-    _, first = _upload()
+    client, first = _upload()
     shutil.rmtree(billing.sessions_dir() / first.json()["id"])  # deleted by the retention sweep
-    client, again = _upload(ip="2.2.2.2")
+    _, again = _upload(client=client)
     assert again.status_code == 409 and seen.call_count == 1
     detail = again.json()["detail"]
-    assert detail["seen"] is True and detail["price"]["display"] == "A$5" and "unlock" in detail["message"]
+    assert detail["seen"] is True and detail["price"]["display"] == "A$5" and "Unlock" in detail["message"]
     sid = detail["session_id"]
     assert (billing.sessions_dir() / sid / "input.docx").is_file()  # kept for the paid run
     poid = _provider_order_id(_checkout(client, sid)["order_id"])
@@ -213,10 +252,14 @@ def test_a_swept_preview_gets_a_409_offering_to_unlock(seen, fake):
     assert snap["status"] == "done" and snap["result"]["locked"] is False
 
 
-def test_a_seen_essay_can_be_unlocked_with_credits(seen, fake):
+def _seen_session(ip="2.2.2.2"):
     _upload()
-    client, again = _upload(ip="2.2.2.2")
-    sid = again.json()["id"]
+    client, again = _upload(ip=ip)
+    return client, again.json()["detail"]["session_id"]
+
+
+def test_a_seen_essay_can_be_unlocked_with_credits(seen, fake):
+    client, sid = _seen_session()
     r = client.post("/api/checkout", json={"product": "pack3"})
     poid = _provider_order_id(r.json()["order_id"])
     fake.pay(poid)
@@ -227,9 +270,7 @@ def test_a_seen_essay_can_be_unlocked_with_credits(seen, fake):
 
 
 def test_a_failed_paid_run_can_be_started_again(seen, fake):
-    _upload()
-    client, again = _upload(ip="2.2.2.2")
-    sid = again.json()["id"]
+    client, sid = _seen_session()
     poid = _provider_order_id(_checkout(client, sid)["order_id"])
     fake.pay(poid)
     _webhook(client, fake, poid)
@@ -253,7 +294,7 @@ def test_fingerprints_outlive_the_documents_then_go(seen):
     now = datetime.now(timezone.utc)
     retention.sweep(None, at=now + timedelta(hours=25))
     assert get_store().document(sid)["purged_at"] and get_store().fingerprint(sid)
-    assert _upload(ip="2.2.2.2")[1].status_code == 409  # still seen, though its preview has gone
+    assert _seen(_upload(ip="2.2.2.2")[1]) == "elsewhere"  # still seen, though its preview has gone
     retention.sweep(None, at=now + timedelta(days=181))
     assert get_store().fingerprint(sid) is None
     with sqlite3.connect(get_store().path) as conn:

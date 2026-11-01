@@ -282,11 +282,12 @@ async def process_document(
             if rescan.entitlement_id is None:
                 if visitor is None:  # came with tokens that didn't fit: a free upload after all
                     visitor = billing.admit(request, response)
-                earlier = await run_in_threadpool(billing.seen_before, fp)
-                if earlier is not None:  # this essay has had its free preview: no second one
-                    seen = billing.start_seen
-                    shown = await run_in_threadpool(lambda: seen(session_id, file.filename, visitor, footnote_count=len(
-                        footnotes), fp=fp, earlier=earlier, options=options))
+                seen = await run_in_threadpool(billing.seen_before, fp, visitor)
+                if seen is not None:  # this essay has had its free preview: no second one
+                    start_seen = billing.start_seen
+                    shown = await run_in_threadpool(lambda: start_seen(
+                        session_id, file.filename, visitor, footnote_count=len(footnotes), fp=fp, seen=seen,
+                        options=options))
                     return {**shown, "rescan_note": note} if note else shown
             slot = billing.processing_slot()  # 503 when too many documents are in flight
             slot.__enter__()
