@@ -195,6 +195,32 @@ for a seen essay (card or credits) runs the new upload fresh (`POST /api/run/{id
   is in practice the same essay. Lower the false-positive risk by raising
   `AGLC_SEEN_OVERLAP`, or set it to `0` to turn the check off.
 
+## 4d. Entitlements and free re-scans
+
+Paying for a document, by card or with credits, creates an entitlement (`entitlements`): the
+paid session, its tier, its fingerprint (as written and as corrected, so a revision with the
+tracked changes accepted is recognised), a re-scan token stored as a SHA-256 hash, and 3 free
+re-scans until 14 days after payment (`FREE_RESCANS`, `RESCAN_DAYS` in `aglc/billing.py`).
+Migration 6 gave every document already paid for an entitlement too (its fingerprint and
+token are made the first time they are needed), so existing paid links keep working.
+
+- The paid page asks for the token (`POST /api/rescan-link/{id}`), keeps it in the browser's
+  localStorage and offers a copyable link (`/#rescan=<token>`: in the fragment, so it never
+  reaches the server's access log). Asking again makes a new token and the old one stops
+  working; whoever has the results link already has the document.
+- An upload sent with the token, mostly the same essay (`AGLC_RESCAN_OVERLAP`, default 0.5 of
+  its distinctive footnotes, at least 5) and within the tier, is processed in full and
+  unlocked; the re-scan count is decremented in the same transaction that records it. It
+  isn't held to the free limits. A different essay, an expired or used-up token, or an
+  essay-tier entitlement and a version grown past 150 footnotes: the upload is treated as a
+  normal free one (preview, or the seen-essay check), with a note saying why. A re-scan whose
+  run fails gives the re-scan back.
+- A full refund of the document's payment revokes its entitlement (no more re-scans). The
+  retention sweep forgets an entitlement's fingerprint and token hash when its re-scans end;
+  the rest of the row stays with the order.
+- Re-scans are separate from the free re-reads of footnotes the model failed to read
+  (`MAX_RERUNS`), which are unchanged.
+
 ## 5. The deploy script and workflow
 
 The workflow tests with `uv sync --all-extras` and then runs the server-side `deploy` script.

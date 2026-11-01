@@ -59,17 +59,26 @@ aglc/payments/providers/
     square_provider.py    square   (Checkout API payment links; HMAC-SHA256 over URL + raw body)
     fake.py               fake     (offline, HMAC-signed events; a stand-in checkout page)
 aglc/store.py             SQLite in $AGLC_DATA_DIR (WAL, user_version migrations):
-                          documents, orders, webhook_events, credit_codes, credit_ledger, code_pickup
+                          documents, orders, webhook_events, credit_codes, credit_ledger, code_pickup,
+                          fingerprints, fingerprint_index, entitlements
 aglc/billing.py           /api/config, /api/checkout, /api/webhooks/{provider},
                           /api/entitlement/{id}, /api/results/{id}, /api/pack/{order},
-                          /api/redeem, /api/credits; free-use limits
+                          /api/redeem, /api/credits, /api/rescan-link/{id}; free-use limits
 aglc/credits.py           redeem codes (AFC-XXXX-XXXX-XXXX, stored hashed) and the credits ledger
+aglc/fingerprint.py       keyed hashes of footnotes: one free preview per essay, re-scan matching
 aglc/mailer.py            email (off unless RESEND_API_KEY + AGLC_EMAIL_FROM): a pack's code, once
 ```
 
 - Prices live only in `billing.PRODUCTS`; `/api/config` sends them all and the pages render
   from them. A document's tier (`essay` or `long`) is chosen by the server from its footnote
-  count; the page can't pick a cheaper one. In v1 the processing session id is the entitlement.
+  count; the page can't pick a cheaper one.
+- Paying (card or credits) creates an entitlement (`entitlements`, migration 6; documents paid
+  for earlier were given one): the paid document, its tier, its fingerprint as written and as
+  corrected, a hashed re-scan token and 3 free re-scans for 14 days (`FREE_RESCANS`,
+  `RESCAN_DAYS`). An upload carrying the token that is mostly the same essay
+  (`AGLC_RESCAN_OVERLAP`, default 0.5, at least 5 footnotes) is checked in full, unlocked, and
+  the re-scan count drops in the same transaction; an essay-tier entitlement doesn't cover a
+  version grown past 150 footnotes. Separate from `MAX_RERUNS`.
 - A pack's webhook makes a random code, stores only its hash with the credits, and holds the
   code until the buyer's page collects it once (or the retention window ends); it is also
   emailed once if email is configured and the checkout gave an address. Spending is one

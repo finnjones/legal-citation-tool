@@ -211,6 +211,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             background: var(--sheet); color: var(--ink); min-width: 0; flex: 1 1 14rem; max-width: 22rem; text-transform: uppercase;
         }
         .paybar .pay-actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+        .paybar #paybarButton small { display: block; font-size: 0.75rem; font-weight: 500; opacity: 0.85; }
         .pricing-card ul { list-style: none; margin-top: 24px; border-top: 1px solid var(--hairline); }
         .pricing-card li { padding: 12px 0; border-bottom: 1px solid var(--hairline); display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; font-size: 0.9375rem; }
         .pricing-card li svg { width: 18px; height: 18px; color: var(--accent); margin-top: 3px; }
@@ -655,6 +656,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <ul>
                                 <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Free first: every footnote's status, every Check item, how many corrections were found, and a few in full (one for every ten, up to {{preview_full}}).</span></li>
                                 <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Pay once to unlock every correction, the bibliography and the .docx with tracked changes. The price is set by how many footnotes your document has.</span></li>
+                                <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span><strong>{{free_rescans}} free re-scans for {{rescan_days}} days.</strong> Revised your essay? Check the new version again in full, free.</span></li>
                                 <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>If the AI model can't read more than a few of your footnotes, you aren't asked to pay until it has. Re-reading them is free.</span></li>
                             </ul>
                             <a class="btn btn-primary" href="#main" data-start>Check my footnotes</a>
@@ -832,6 +834,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             setupControls();
             trackStickyHeights();
             await loadConfig();
+            if (config.payments) takeRescanLink();
             resumeSession();
         });
 
@@ -971,6 +974,88 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                  <p>It works for as long as we keep your document; see <a href="/privacy">Privacy</a>.</p>`));
             document.getElementById("relink").hidden = true;  // the banner carries the link
             announce("Payment received. Your document is unlocked.");
+            if (result?.rescan?.active && !rescanFor(result.id)) getRescanLink();
+        }
+
+        // ---- Re-scans: a paid document's token, kept in this browser (shown once by the server) ----
+
+        const RESCANS_KEY = "aforecite.rescans";
+
+        function storedRescans() {
+            try {
+                const now = new Date().toISOString();
+                return JSON.parse(localStorage.getItem(RESCANS_KEY) || "[]")
+                    .filter(r => r && typeof r.token === "string" && (!r.expires_at || r.expires_at > now)).slice(0, 5);
+            } catch { return []; }
+        }
+
+        function storeRescan(entry) {
+            try {
+                const kept = storedRescans().filter(r => r.token !== entry.token && (!entry.session || r.session !== entry.session));
+                localStorage.setItem(RESCANS_KEY, JSON.stringify([entry, ...kept].slice(0, 5)));
+            } catch {}
+        }
+
+        function rescanFor(sessionId) {
+            return storedRescans().find(r => r.session === sessionId);
+        }
+
+        function rescanOffer() {
+            return `${config.free_rescans ?? 3} free re-scans for ${config.rescan_days ?? 14} days`;
+        }
+
+        function rescanLink(token) {
+            return `${location.origin}/#rescan=${encodeURIComponent(token)}`;
+        }
+
+        function formatDate(iso) {
+            try { return new Date(iso).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" }); }
+            catch { return iso; }
+        }
+
+        function rescanBanner(data) {
+            const r = data.rescan;
+            const own = r.session_id === data.id;
+            if (!r.active) {
+                return banner("", r.remaining === 0 && r.expires_at > new Date().toISOString() ? "Free re-scans used" : "Free re-scans ended",
+                    `${data.rescanned ? "This was a free re-scan. " : ""}This document's ${r.total} free re-scans have been used or have ended. A new version can be unlocked as a new document.`);
+            }
+            const left = `${r.remaining} of ${r.total} re-scans left, until ${formatDate(r.expires_at)}.`;
+            const saved = rescanFor(r.session_id);
+            const text = `${data.rescanned ? "This was a free re-scan. " : ""}${left} Revised your essay? Upload the new version in this browser and it's checked in full, free.`
+                + (r.tier === "essay" ? ` (Up to ${config.essay_max_footnotes ?? 150} footnotes: a longer version is a new document.)` : "");
+            if (!own) return banner("ok", "Free re-scans", text);
+            return banner("ok", "Free re-scans", text,
+                saved ? `<button type="button" class="btn btn-secondary" data-copy-rescan="${escapeHtml(saved.token)}">Copy re-scan link</button>`
+                    : `<button type="button" class="btn btn-secondary" data-get-rescan>Get my re-scan link</button>`,
+                saved ? `<p>To re-scan from another browser, keep this link: anyone with it can use your re-scans.</p>` : "");
+        }
+
+        async function getRescanLink(button = null) {
+            if (button) { button.disabled = true; button.textContent = "Making your link…"; }
+            try {
+                const response = await fetch(`/api/rescan-link/${encodeURIComponent(result.id)}`, { method: "POST" });
+                if (!response.ok) throw new Error(await detailOf(response, "Your re-scan link couldn't be made. Please try again."));
+                const { token, rescan } = await response.json();
+                storeRescan({ token, session: result.id, expires_at: rescan.expires_at });
+                result.rescan = rescan;
+                setBanner("rescan", rescanBanner(result));
+            } catch (error) {
+                setBanner("error", banner("error", "Couldn't make your re-scan link", error.message));
+                if (button) { button.disabled = false; button.textContent = "Get my re-scan link"; }
+            }
+        }
+
+        // A re-scan link opened in this browser (/#rescan=…): keep its token for the next upload
+        function takeRescanLink() {
+            const match = location.hash.match(/^#rescan=([A-Za-z0-9_-]{20,100})$/);
+            if (!match) return;
+            storeRescan({ token: match[1], session: null, expires_at: null });
+            history.replaceState(null, "", location.pathname + location.search);
+            const note = document.getElementById("uploadError");
+            note.innerHTML = banner("ok", "Re-scan link saved", "Upload the revised version of the essay you paid for: it's checked in full, free.");
+            note.hidden = false;
+            note.removeAttribute("role");
         }
 
         function reDownloadLink() {
@@ -1061,6 +1146,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 formData.append("track_changes", document.getElementById("trackChanges").checked);
                 formData.append("bibliography", document.getElementById("bibliography").checked);
                 formData.append("progress", "true");
+                if (config.payments) storedRescans().forEach(r => formData.append("rescan_token", r.token));
                 let response;
                 try {
                     response = await fetch("/api/process", { method: "POST", body: formData });
@@ -1072,13 +1158,16 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     if (body.detail?.seen) {
                         progress.stop();
                         showSeenUnlock(body.detail);
+                        if (body.detail.rescan_note) setBanner("rescan", banner("check", "Not a free re-scan", escapeHtml(body.detail.rescan_note)));
                         return;
                     }
                 }
                 if (!response.ok) throw new Error(await detailOf(response, "Something went wrong processing your document. Please try again."));
                 let data = await response.json();
+                const rescanNote = data.rescan_note;
                 // 202: processing in the background; follow it until the result is ready
                 if (response.status === 202) data = await followProgress(data.id, progress);
+                if (rescanNote) data.rescan_note = rescanNote;
                 await progress.finish();
                 data.filename = data.filename || file.name;
                 if (config.payments) history.replaceState(null, "", `/?session=${encodeURIComponent(data.id)}`);
@@ -1516,6 +1605,9 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 "", `<ul class="check-list">${outside.map(item => `<li>${item}</li>`).join("")}</ul>`) : "");
             setBanner("cases", caseCheckBanner(data.case_check));
 
+            setBanner("rescan", config.payments && !locked && data.rescan ? rescanBanner(data) : "");
+            if (data.rescan_note) setBanner("rescan", banner("check", "Not a free re-scan", escapeHtml(data.rescan_note)));
+
             const relink = document.getElementById("relink");
             relink.hidden = !(config.payments && !locked);
             if (!relink.hidden) relink.innerHTML = `To download again later, keep this page's link. <button type="button" class="link-button" data-copy-link>Copy link</button>`;
@@ -1854,7 +1946,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             } else if (data.seen && !data.footnotes.length) {
                 const price = data.price?.display;
                 text.innerHTML = `<strong>We've already checked this essay.</strong> Unlock it to have it checked again in full.`;
-                button.textContent = `Unlock this document${price ? ` — ${price}` : ""}`;
+                button.innerHTML = `Unlock this document${price ? ` — ${escapeHtml(price)}` : ""}<small>${rescanOffer()}</small>`;
                 button.dataset.action = "checkout";
                 const need = data.credits_needed || 1;
                 creditsButton.textContent = `Use ${need === 1 ? "a credit" : `${need} credits`}`;
@@ -1864,7 +1956,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 text.innerHTML = `Free preview: <strong>${shown} of ${plural(total, "correction")}</strong> shown.`;
                 const price = data.price?.display || config.price?.display;
                 const tier = data.tier === "long" ? `long document, over ${config.essay_max_footnotes ?? 150} footnotes` : "essay";
-                button.textContent = `Unlock all ${plural(total, "correction")} and the .docx${price ? ` — ${price}` : ""}`;
+                button.innerHTML = `Unlock all ${plural(total, "correction")} and the .docx${price ? ` — ${escapeHtml(price)}` : ""}`
+                    + `<small>${rescanOffer()}</small>`;
                 button.title = `Priced as ${tier === "essay" ? "an essay" : `a ${tier}`}`;
                 button.dataset.action = "checkout";
                 const need = data.credits_needed || 1;
@@ -1925,6 +2018,10 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 if (saved) redeemCode(saved.dataset.useCode, saved);
                 const copyCode = e.target.closest("[data-copy-code]");
                 if (copyCode) copyText(copyCode.dataset.copyCode, copyCode, "Code copied");
+                const copyRescan = e.target.closest("[data-copy-rescan]");
+                if (copyRescan) copyText(rescanLink(copyRescan.dataset.copyRescan), copyRescan, "Link copied");
+                const getRescan = e.target.closest("[data-get-rescan]");
+                if (getRescan) getRescanLink(getRescan);
             });
             document.addEventListener("submit", (e) => {
                 const form = e.target.closest("[data-report-form]");
@@ -1937,7 +2034,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         // A document's checkout (the server sets its price from its footnote count), or a pack's:
         // from a document's unlock screen, the pack unlocks that document with its first credits
         async function startCheckout(product = null, button = document.getElementById("paybarButton"), forDocument = !product) {
-            const label = button.textContent;
+            const label = button.innerHTML;
             button.disabled = true;
             button.textContent = "Opening checkout…";
             try {
@@ -1956,7 +2053,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 if (document.body.dataset.view === "results") setBanner("error", banner("error", "Couldn't open the checkout", error.message));
                 else alert(error.message);
                 button.disabled = false;
-                button.textContent = label;
+                button.innerHTML = label;
             }
         }
 
@@ -2206,7 +2303,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             </div>`;
         }
 
-        const BANNER_ORDER = ["payment", "pack", "error", "seen", "credits", "failed", "preview", "general", "cases"];
+        const BANNER_ORDER = ["payment", "pack", "error", "rescan", "seen", "credits", "failed", "preview", "general", "cases"];
         const banners = {};
         function setBanner(key, html) {
             banners[key] = html;

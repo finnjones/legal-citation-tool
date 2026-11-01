@@ -213,6 +213,7 @@ async def process_document(
     bibliography: Annotated[bool, Form()] = True,
     fix_body: Annotated[bool, Form()] = True,
     progress: Annotated[bool, Form()] = False,
+    rescan_token: Annotated[list[str] | None, Form()] = None,
 ) -> dict:
     """Process a Word document and return formatted citations.
 
@@ -224,6 +225,9 @@ async def process_document(
         fix_body: Whether to fix footnote numbers and headings in the body text
         progress: Answer straight away (202, `{id, status: "processing"}`) and process in the
             background; GET /api/progress/{id} then reports progress and, at the end, the result
+        rescan_token: re-scan tokens of documents paid for (payments on; may be repeated): a
+            revision of one of them is checked in full, unlocked, using one of its free
+            re-scans. Otherwise the upload is a free one, and `rescan_note` says why
 
     Returns:
         JSON with id, footnotes, bibliography, warnings, body_fixes. With payments on
@@ -238,9 +242,12 @@ async def process_document(
         raise HTTPException(status_code=413, detail=guards.too_large_message())
 
     paid = billing.enabled()
-    visitor = billing.admit(request, response) if paid else None  # free-use quotas: 429
+    # A re-scan of a paid document isn't a free use, so isn't held to the free limits
+    rescans = billing.rescan_candidates(rescan_token) if paid and rescan_token else []
+    visitor = billing.admit(request, response) if paid and not rescans else None  # free-use quotas: 429
     if paid:
         model = None  # the server's $AGLC_LLM (and $AGLC_LLM_FALLBACK) only: it pays for the calls
+    note = None
 
     # Create session directory
     session_id = str(uuid.uuid4())
@@ -270,21 +277,32 @@ async def process_document(
         if paid:
             footnotes = await run_in_threadpool(billing.read_capped, input_file)  # 413, before any LLM call
             fp = await run_in_threadpool(billing.fingerprint_of, footnotes)
-            earlier = await run_in_threadpool(billing.seen_before, fp)
-            if earlier is not None:  # this essay has had its free preview: no second one
-                seen = billing.start_seen
-                return await run_in_threadpool(lambda: seen(session_id, file.filename, visitor, footnote_count=len(
-                    footnotes), fp=fp, earlier=earlier, options=options))
+            rescan = await run_in_threadpool(billing.choose_rescan, rescans, fp, len(footnotes))
+            note = rescan.note
+            if rescan.entitlement_id is None:
+                if visitor is None:  # came with tokens that didn't fit: a free upload after all
+                    visitor = billing.admit(request, response)
+                earlier = await run_in_threadpool(billing.seen_before, fp)
+                if earlier is not None:  # this essay has had its free preview: no second one
+                    seen = billing.start_seen
+                    shown = await run_in_threadpool(lambda: seen(session_id, file.filename, visitor, footnote_count=len(
+                        footnotes), fp=fp, earlier=earlier, options=options))
+                    return {**shown, "rescan_note": note} if note else shown
             slot = billing.processing_slot()  # 503 when too many documents are in flight
             slot.__enter__()
-            billing.start_document(session_id, file.filename, visitor, footnote_count=len(footnotes), fp=fp)
+            if rescan.entitlement_id is not None:
+                billing.start_rescan(session_id, file.filename, billing.visitor_of(request), footnote_count=len(footnotes),
+                                     fp=fp, ent_id=rescan.entitlement_id)
+            else:
+                billing.start_document(session_id, file.filename, visitor, footnote_count=len(footnotes), fp=fp)
             started = True
+        extra = {"rescan_note": note} if note else {}
         if progress:
             job.start(slot)  # the job releases the slot when it finishes
             response.status_code = status.HTTP_202_ACCEPTED
-            return {"id": session_id, "status": "processing"}
+            return {"id": session_id, "status": "processing", **extra}
         try:
-            return await run_in_threadpool(job.run)
+            return {**await run_in_threadpool(job.run), **extra}
         finally:
             if slot is not None:
                 slot.__exit__(None, None, None)
@@ -292,6 +310,8 @@ async def process_document(
     except Exception as e:
         # Clean up on error (a seen document's 409 keeps its upload, for the paid run)
         seen_409 = isinstance(e, HTTPException) and e.status_code == 409 and isinstance(e.detail, dict)
+        if seen_409 and note:
+            e.detail["rescan_note"] = note
         if not seen_409:
             shutil.rmtree(session_dir, ignore_errors=True)
         if started:

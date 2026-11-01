@@ -44,6 +44,8 @@ Tests: `tests/test_paywall.py`, plus the preview tests in `tests/test_billing.py
 | Preview size | 1 to 3 changed footnotes, by document size | all | **fixed**: it was always 3, which fully corrected a short essay (3 of 3, or 3 of 4) for free |
 | A seen essay (an earlier free preview's footnotes) | that earlier preview again, recomputed by `billing.preview` from the earlier session's saved result under a new session id (never the earlier session's id), or a 409 with only the price; the earlier upload's filename is not sent | after payment, a fresh run of the new upload | ok |
 | `POST /api/run/{id}` | 402 | the fresh run's full result | ok |
+| `POST /api/process` with `rescan_token` | a token that doesn't fit (different essay, expired, used up, too long for an essay tier) gets the normal preview and a `rescan_note`, never a full result | a revision of the paid document: full result, one re-scan used | ok: the token is checked against the entitlement's fingerprint before anything is unlocked |
+| `POST /api/rescan-link/{id}` | 402 | a new token (hash stored) | ok |
 | The page (`web/index.html`) | renders what it is sent; a locked footnote shows "Result hidden until you unlock" because it has no result, not because one is hidden with CSS | full | ok |
 
 Not in scope: someone who pays can share their own results link; that is a paid document,

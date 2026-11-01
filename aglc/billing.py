@@ -4,9 +4,15 @@
 When it is on, processing is free but returns a redacted preview (see `preview`): every
 footnote's original and stamp, all warnings, how many corrections were found, and only the
 first `preview_size` changed footnotes in full (a tenth of them, 1 to PREVIEW_FULL). The
-full result is kept server-side; paying for the document (v1: the processing session id is
-the entitlement) unlocks it and the .docx download. docs/paywall-audit.md lists every path
-checked for leaks.
+full result is kept server-side; paying for the document unlocks it and the .docx
+download. docs/paywall-audit.md lists every path checked for leaks.
+
+Paying (by card or with credits) creates an entitlement: the paid document, its tier, its
+fingerprint and FREE_RESCANS free re-scans for RESCAN_DAYS. The page is given a re-scan
+token (POST /api/rescan-link/{session_id}; kept hashed). An upload that comes with it and
+is mostly the same essay (AGLC_RESCAN_OVERLAP) is checked in full, unlocked, using one
+re-scan; one that isn't gets the normal preview, with a note saying why. Documents paid for
+before entitlements existed were given one by the migration and keep working.
 
 What can be bought is in PRODUCTS (prices live there only): a document is an `essay` (up to
 ESSAY_MAX_FOOTNOTES footnotes) or a `long` document (up to $AGLC_MAX_FOOTNOTES), chosen
@@ -24,6 +30,7 @@ bought from a document's unlock screen unlocks that document with its first cred
     GET  /api/pack/{order_id}           a pack's status, and its code the first time it is asked for
     POST /api/redeem {session_id, code} unlock a document with credits
     POST /api/credits {code}            credits left on a code
+    POST /api/rescan-link/{session_id}  a paid document's re-scan token (a new one each time)
 
 Free processing is limited before any LLM call: per browser and per IP address per day,
 a global daily cap, a footnote cap and a cap on concurrent jobs. If a paid document's
@@ -59,7 +66,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -237,6 +244,11 @@ def _visitor(request: Request) -> Visitor:
         salt = os.environ.get("AGLC_IP_SALT") or get_store().secret("ip_salt")
         ip_hash = hashlib.sha256(f"{salt}:{today()}:{ip}".encode()).hexdigest()[:32]
     return Visitor(ip_hash=ip_hash, anon_id=anon, new_cookie=new)
+
+
+def visitor_of(request: Request) -> Visitor:
+    """Who is uploading (hashed), without the free-use check or the cookie: for a re-scan."""
+    return _visitor(request)
 
 
 def _free_limits() -> tuple[int, int, int]:
@@ -435,8 +447,219 @@ def run_failed(session_id: str) -> None:
     get_store().set_status(session_id, "seen", expect="processing")
 
 
+# --------------------------------------------------------------------------- #
+# Entitlements: a paid document, and its free re-scans
+# --------------------------------------------------------------------------- #
+
+FREE_RESCANS = 3  # free re-scans of a revised version of a paid document...
+RESCAN_DAYS = 14  # ... for this many days after paying (separate from MAX_RERUNS)
+DEFAULT_RESCAN_OVERLAP = 0.5  # $AGLC_RESCAN_OVERLAP: how like the paid document a re-scan must be
+
+
+def rescan_overlap() -> float:
+    return min(1.0, max(0.0, _float_env("AGLC_RESCAN_OVERLAP", DEFAULT_RESCAN_OVERLAP)))
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(f"aforecite-rescan:{token}".encode()).hexdigest()
+
+
+def _grant_entitlement(conn: sqlite3.Connection, session_id: str, source: str) -> str:
+    """Record that `session_id` was paid for (in the caller's transaction, with the unlock).
+    A document paid for again after a refund gets its entitlement back, fresh."""
+    doc = conn.execute("SELECT footnote_count FROM documents WHERE session_id = ?", (session_id,)).fetchone()
+    paid = datetime.now(timezone.utc)
+    ent_id = uuid.uuid4().hex
+    conn.execute(
+        "INSERT INTO entitlements (id, session_id, tier, source, rescans_remaining, paid_at, expires_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET source = excluded.source,"
+        " tier = excluded.tier, rescans_remaining = excluded.rescans_remaining, paid_at = excluded.paid_at,"
+        " expires_at = excluded.expires_at, token_hash = NULL, revoked_at = NULL",
+        (ent_id, session_id, tier_for(doc["footnote_count"]), source, FREE_RESCANS,
+         paid.isoformat(timespec="seconds"), (paid + timedelta(days=RESCAN_DAYS)).isoformat(timespec="seconds")),
+    )
+    ent = conn.execute("SELECT id FROM entitlements WHERE session_id = ?", (session_id,)).fetchone()
+    conn.execute("UPDATE documents SET entitlement_id = ? WHERE session_id = ?", (ent["id"], session_id))
+    return ent["id"]
+
+
+def _revoke_entitlement(conn: sqlite3.Connection, session_id: str) -> None:
+    """The document's payment was refunded (or its files have gone): no more re-scans."""
+    conn.execute("UPDATE entitlements SET rescans_remaining = 0, token_hash = NULL, revoked_at = ?"
+                 " WHERE session_id = ? AND revoked_at IS NULL", (now(), session_id))
+
+
+def _entitlement(conn: sqlite3.Connection, ent_id: str | None) -> sqlite3.Row | None:
+    if not ent_id:
+        return None
+    return conn.execute("SELECT * FROM entitlements WHERE id = ?", (ent_id,)).fetchone()
+
+
+def _active(ent: sqlite3.Row | None) -> bool:
+    return ent is not None and not ent["revoked_at"] and ent["expires_at"] > now()
+
+
+def _session_hashes(session_id: str, key: str) -> set[str]:
+    """A document's footnote hashes, as written and (if its result is still kept) as
+    corrected, so a revision with the corrections accepted is still recognised."""
+    store = get_store()
+    hashes = set(store.fingerprint(session_id) or ())
+    d = _session_dir(session_id)
+    if not hashes and (d / "input.docx").is_file():  # paid for before fingerprints were kept
+        try:
+            hashes = set(fingerprint.compute([fn.original.text for fn in read_footnotes(d / "input.docx")], key).hashes)
+        except Exception:  # noqa: BLE001 - an old upload that can't be read just isn't recognised
+            log.warning("couldn't fingerprint the earlier upload of %s", session_id[:8])
+    full = _load_result(session_id)
+    if full:
+        corrected = [_plain(fn.get("formatted_html", "")) for fn in full["footnotes"] if fn.get("changed")]
+        hashes |= set(fingerprint.compute(corrected, key).hashes)
+    return hashes
+
+
+def _plain(html: str) -> str:
+    from html import unescape
+
+    return unescape(re.sub(r"<[^>]+>", "", html))
+
+
+def refresh_entitlement(ent_id: str | None, session_id: str) -> None:
+    """Add `session_id`'s footnotes (the paid document, or a re-scan of it) to the
+    entitlement's fingerprint, while its files are still kept."""
+    if not ent_id:
+        return
+    key = get_store().secret("fingerprint_key")
+    hashes = _session_hashes(session_id, key)
+    if not hashes:
+        return
+    with get_store().transaction() as conn:
+        ent = _entitlement(conn, ent_id)
+        if ent is None:
+            return
+        known = set(json.loads(ent["fingerprint"])) if ent["fingerprint"] else set()
+        if not hashes <= known:
+            conn.execute("UPDATE entitlements SET fingerprint = ? WHERE id = ?",
+                         (json.dumps(sorted(known | hashes)), ent_id))
+
+
+def rescan_info(ent: sqlite3.Row | None) -> dict | None:
+    """What the page shows about a paid document's re-scans."""
+    if ent is None:
+        return None
+    return {"remaining": ent["rescans_remaining"] if _active(ent) else 0, "total": FREE_RESCANS,
+            "expires_at": ent["expires_at"], "tier": ent["tier"], "active": _active(ent) and ent["rescans_remaining"] > 0,
+            "session_id": ent["session_id"]}
+
+
+def new_rescan_token(session_id: str) -> dict:
+    """Make the paid document's re-scan token (replacing any earlier one, which stops
+    working): only its hash is kept, so it is shown this once. Whoever has the document's
+    results link has the document itself, so may have its re-scans too."""
+    _require_enabled()
+    session_id = check_session_id(session_id)
+    store = get_store()
+    doc = store.document(session_id)
+    _require_not_purged(doc)
+    if doc is None or not doc["unlocked_at"]:
+        raise HTTPException(402, "Unlock this document first.")
+    token = secrets.token_urlsafe(24)
+    with store.transaction() as conn:
+        ent = conn.execute("SELECT * FROM entitlements WHERE session_id = ?", (session_id,)).fetchone()
+        if not _active(ent):
+            raise HTTPException(410, "This document's free re-scans have ended.")
+        conn.execute("UPDATE entitlements SET token_hash = ? WHERE id = ?", (_token_hash(token), ent["id"]))
+        ent = _entitlement(conn, ent["id"])
+    refresh_entitlement(ent["id"], session_id)
+    return {"token": token, "rescan": rescan_info(ent)}
+
+
+@dataclass
+class Rescan:
+    """The outcome of trying to use re-scan tokens on an upload."""
+    entitlement_id: str | None = None  # a re-scan to use
+    note: str | None = None  # why it isn't one, for the page
+
+
+def rescan_candidates(tokens: list[str] | None) -> list[sqlite3.Row]:
+    """The usable entitlements among the tokens an upload came with (checked before the
+    upload is read, so that a re-scan isn't held to the free limits)."""
+    found = []
+    with get_store().read() as conn:
+        for token in (tokens or [])[:10]:
+            if not token or len(token) > 100:
+                continue
+            ent = conn.execute("SELECT * FROM entitlements WHERE token_hash = ?", (_token_hash(token),)).fetchone()
+            if ent is not None and ent["id"] not in {e["id"] for e in found}:
+                found.append(ent)
+    return found
+
+
+def choose_rescan(candidates: list[sqlite3.Row], fp: fingerprint.Fingerprint, footnote_count: int) -> Rescan:
+    """The entitlement whose paid document this upload is a revision of, if any: at least
+    AGLC_RESCAN_OVERLAP of its counted footnotes (and 5) in the paid document as written or
+    corrected (the same containment rule as the seen check). An essay-tier entitlement
+    doesn't cover a version that has grown into a long document: that is a new purchase."""
+    note = None
+    for ent in candidates:
+        if not _active(ent) or ent["rescans_remaining"] <= 0:
+            note = note or (f"Your {FREE_RESCANS} free re-scans for that document have been used or have ended, so "
+                            "this is checked as a new document.")
+            continue
+        if not ent["fingerprint"]:
+            refresh_entitlement(ent["id"], ent["session_id"])
+            with get_store().read() as conn:
+                ent = _entitlement(conn, ent["id"])
+        known = json.loads(ent["fingerprint"]) if ent["fingerprint"] else []
+        if not fingerprint.matches(fp.hashes, known, rescan_overlap()):
+            note = note or ("This looks like a different essay from the one you paid for, so it isn't a free "
+                            "re-scan. Here is its free preview.")
+            continue
+        if ent["tier"] == "essay" and tier_for(footnote_count) == "long":
+            note = (f"This version has more than {ESSAY_MAX_FOOTNOTES} footnotes, so it's a long document, which your "
+                    "free re-scans (bought for an essay) don't cover. Unlock it as a new document to see every correction.")
+            continue
+        return Rescan(entitlement_id=ent["id"])
+    return Rescan(note=note)
+
+
+def start_rescan(session_id: str, filename: str, visitor: Visitor, *, footnote_count: int,
+                 fp: fingerprint.Fingerprint, ent_id: str) -> None:
+    """Record a re-scan, unlocked, using one of the entitlement's re-scans: the decrement and
+    the record are one transaction, so re-scans at the same moment can't take more than
+    are left. 429 if none are left after all."""
+    with get_store().transaction() as conn:
+        taken = conn.execute(
+            "UPDATE entitlements SET rescans_remaining = rescans_remaining - 1"
+            " WHERE id = ? AND rescans_remaining > 0 AND revoked_at IS NULL AND expires_at > ?",
+            (ent_id, now()),
+        ).rowcount == 1
+        if not taken:
+            raise HTTPException(429, f"The {FREE_RESCANS} free re-scans for that document have been used.")
+        conn.execute(
+            "INSERT INTO documents (session_id, filename, ip_hash, anon_id, day, created_at, footnote_count, kind,"
+            " unlocked_at, unlocked_by, entitlement_id) VALUES (?, ?, ?, ?, ?, ?, ?, 'rescan', ?, ?, ?)",
+            (session_id, filename, visitor.ip_hash, visitor.anon_id, today(), now(), footnote_count, now(),
+             f"rescan:{ent_id}", ent_id),
+        )
+    get_store().add_fingerprint(session_id, fp.doc_hash, fp.hashes)
+    log.info("document %s is a free re-scan", session_id[:8])
+
+
+def _give_back_rescan(conn: sqlite3.Connection, ent_id: str) -> None:
+    conn.execute("UPDATE entitlements SET rescans_remaining = MIN(?, rescans_remaining + 1) WHERE id = ?",
+                 (FREE_RESCANS, ent_id))
+
+
 def fail_document(session_id: str) -> None:
-    get_store().finish_document(session_id, status="failed")
+    """A run failed: it isn't a free use, and a re-scan's re-scan is given back."""
+    store = get_store()
+    store.finish_document(session_id, status="failed")
+    doc = store.document(session_id)
+    if doc is not None and doc["kind"] == "rescan" and doc["entitlement_id"]:
+        with store.transaction() as conn:
+            _give_back_rescan(conn, doc["entitlement_id"])
+            conn.execute("UPDATE documents SET unlocked_at = NULL, unlocked_by = NULL WHERE session_id = ?",
+                         (session_id,))
 
 
 def write_result(session_dir: Path, filename: str, full: dict, *,
@@ -465,15 +688,25 @@ def save_result(session_id: str, filename: str, full: dict, *,
         # A preview worth having: later uploads of the same essay get it again, not a new one.
         # (One the model mostly failed to read isn't, so the essay can be tried again.)
         store.index_fingerprint(session_id)
+    if doc["unlocked_at"]:  # a paid run, re-run or re-scan: its corrections join the fingerprint
+        refresh_entitlement(doc["entitlement_id"], session_id)
     return view(session_id, full)
 
 
 def view(session_id: str, full: dict) -> dict:
     """The full result once unlocked, else the preview; with the extraction report."""
-    doc = get_store().document(session_id)
+    store = get_store()
+    doc = store.document(session_id)
     shown = {**full, "locked": False} if doc["unlocked_at"] else preview(full)
-    return {**shown, "id": session_id, **extraction_report(full),
-            "reruns_left": max(0, MAX_RERUNS - doc["reruns"])}
+    out = {**shown, "id": session_id, **extraction_report(full), "reruns_left": max(0, MAX_RERUNS - doc["reruns"])}
+    if doc["unlocked_at"]:
+        with store.read() as conn:
+            ent = _entitlement(conn, doc["entitlement_id"])
+        if ent is not None and not ent["fingerprint"] and ent["session_id"] == session_id:
+            refresh_entitlement(ent["id"], session_id)  # paid for before entitlements had one
+        out["rescan"] = rescan_info(ent)
+        out["rescanned"] = doc["kind"] == "rescan"
+    return out
 
 
 def _expired_message() -> str:
@@ -618,6 +851,7 @@ def _unlock_with_credits(conn: sqlite3.Connection, code_id: str, session_id: str
         return False
     if not credits.spend(conn, code_id, cost, session_id=session_id):
         raise _NotEnoughCredits(cost)
+    _grant_entitlement(conn, session_id, f"credit:{code_id}")
     return True
 
 
@@ -651,6 +885,7 @@ def _settle(conn: sqlite3.Connection, order: sqlite3.Row, *, payment_id: str | N
         "UPDATE documents SET unlocked_at = ?, unlocked_by = ? WHERE session_id = ?",
         (now(), order["id"], order["session_id"]),
     )
+    _grant_entitlement(conn, order["session_id"], order["id"])
     return "unlocked"
 
 
@@ -668,10 +903,13 @@ def _mark_refunded(conn: sqlite3.Connection, order: sqlite3.Row, event: WebhookE
         removed = credits.revoke(conn, order["id"], payment_id=order["payment_id"])
         log.info("pack order %s refunded: %s unspent credits removed", order["id"], removed or 0)
         return "pack_refunded"
-    conn.execute(
-        "UPDATE documents SET unlocked_at = NULL, unlocked_by = NULL WHERE session_id = ? AND unlocked_by = ?",
+    locked = conn.execute(
+        "UPDATE documents SET unlocked_at = NULL, unlocked_by = NULL, entitlement_id = NULL"
+        " WHERE session_id = ? AND unlocked_by = ?",
         (order["session_id"], order["id"]),
-    )
+    ).rowcount
+    if locked:
+        _revoke_entitlement(conn, order["session_id"])
     return "refunded"
 
 
@@ -714,7 +952,12 @@ def after_payment(outcome: str, order_id: str | None, email: str | None) -> None
         return
     if outcome in _REFUND_OUTCOMES:
         _refund(order_id)
-    elif outcome in _PACK_OUTCOMES and email:
+        return
+    if outcome in ("unlocked", "pack_unlocked"):  # the paid document's fingerprint, for re-scans
+        order = get_store().order(order_id)
+        doc = get_store().document(order["session_id"])
+        refresh_entitlement(doc["entitlement_id"], order["session_id"])
+    if outcome in _PACK_OUTCOMES and email:
         _email_code(order_id, email)
 
 
@@ -772,7 +1015,13 @@ def _refund_missing(session_id: str) -> None:
         doc = conn.execute("SELECT unlocked_by FROM documents WHERE session_id = ?", (session_id,)).fetchone()
         unlocked_by = doc["unlocked_by"] if doc else None
         if unlocked_by:
-            conn.execute("UPDATE documents SET unlocked_at = NULL, unlocked_by = NULL WHERE session_id = ?", (session_id,))
+            conn.execute("UPDATE documents SET unlocked_at = NULL, unlocked_by = NULL, entitlement_id = NULL"
+                         " WHERE session_id = ?", (session_id,))
+        if unlocked_by and unlocked_by.startswith("rescan:"):
+            _give_back_rescan(conn, unlocked_by.removeprefix("rescan:"))
+            unlocked_by = None
+        elif unlocked_by:
+            _revoke_entitlement(conn, session_id)
         if unlocked_by and unlocked_by.startswith("credit:"):
             credits.give_back(conn, unlocked_by.removeprefix("credit:"), session_id)
         elif unlocked_by:
@@ -861,6 +1110,8 @@ async def get_config() -> dict:
         "preview_footnotes": PREVIEW_FULL,  # the most a preview shows in full (preview_size)
         "preview_share": PREVIEW_SHARE,
         "email_codes": mailer.enabled(),  # whether a pack's code is also emailed
+        "free_rescans": FREE_RESCANS,
+        "rescan_days": RESCAN_DAYS,
     }
 
 
@@ -1103,7 +1354,14 @@ def redeem(body: RedeemRequest) -> dict:
                                  "hasn't enough left.") from None
     if spent:
         log.info("document %s unlocked with %d credits", session_id[:8], cost)
+        refresh_entitlement(get_store().document(session_id)["entitlement_id"], session_id)
     return {"unlocked": True, "credits_spent": cost if spent else 0, "credits_remaining": left}
+
+
+@router.post("/api/rescan-link/{session_id}")
+def rescan_link(session_id: str) -> dict:
+    """A new re-scan token for a paid document (the old one stops working)."""
+    return new_rescan_token(session_id)
 
 
 # ---- Stand-in checkout page for AGLC_PAYMENTS=fake (local demos and tests) -- #

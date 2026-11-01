@@ -28,6 +28,7 @@
                 <h2>Free preview limits</h2>
                 <p>To limit free previews to a few a day, we set one cookie (<code>aglc_anon</code>) holding a random identifier, kept for a year. We also record a one-way hash of your IP address, salted and changed every day, so we can count previews per day without keeping your address in our database.</p>
                 <p>Each essay gets one free preview. To tell whether an essay has been checked before, we keep a fingerprint of each document you upload: a scrambled code made from each footnote (a keyed one-way hash). It can't be turned back into your footnotes, and it only shows whether a later upload has the same footnotes. Fingerprints are kept for {{fingerprint_days}} days, then deleted automatically. They aren't linked to your name.</p>
+                <p>When you unlock a document, we keep a record of it for its free re-scans: which document it was, the fingerprint of its footnotes as you wrote them and as corrected (so a revised version can be recognised), a one-way hash of your re-scan link, and how many re-scans are left. The fingerprint and link hash are deleted when the re-scans end ({{rescan_days}} days after you pay); the rest of the record is kept with the order, for our accounts.</p>
                 <p>Our web server's own logs record IP addresses for security and troubleshooting. {{log_retention}}</p>
 
                 <h2>Fonts and analytics</h2>

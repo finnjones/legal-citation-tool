@@ -8,6 +8,8 @@ and analytics are set in one place:
     {{price_long}} {{price_pack3}} {{price_pack10}}
                       a long document, and the 3- and 10-credit packs
     {{essay_max}}     the most footnotes an essay can have (more is a long document)
+    {{free_rescans}} {{rescan_days}}
+                      free re-scans of a paid document, and for how many days
     {{max_footnotes}} the most footnotes any document can have ($AGLC_MAX_FOOTNOTES)
     {{preview_full}}  changed footnotes shown free before paying
     {{base_url}}      $AGLC_PUBLIC_URL or the request's own origin (for Open Graph URLs)
@@ -197,6 +199,8 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "price_pack3": escape(billing.PRODUCTS["pack3"].display),
         "price_pack10": escape(billing.PRODUCTS["pack10"].display),
         "essay_max": str(billing.ESSAY_MAX_FOOTNOTES),
+        "free_rescans": str(billing.FREE_RESCANS),
+        "rescan_days": str(billing.RESCAN_DAYS),
         "max_footnotes": str(billing.max_footnotes()),
         "preview_full": str(billing.PREVIEW_FULL),
         "base_url": escape(base_url(request)),

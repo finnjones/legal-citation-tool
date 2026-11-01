@@ -4,7 +4,8 @@ One file, `$AGLC_DATA_DIR/aglc.db`, in WAL mode so the web workers can read whil
 webhook writes. The schema is versioned with `PRAGMA user_version`: append a migration
 to MIGRATIONS, never edit one that has shipped.
 
-    documents       one row per processed upload (the session id is the entitlement in v1)
+    documents       one row per processed upload; unlocked_at is set only with an entitlement
+                    (entitlement_id), or by a re-scan of one
     orders          one row per checkout; status pending -> paid -> refunding -> refunded.
                     A document's order has its session id; a credit pack's may have none
     webhook_events  every webhook applied, keyed by the provider's event id (idempotency)
@@ -18,6 +19,9 @@ to MIGRATIONS, never edit one that has shipped.
                     text; kept $AGLC_FINGERPRINT_DAYS
     fingerprint_index  footnote hash -> session, for free previews only: finds an essay
                     that has had its free preview already
+    entitlements    one per document paid for (by card or credits): its tier, the paid
+                    document's fingerprint, a hashed re-scan token and the free re-scans
+                    left until expires_at (aglc/billing.py)
     meta            small settings, eg the salt for hashing IP addresses
 """
 
@@ -173,6 +177,32 @@ MIGRATIONS: list[str] = [
         PRIMARY KEY (hash, session_id)
     ) WITHOUT ROWID;
     CREATE INDEX fingerprint_index_session ON fingerprint_index(session_id);
+    """,
+    # 6: entitlements (a paid document's record, with its free re-scans). Documents paid for
+    # before this get one each, with no fingerprint or token yet (both are filled in on demand).
+    """
+    CREATE TABLE entitlements (
+        id                 TEXT PRIMARY KEY,
+        session_id         TEXT NOT NULL UNIQUE REFERENCES documents(session_id),
+        tier               TEXT NOT NULL,          -- essay | long
+        source             TEXT NOT NULL,          -- the order id, or credit:<code id>
+        fingerprint        TEXT,                   -- JSON list of hashes: the paid document as written and as corrected
+        token_hash         TEXT UNIQUE,            -- the re-scan token's SHA-256, NULL until one is made
+        rescans_remaining  INTEGER NOT NULL CHECK (rescans_remaining >= 0),
+        paid_at            TEXT NOT NULL,
+        expires_at         TEXT NOT NULL,          -- re-scans end
+        revoked_at         TEXT                    -- refunded
+    );
+    ALTER TABLE documents ADD COLUMN entitlement_id TEXT;
+    INSERT INTO entitlements (id, session_id, tier, source, rescans_remaining, paid_at, expires_at)
+        SELECT lower(hex(randomblob(16))), session_id,
+               CASE WHEN footnote_count > 150 THEN 'long' ELSE 'essay' END,
+               COALESCE(unlocked_by, 'legacy'), 3, unlocked_at,
+               strftime('%Y-%m-%dT%H:%M:%S+00:00', unlocked_at, '+14 days')
+        FROM documents WHERE unlocked_at IS NOT NULL;
+    UPDATE documents SET entitlement_id =
+        (SELECT e.id FROM entitlements e WHERE e.session_id = documents.session_id)
+        WHERE unlocked_at IS NOT NULL
     """,
 ]
 
@@ -413,6 +443,16 @@ class Store:
             )} if found else {}
         hits = [(sid, n) for sid, n in found.items() if n >= at_least]
         return sorted(hits, key=lambda h: (h[1], created.get(h[0], "")), reverse=True)
+
+    def end_rescans(self, at: str) -> int:
+        """Forget the fingerprint and re-scan token of entitlements whose re-scans have ended
+        (expired or refunded) by `at`; the rest of the record stays with the order."""
+        with self.transaction() as conn:
+            return conn.execute(
+                "UPDATE entitlements SET fingerprint = NULL, token_hash = NULL"
+                " WHERE (expires_at < ? OR revoked_at IS NOT NULL) AND (fingerprint IS NOT NULL OR token_hash IS NOT NULL)",
+                (at,),
+            ).rowcount
 
     def purge_fingerprints(self, cutoff: str) -> int:
         """Delete fingerprints made before `cutoff` (the retention sweep)."""

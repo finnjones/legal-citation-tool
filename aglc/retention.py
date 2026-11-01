@@ -18,7 +18,8 @@ results. What counts as "after the window":
   from the payment (the database keeps only a hash of it).
 - Fingerprints (keyed hashes of each upload's footnotes, aglc/fingerprint.py): kept
   longer, $AGLC_FINGERPRINT_DAYS (default 180), so an essay can't have a second free
-  preview the day after its first was deleted.
+  preview the day after its first was deleted. A paid document's own fingerprint and
+  re-scan token (its entitlement) go when its re-scans end, after RESCAN_DAYS.
 
 A deleted document's database row is kept, without its filename, with `purged_at` set: it
 still counts towards today's free-use limits, its orders stay for the accounts, and asking
@@ -96,6 +97,7 @@ def sweep(temp_dir: Path | None, *, at: datetime | None = None) -> int:
         store = get_store()
         store.purge_pickups(cutoff.isoformat(timespec="seconds"))
         store.purge_fingerprints((at - timedelta(days=keep_days())).isoformat(timespec="seconds"))
+        store.end_rescans(at.isoformat(timespec="seconds"))
     sessions = data_dir() / "sessions"
     if sessions.is_dir():
         deleted += _sweep_paid(sessions, cutoff)
