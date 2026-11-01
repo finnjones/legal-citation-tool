@@ -96,7 +96,8 @@ def test_buying_a_pack_shows_its_code_once_and_keeps_only_a_hash(paid, client, f
     code = first["code"]
     assert re.fullmatch(r"AFC-[23456789ABCDEFGHJKMNPQRSTWXYZ]{4}(-[23456789ABCDEFGHJKMNPQRSTWXYZ]{4}){2}", code)
     assert "code" not in _code(client, order_id)  # forgotten once the page said it had it
-    raw = get_store().path.read_bytes() + get_store().path.with_name("aglc.db-wal").read_bytes()
+    wal = get_store().path.with_name("aglc.db-wal")  # SQLite may already have removed it
+    raw = get_store().path.read_bytes() + (wal.read_bytes() if wal.exists() else b"")
     assert code.encode() not in raw and code.replace("-", "").encode() not in raw
     with sqlite3.connect(get_store().path) as conn:
         assert conn.execute("SELECT COUNT(*) FROM code_pickup").fetchone()[0] == 0
