@@ -4,7 +4,13 @@ Pages live in web/ and use a few placeholders, filled in here so the brand name,
 and analytics are set in one place:
 
     {{brand}}         BRAND below (a placeholder until the name is chosen)
-    {{price}}         the server's price, eg "A$4" (billing.PRODUCTS)
+    {{price}}         the price of an essay, eg "A$5" (billing.PRODUCTS, as are the next)
+    {{price_long}} {{price_pack3}} {{price_pack10}}
+                      a long document, and the 3- and 10-credit packs
+    {{essay_max}}     the most footnotes an essay can have (more is a long document)
+    {{free_rescans}} {{rescan_days}}
+                      free re-scans of a paid document, and for how many days
+    {{max_footnotes}} the most footnotes any document can have ($AGLC_MAX_FOOTNOTES)
     {{preview_full}}  changed footnotes shown free before paying
     {{base_url}}      $AGLC_PUBLIC_URL or the request's own origin (for Open Graph URLs)
     {{analytics}}     the Plausible script, only when $AGLC_PLAUSIBLE_DOMAIN is set
@@ -19,6 +25,8 @@ and analytics are set in one place:
     {{gst_note}}      from $AGLC_GST_REGISTERED (default: not registered)
     {{analytics_note}} whether analytics is on ($AGLC_PLAUSIBLE_DOMAIN)
     {{payment_provider}} "Stripe" when $AGLC_PAYMENTS=stripe, otherwise "Square"
+    {{email_note}}    whether a credit pack's code is emailed (aglc/mailer.py)
+    {{fingerprint_days}} how long upload fingerprints are kept: $AGLC_FINGERPRINT_DAYS
     {{rule_pages}}    index only: where each rule is in the AGLC4 PDF (aglc/guide_pdf.py)
     {{> name}}        web/partials/<name>.html
 
@@ -47,13 +55,13 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
-from . import billing, guards, guide_pdf, reports, retention
+from . import billing, fingerprint, guards, guide_pdf, reports, retention
 
 #: The product's name ("aforecited": cited above, which is what Ibid and (n x) do). Set here only.
 BRAND = "Aforecite"
 
 #: When the policy pages (privacy, terms, refunds) last changed: update it with them.
-POLICY_DATE = "23 October 2026"
+POLICY_DATE = "1 November 2026"
 
 #: When the pages that aren't guides or policy pages last changed (ISO dates, for the
 #: sitemap's <lastmod>): update each with its page.
@@ -229,6 +237,16 @@ def payment_provider() -> str:
     return "Stripe" if (os.environ.get("AGLC_PAYMENTS") or "").strip().lower() == "stripe" else "Square"
 
 
+def email_note() -> str:
+    """Whether a credit pack's code is emailed (aglc/mailer.py)."""
+    from . import mailer
+
+    if mailer.enabled():
+        return ("If the checkout gives us your email address, we email the code to it once, through our email "
+                "provider (Resend). We don't keep the address.")
+    return "We don't email codes. If the checkout passes us your email address, we don't keep it."
+
+
 def log_retention() -> str:
     days = (os.environ.get("AGLC_LOG_RETENTION_DAYS") or "").strip()
     if not days:
@@ -240,7 +258,14 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
     html = _PARTIAL.sub(lambda m: _read(WEB_DIR / "partials" / f"{m[1]}.html"), html)
     values = {
         "brand": escape(BRAND),
-        "price": escape(billing.PRODUCTS["document"].display),
+        "price": escape(billing.PRODUCTS["essay"].display),
+        "price_long": escape(billing.PRODUCTS["long"].display),
+        "price_pack3": escape(billing.PRODUCTS["pack3"].display),
+        "price_pack10": escape(billing.PRODUCTS["pack10"].display),
+        "essay_max": str(billing.ESSAY_MAX_FOOTNOTES),
+        "free_rescans": str(billing.FREE_RESCANS),
+        "rescan_days": str(billing.RESCAN_DAYS),
+        "max_footnotes": str(billing.max_footnotes()),
         "preview_full": str(billing.PREVIEW_FULL),
         "base_url": escape(base_url(request)),
         "analytics": analytics_tag(),
@@ -254,9 +279,11 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "analytics_note": analytics_note(),
         "payment_provider": payment_provider(),
         "log_retention": log_retention(),
+        "email_note": email_note(),
+        "fingerprint_days": f"{fingerprint.keep_days():g}",
         **(extra or {}),
     }
-    return re.sub(r"\{\{\s*([a-z_]+)\s*\}\}", lambda m: values.get(m[1], m[0]), html)
+    return re.sub(r"\{\{\s*([a-z0-9_]+)\s*\}\}", lambda m: values.get(m[1], m[0]), html)
 
 
 def _read(path: Path) -> str:
@@ -368,11 +395,11 @@ def _web_application(base: str) -> dict:
         "operatingSystem": "Web", "inLanguage": "en-AU", "publisher": {"@id": f"{base}/#organization"},
     }
     if billing.enabled():
-        product = billing.PRODUCTS["document"]
-        app["offers"] = {
-            "@type": "Offer", "price": f"{product.amount / 100:.2f}", "priceCurrency": product.currency,
-            "description": "One document: every corrected footnote and the .docx with tracked changes",
-        }
+        app["offers"] = [
+            {"@type": "Offer", "name": product.name, "price": f"{product.amount / 100:.2f}",
+             "priceCurrency": product.currency}
+            for product in billing.PRODUCTS.values()
+        ]
     return app
 
 
@@ -605,9 +632,13 @@ def llms_txt(request: Request) -> PlainTextResponse:
     ]
     if billing.enabled():
         lines.append(
-            f"- A free preview shows every footnote's status, every Check item and the first "
-            f"{billing.PREVIEW_FULL} fixes in full; one payment of {billing.PRODUCTS['document'].display} "
-            "unlocks the whole document."
+            f"- A free preview shows every footnote's status, every Check item and up to "
+            f"{billing.PREVIEW_FULL} fixes in full. Unlocking the whole document costs "
+            f"{billing.PRODUCTS['essay'].display} per essay (up to {billing.ESSAY_MAX_FOOTNOTES} footnotes) or "
+            f"{billing.PRODUCTS['long'].display} for a long document, or use credit packs "
+            f"({billing.PRODUCTS['pack3'].display} for 3, {billing.PRODUCTS['pack10'].display} for 10). "
+            f"Each unlock includes {billing.FREE_RESCANS} free re-scans of a revised version for "
+            f"{billing.RESCAN_DAYS} days."
         )
     lines += [
         "- It follows the Australian Guide to Legal Citation, 4th edition (AGLC4). It isn't affiliated "

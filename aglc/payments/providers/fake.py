@@ -37,6 +37,7 @@ class FakeCheckout:
     product: Product
     redirect_url: str
     payment_id: str | None = None
+    email: str | None = None
     refunds: list[Refund] = field(default_factory=list)
 
 
@@ -73,13 +74,16 @@ class FakePaymentProvider(PaymentProvider):
             payment_id=payload.get("payment_id"),
             amount=int(payload.get("amount") or 0),
             currency=payload.get("currency") or "",
+            email=payload.get("email"),
+            full=bool(payload.get("full", True)),
         )
 
     def retrieve(self, provider_order_id: str) -> PaymentStatus:
         c = self.checkouts.get(provider_order_id)
         if not c or not c.payment_id:
             return PaymentStatus(paid=False)
-        return PaymentStatus(paid=True, amount=c.product.amount, currency=c.product.currency, payment_id=c.payment_id)
+        return PaymentStatus(paid=True, amount=c.product.amount, currency=c.product.currency, payment_id=c.payment_id,
+                             email=c.email)
 
     def refund(self, *, payment_id: str, amount: int, currency: str, reason: str, idempotency_key: str) -> Refund:
         if self.fail_refunds:
@@ -102,10 +106,11 @@ class FakePaymentProvider(PaymentProvider):
     def cancel_checkout(self, checkout_id: str) -> None:
         self.cancelled.append(checkout_id)
 
-    def pay(self, provider_order_id: str) -> str:
-        """The customer pays; returns the payment id."""
+    def pay(self, provider_order_id: str, email: str | None = None) -> str:
+        """The customer pays (giving `email` at the checkout, if any); returns the payment id."""
         c = self.checkouts[provider_order_id]
         c.payment_id = c.payment_id or f"fake_payment_{uuid.uuid4().hex[:16]}"
+        c.email = email or c.email
         return c.payment_id
 
     def signed_event(
@@ -116,6 +121,7 @@ class FakePaymentProvider(PaymentProvider):
         amount: int | None = None,
         currency: str | None = None,
         event_id: str | None = None,
+        full: bool = True,
     ) -> tuple[bytes, dict[str, str]]:
         """The webhook body and headers the provider would send for this checkout."""
         c = self.checkouts[provider_order_id]
@@ -128,6 +134,8 @@ class FakePaymentProvider(PaymentProvider):
                 "payment_id": c.payment_id,
                 "amount": c.product.amount if amount is None else amount,
                 "currency": currency or c.product.currency,
+                "email": c.email,
+                "full": full,
             }
         ).encode()
         return body, {SIGNATURE_HEADER: self.sign(body), "content-type": "application/json"}

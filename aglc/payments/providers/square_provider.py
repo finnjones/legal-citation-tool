@@ -141,6 +141,7 @@ class SquareProvider(PaymentProvider):
                 payment_id=p.get("id"),
                 amount=int(money.get("amount") or 0),
                 currency=str(money.get("currency") or ""),
+                email=p.get("buyer_email_address"),
             )
         if kind.startswith("refund.") and "refund" in obj:
             r = obj["refund"]
@@ -162,7 +163,7 @@ class SquareProvider(PaymentProvider):
             return PaymentStatus(paid=False)
         total = order.total_money
         due, currency = (total.amount or 0, total.currency or "") if total else (0, "")
-        paid_amount, payment_id = 0, None
+        paid_amount, payment_id, email = 0, None, None
         for tender in order.tenders or []:
             if not tender.payment_id:
                 continue
@@ -170,8 +171,11 @@ class SquareProvider(PaymentProvider):
             if payment and payment.status == "COMPLETED" and payment.amount_money:
                 paid_amount += payment.amount_money.amount or 0
                 payment_id = payment_id or payment.id
+                found = getattr(payment, "buyer_email_address", None)
+                email = email or (found if isinstance(found, str) else None)
         return PaymentStatus(
-            paid=due > 0 and paid_amount >= due, amount=paid_amount, currency=currency, payment_id=payment_id
+            paid=due > 0 and paid_amount >= due, amount=paid_amount, currency=currency, payment_id=payment_id,
+            email=email,
         )
 
     def refund(self, *, payment_id: str, amount: int, currency: str, reason: str, idempotency_key: str) -> Refund:

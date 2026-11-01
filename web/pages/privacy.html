@@ -23,9 +23,12 @@
 
                 <h2>Payments</h2>
                 <p>Payments are taken on {{payment_provider}}'s own checkout page. Your card details go to {{payment_provider}} and never reach our server. We keep a record of each order: the amount, its status, and {{payment_provider}}'s payment and order references, so we can confirm payment and give refunds.</p>
+                <p><strong>Credit packs:</strong> we keep a one-way hash of the pack's code (not the code itself, which can't be worked out from the hash), how many credits are left, and a ledger of each credit given, used or refunded, with the document it unlocked and the payment reference. These are kept while the credits can be used (they don't expire) and then for our accounts, like order records. The code itself is held on our server only until the page you return to after paying shows it to you, and for no more than {{retention_hours}} hours. {{email_note}}</p>
 
                 <h2>Free preview limits</h2>
                 <p>To limit free previews to a few a day, we set one cookie (<code>aglc_anon</code>) holding a random identifier, kept for a year. We also record a one-way hash of your IP address, salted and changed every day, so we can count previews per day without keeping your address in our database.</p>
+                <p>Each essay gets one free preview. To tell whether an essay has been checked before, we keep a fingerprint of each document you upload: a scrambled code made from each footnote (a keyed one-way hash). It can't be turned back into your footnotes, and it only shows whether a later upload has the same footnotes. If someone else uploads an essay with the same footnotes, they're told only that it has had its free preview: nothing from your essay is shown to them. Fingerprints are kept for {{fingerprint_days}} days, then deleted automatically. They aren't linked to your name.</p>
+                <p>When you unlock a document, we keep a record of it for its free re-scans: which document it was, the fingerprint of its footnotes as you wrote them and as corrected (so a revised version can be recognised), a one-way hash of your re-scan link, and how many re-scans are left. The fingerprint and link hash are deleted when the re-scans end ({{rescan_days}} days after you pay); the rest of the record is kept with the order, for our accounts.</p>
                 <p>Our web server's own logs record IP addresses for security and troubleshooting. {{log_retention}}</p>
 
                 <h2>Fonts and analytics</h2>

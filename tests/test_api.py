@@ -555,8 +555,9 @@ def test_price_on_the_page_comes_from_the_server():
     from aglc import billing
 
     text = client.get("/").text
-    assert f"{billing.PRODUCTS['document'].display} per document" in text
-    assert f"first {billing.PREVIEW_FULL} fixes free" in text
+    assert f"{billing.PRODUCTS['essay'].display} per essay" in text
+    assert billing.PRODUCTS["long"].display in text and billing.PRODUCTS["pack10"].display in text
+    assert f"up to {billing.PREVIEW_FULL})" in text
 
 
 # ---- Tests: the AGLC4 guides, sitemap and robots.txt ------------------------------ #
@@ -766,9 +767,11 @@ def test_home_page_offer_is_the_live_price_when_payments_are_on(monkeypatch):
 
     monkeypatch.setenv("AGLC_PAYMENTS", "fake")
     app = next(n for n in _nodes(client.get("/").text) if n["@type"] == "WebApplication")
-    product = billing.PRODUCTS["document"]
-    assert app["offers"]["price"] == f"{product.amount / 100:.2f}"
-    assert app["offers"]["priceCurrency"] == product.currency
+    offers = {o["name"]: o for o in app["offers"]}
+    assert len(offers) == len(billing.PRODUCTS)
+    for product in billing.PRODUCTS.values():
+        assert offers[product.name]["price"] == f"{product.amount / 100:.2f}"
+        assert offers[product.name]["priceCurrency"] == product.currency
 
 
 def test_owner_name_is_the_publisher_when_set(monkeypatch):
@@ -864,7 +867,7 @@ def test_sitemap_has_a_lastmod_for_every_url():
         lastmod = url.find("s:lastmod", ns).text
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", lastmod) and lastmod == site.lastmod(path)
     assert site.lastmod("/guides/ibid") == site.GUIDES["ibid"].updated
-    assert site.lastmod("/privacy") == "2026-10-23"  # from POLICY_DATE
+    assert site.lastmod("/privacy") == "2026-11-01"  # from POLICY_DATE
     assert site.lastmod("/about") == "2026-10-18"  # unchanged by this work: its real last change
     assert not any("/api/" in el.text for el in root.iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc"))
 
@@ -915,7 +918,9 @@ def test_llms_txt_states_the_live_price_only_when_payments_are_on(monkeypatch):
     from aglc import billing
 
     monkeypatch.setenv("AGLC_PAYMENTS", "fake")
-    assert f"one payment of {billing.PRODUCTS['document'].display}" in client.get("/llms.txt").text
+    text = client.get("/llms.txt").text
+    assert f"{billing.PRODUCTS['essay'].display} per essay" in text
+    assert billing.PRODUCTS["long"].display in text and billing.PRODUCTS["pack10"].display in text
 
 
 # ---- Guard tests: the guides may only cite rules and examples this repo knows -------- #
