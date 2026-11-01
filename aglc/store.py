@@ -14,11 +14,16 @@ to MIGRATIONS, never edit one that has shipped.
                     unlocked and the pack's payment id
     code_pickup     a new pack's code, held only until the buyer's page collects it (or the
                     retention window ends), so it can be shown once
+    fingerprints    keyed hashes of each upload's footnotes (aglc/fingerprint.py), never the
+                    text; kept $AGLC_FINGERPRINT_DAYS
+    fingerprint_index  footnote hash -> session, for free previews only: finds an essay
+                    that has had its free preview already
     meta            small settings, eg the salt for hashing IP addresses
 """
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import sqlite3
@@ -148,6 +153,27 @@ MIGRATIONS: list[str] = [
         created_at  TEXT NOT NULL
     );
     """,
+    # 5: fingerprints, and documents that were refused a second free preview ("seen")
+    """
+    ALTER TABLE documents ADD COLUMN kind TEXT NOT NULL DEFAULT 'free';  -- free | seen
+    ALTER TABLE documents ADD COLUMN seen_of TEXT;                       -- the earlier preview it matched
+
+    CREATE TABLE fingerprints (
+        session_id  TEXT PRIMARY KEY,
+        doc_hash    TEXT NOT NULL,
+        hashes      TEXT NOT NULL,             -- JSON list of the counted footnotes' hashes
+        indexed     INTEGER NOT NULL DEFAULT 0, -- in fingerprint_index: a free preview
+        created_at  TEXT NOT NULL
+    );
+    CREATE INDEX fingerprints_created ON fingerprints(created_at);
+
+    CREATE TABLE fingerprint_index (
+        hash        TEXT NOT NULL,
+        session_id  TEXT NOT NULL,
+        PRIMARY KEY (hash, session_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX fingerprint_index_session ON fingerprint_index(session_id);
+    """,
 ]
 
 # A document whose retention window (see aglc/retention.py) ended before :cutoff: uploaded,
@@ -239,7 +265,8 @@ class Store:
     # ---- documents ---------------------------------------------------------- #
 
     def add_document(self, session_id: str, filename: str, *, ip_hash: str | None, anon_id: str | None,
-                     limits: tuple[int, int, int] | None = None) -> str | None:
+                     limits: tuple[int, int, int] | None = None, footnote_count: int = 0, kind: str = "free",
+                     status: str = "processing", seen_of: str | None = None) -> str | None:
         """Record a document. With `limits` (per IP, per browser, global), only while today's
         free uses are under them: the count and the insert are one transaction, so two
         uploads at once can't both take the last free run. Returns the limit that refused it
@@ -253,8 +280,9 @@ class Store:
                 if by_browser >= per_browser or by_ip >= per_ip:
                     return "visitor"
             conn.execute(
-                "INSERT INTO documents (session_id, filename, ip_hash, anon_id, day, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (session_id, filename, ip_hash, anon_id, today(), now()),
+                "INSERT INTO documents (session_id, filename, ip_hash, anon_id, day, created_at, footnote_count, kind,"
+                " status, seen_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (session_id, filename, ip_hash, anon_id, today(), now(), footnote_count, kind, status, seen_of),
             )
         return None
 
@@ -321,7 +349,8 @@ class Store:
     @staticmethod
     def _free_uses(conn: sqlite3.Connection, *, ip_hash: str | None, anon_id: str | None) -> tuple[int, int, int]:
         def count(where: str, *args) -> int:
-            sql = f"SELECT COUNT(*) FROM documents WHERE day = ? AND unlocked_at IS NULL AND {where}"
+            # A "seen" upload ran no model: it isn't a free use
+            sql = f"SELECT COUNT(*) FROM documents WHERE day = ? AND unlocked_at IS NULL AND kind != 'seen' AND {where}"
             return conn.execute(sql, (today(), *args)).fetchone()[0]
 
         return (
@@ -329,6 +358,68 @@ class Store:
             count("anon_id = ? AND status != 'failed'", anon_id) if anon_id else 0,
             count("1"),
         )
+
+    def set_status(self, session_id: str, status: str, *, expect: str | None = None) -> bool:
+        """Set a document's status (only if it is `expect`, when given); True if it was set."""
+        with self.transaction() as conn:
+            if expect is None:
+                return conn.execute("UPDATE documents SET status = ? WHERE session_id = ?",
+                                    (status, session_id)).rowcount == 1
+            return conn.execute("UPDATE documents SET status = ? WHERE session_id = ? AND status = ?",
+                                (status, session_id, expect)).rowcount == 1
+
+    # ---- fingerprints -------------------------------------------------------- #
+
+    def add_fingerprint(self, session_id: str, doc_hash: str, hashes: tuple[str, ...]) -> None:
+        with self.transaction() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO fingerprints (session_id, doc_hash, hashes, indexed, created_at)"
+                " VALUES (?, ?, ?, 0, ?)",
+                (session_id, doc_hash, json.dumps(list(hashes)), now()),
+            )
+
+    def fingerprint(self, session_id: str) -> tuple[str, ...] | None:
+        with self.read() as conn:
+            row = conn.execute("SELECT hashes FROM fingerprints WHERE session_id = ?", (session_id,)).fetchone()
+        return tuple(json.loads(row["hashes"])) if row else None
+
+    def index_fingerprint(self, session_id: str) -> None:
+        """Make a free preview's fingerprint findable by later uploads (once)."""
+        with self.transaction() as conn:
+            row = conn.execute("SELECT hashes FROM fingerprints WHERE session_id = ? AND indexed = 0",
+                               (session_id,)).fetchone()
+            if row is None:
+                return
+            conn.executemany("INSERT OR IGNORE INTO fingerprint_index (hash, session_id) VALUES (?, ?)",
+                             [(h, session_id) for h in json.loads(row["hashes"])])
+            conn.execute("UPDATE fingerprints SET indexed = 1 WHERE session_id = ?", (session_id,))
+
+    def fingerprint_candidates(self, hashes: tuple[str, ...], at_least: int) -> list[tuple[str, int]]:
+        """Indexed (free preview) sessions sharing at least `at_least` of `hashes`, as
+        (session id, how many), most shared first, then newest first."""
+        found: dict[str, int] = {}
+        with self.read() as conn:
+            for i in range(0, len(hashes), 500):  # SQLite's limit on query parameters
+                chunk = hashes[i : i + 500]
+                rows = conn.execute(
+                    f"SELECT session_id, COUNT(*) AS n FROM fingerprint_index WHERE hash IN ({','.join('?' * len(chunk))})"
+                    " GROUP BY session_id", chunk,
+                ).fetchall()
+                for r in rows:
+                    found[r["session_id"]] = found.get(r["session_id"], 0) + r["n"]
+            created = {r["session_id"]: r["created_at"] for r in conn.execute(
+                f"SELECT session_id, created_at FROM fingerprints WHERE session_id IN ({','.join('?' * len(found))})",
+                list(found),
+            )} if found else {}
+        hits = [(sid, n) for sid, n in found.items() if n >= at_least]
+        return sorted(hits, key=lambda h: (h[1], created.get(h[0], "")), reverse=True)
+
+    def purge_fingerprints(self, cutoff: str) -> int:
+        """Delete fingerprints made before `cutoff` (the retention sweep)."""
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM fingerprint_index WHERE session_id IN"
+                         " (SELECT session_id FROM fingerprints WHERE created_at < ?)", (cutoff,))
+            return conn.execute("DELETE FROM fingerprints WHERE created_at < ?", (cutoff,)).rowcount
 
     # ---- orders ------------------------------------------------------------- #
 

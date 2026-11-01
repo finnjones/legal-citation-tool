@@ -170,6 +170,31 @@ documents, so the provider setup in sections 3 and 3a doesn't change.
   the document it unlocked), refund and return, so a code's history can be read back:
   `sqlite3 aglc.db "SELECT * FROM credit_ledger WHERE code_id = '...'"`.
 
+## 4c. One free preview per essay
+
+Every upload is fingerprinted before any model call (`aglc/fingerprint.py`): each footnote is
+normalised (case, quotes, dashes, punctuation and spacing don't matter) and hashed with
+HMAC-SHA256 under a random key kept in the database (`meta.fingerprint_key`). Only the hashes
+are stored, never the text. A free upload whose distinctive footnotes are at least
+`AGLC_SEEN_OVERLAP` (default 0.6) contained in one earlier free preview, with at least 5
+matching, is "seen": no model runs, and it gets the earlier preview again (the same
+footnotes in full), or, if that preview has been deleted, a 409 offering to unlock. Paying
+for a seen essay (card or credits) runs the new upload fresh (`POST /api/run/{id}`).
+
+- Containment of the new document, not Jaccard similarity, so cutting footnotes out of an
+  essay (eg the ones the preview showed) still matches it. Bare Ibids, bare (n x) references
+  and anything under 12 characters don't count: they are common to every essay. A document
+  with fewer than 5 distinctive footnotes never matches, so short documents don't collide.
+- Only a preview worth having is matched against: one that finished and could be paid for.
+  A run that failed, or one the model mostly couldn't read, doesn't use up the essay's preview.
+- The sample essay is never "seen". A seen upload isn't counted against the free limits.
+- Fingerprints are kept `AGLC_FINGERPRINT_DAYS` (default 180), well past the 24-hour
+  document retention, and then deleted by the retention sweep. The privacy page says so.
+- Two students whose essays share most of their distinctive footnotes would collide; the
+  second sees the first's preview. With 60% containment of at least 5 full citations, that
+  is in practice the same essay. Lower the false-positive risk by raising
+  `AGLC_SEEN_OVERLAP`, or set it to `0` to turn the check off.
+
 ## 5. The deploy script and workflow
 
 The workflow tests with `uv sync --all-extras` and then runs the server-side `deploy` script.

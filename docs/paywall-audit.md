@@ -13,7 +13,11 @@ body-text fixes that were made (a count only), no .docx.
 
 **Preview size.** `billing.preview_size`: the first `min(3, max(1, ceil(0.10 x changed)))`
 changed footnotes (`PREVIEW_FULL`, `PREVIEW_SHARE`, `PREVIEW_MIN`). Always the first ones in
-document order, so uploading the same essay again shows the same ones.
+document order, so uploading the same essay again shows the same ones. Uploading it again
+from another browser and address, or with the shown footnotes deleted to see the next ones,
+is stopped by the seen-essay check (`aglc/fingerprint.py`): the upload's footnotes are
+mostly contained in an earlier free preview, so it gets that preview again, with no model
+run (`tests/test_seen.py`, including that exact attack).
 
 Tests: `tests/test_paywall.py`, plus the preview tests in `tests/test_billing.py`.
 
@@ -38,6 +42,8 @@ Tests: `tests/test_paywall.py`, plus the preview tests in `tests/test_billing.py
 | Body-text fixes (`body_fixes`) | the checks left for the student (`applied: false`, like warnings); fixes that were made are counted (`body_fixes_locked`) | all | **leak, fixed**: the fixes made were sent in full, eg "'s 5-7' changed to 'ss 5–7'", which are corrections in the paid .docx |
 | Footnote `changes` (why each change was made) | only on shown footnotes; a locked footnote has `number`, `changed`, `locked`, `original`, `original_html` only | all | ok |
 | Preview size | 1 to 3 changed footnotes, by document size | all | **fixed**: it was always 3, which fully corrected a short essay (3 of 3, or 3 of 4) for free |
+| A seen essay (an earlier free preview's footnotes) | that earlier preview again, recomputed by `billing.preview` from the earlier session's saved result under a new session id (never the earlier session's id), or a 409 with only the price; the earlier upload's filename is not sent | after payment, a fresh run of the new upload | ok |
+| `POST /api/run/{id}` | 402 | the fresh run's full result | ok |
 | The page (`web/index.html`) | renders what it is sent; a locked footnote shows "Result hidden until you unlock" because it has no result, not because one is hidden with CSS | full | ok |
 
 Not in scope: someone who pays can share their own results link; that is a paid document,

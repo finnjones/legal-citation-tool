@@ -29,6 +29,13 @@ Free processing is limited before any LLM call: per browser and per IP address p
 a global daily cap, a footnote cap and a cap on concurrent jobs. If a paid document's
 files have gone, the payment is refunded automatically.
 
+One essay gets one free preview, whoever uploads it. Each upload is fingerprinted
+(aglc/fingerprint.py) and, before any LLM call, compared with earlier free previews: a
+match is a "seen" document. No model runs for it: the page gets the earlier preview again
+(the same footnotes in full), or, if that has been deleted, a 409 offering to unlock. A
+seen document can always be paid for; payment unlocks a fresh run of the new upload
+(POST /api/run/{session_id}, in aglc/api.py).
+
 Nobody pays for footnotes the model failed to read. Failed footnotes are retried once
 before the preview; if more than $AGLC_MAX_FAILED_SHARE of them (or a whole batch) still
 failed, the document isn't `payable` and checkout refuses it (409) until a free re-run
@@ -61,9 +68,9 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
-from . import credits, mailer, pipeline, retention
+from . import credits, fingerprint, mailer, pipeline, retention
 from .docx_io import read_footnotes
-from .models import Extraction
+from .models import Extraction, Footnote
 from .payments import (
     PaymentError,
     Product,
@@ -121,6 +128,19 @@ def _session_dir(session_id: str) -> Path:
 def _files_present(session_id: str) -> bool:
     d = _session_dir(session_id)
     return (d / "output.docx").is_file() and (d / "result.json").is_file()
+
+
+def _awaiting_run(doc: sqlite3.Row) -> bool:
+    """A seen document not yet run: it is unlocked by paying, then run (POST /api/run)."""
+    return doc["kind"] == "seen" and doc["status"] in ("seen", "processing")
+
+
+def _can_deliver(doc: sqlite3.Row) -> bool:
+    """Whether what a payment for this document buys is still on disk: the result, or for a
+    seen document awaiting its run, the upload it will be run on."""
+    if _awaiting_run(doc):
+        return (_session_dir(doc["session_id"]) / "input.docx").is_file()
+    return _files_present(doc["session_id"])
 
 
 def _float_env(name: str, default: float) -> float:
@@ -253,11 +273,56 @@ def admit(request: Request, response: Response) -> Visitor:
 
 def check_footnote_cap(docx_path: Path) -> int:
     """Count the footnotes (no LLM involved) and refuse (413) a document over the cap."""
-    count = len(read_footnotes(docx_path))
+    return len(read_capped(docx_path))
+
+
+def read_capped(docx_path: Path) -> list[Footnote]:
+    """The document's footnotes (no LLM involved), refusing (413) a document over the cap."""
+    footnotes = read_footnotes(docx_path)
     cap = max_footnotes()
-    if count > cap:
-        raise HTTPException(413, f"This document has {count} footnotes; the limit is {cap}. Try splitting it into parts.")
-    return count
+    if len(footnotes) > cap:
+        raise HTTPException(413, f"This document has {len(footnotes)} footnotes; the limit is {cap}. "
+                                 "Try splitting it into parts.")
+    return footnotes
+
+
+# --------------------------------------------------------------------------- #
+# Fingerprints: one free preview per essay
+# --------------------------------------------------------------------------- #
+
+_sample_hash: dict[str, str] = {}
+
+
+def fingerprint_of(footnotes: list[Footnote]) -> fingerprint.Fingerprint:
+    key = get_store().secret("fingerprint_key")
+    return fingerprint.compute([fn.original.text for fn in footnotes], key)
+
+
+def _is_sample(fp: fingerprint.Fingerprint) -> bool:
+    """The sample essay ("Try a sample essay") may be previewed by everyone."""
+    from .site import SAMPLE_ESSAY
+
+    key = get_store().secret("fingerprint_key")
+    if key not in _sample_hash:
+        try:
+            _sample_hash[key] = fingerprint_of(read_footnotes(SAMPLE_ESSAY)).doc_hash
+        except (OSError, ValueError, KeyError):
+            _sample_hash[key] = ""
+    return fp.doc_hash == _sample_hash[key]
+
+
+def seen_before(fp: fingerprint.Fingerprint) -> str | None:
+    """The earlier free preview this upload matches (see aglc/fingerprint.py), or None.
+    One whose result is still kept is preferred, so its preview can be shown again."""
+    share = fingerprint.seen_overlap()
+    if share <= 0 or len(fp.hashes) < fingerprint.MIN_MATCHES or _is_sample(fp):
+        return None
+    # each candidate's count is how many of this upload's counted footnotes it shares
+    hits = [sid for sid, shared in get_store().fingerprint_candidates(fp.hashes, fingerprint.MIN_MATCHES)
+            if shared / len(fp.hashes) >= share]
+    if not hits:
+        return None
+    return next((sid for sid in hits if _load_result(sid) is not None), hits[0])
 
 
 _semaphore: tuple[int, threading.BoundedSemaphore] | None = None
@@ -296,15 +361,78 @@ def extraction_report(full: dict) -> dict:
     return {"failed_footnotes": sorted(failed), "payable": payable}
 
 
-def start_document(session_id: str, filename: str, visitor: Visitor) -> None:
+def start_document(session_id: str, filename: str, visitor: Visitor, *, footnote_count: int = 0,
+                   fp: fingerprint.Fingerprint | None = None) -> None:
     """Record a free run, refusing (429) one over today's limits. The check and the record
     are one transaction, so uploads at the same moment can't all pass `admit` and then
-    all be recorded."""
+    all be recorded. Its fingerprint is kept, and found by later uploads once its preview
+    is ready (save_result)."""
     limits = _free_limits()
     refused = get_store().add_document(session_id, filename, ip_hash=visitor.ip_hash, anon_id=visitor.anon_id,
-                                       limits=limits)
+                                       limits=limits, footnote_count=footnote_count)
     if refused:
         _refuse(refused, limits[1])
+    if fp is not None:
+        get_store().add_fingerprint(session_id, fp.doc_hash, fp.hashes)
+
+
+SEEN_MESSAGE = "We've already checked this essay — unlock it to see every correction."
+
+
+def start_seen(session_id: str, filename: str, visitor: Visitor, *, footnote_count: int,
+               fp: fingerprint.Fingerprint, earlier: str, options: dict) -> dict:
+    """Record an upload that matched an earlier free preview, with no model run, and return
+    that preview again (the same footnotes in full) for this new session; 409, offering to
+    unlock, if the earlier result has been deleted. Paying for it runs the new upload."""
+    get_store().add_document(session_id, filename, ip_hash=visitor.ip_hash, anon_id=visitor.anon_id,
+                             footnote_count=footnote_count, kind="seen", status="seen", seen_of=earlier)
+    get_store().add_fingerprint(session_id, fp.doc_hash, fp.hashes)
+    (_session_dir(session_id) / "options.json").write_text(json.dumps(options))
+    log.info("document %s matches the earlier free preview %s: no model run", session_id[:8], earlier[:8])
+    return seen_view(get_store().document(session_id))
+
+
+def seen_view(doc: sqlite3.Row) -> dict:
+    """What a locked seen document shows: the earlier preview, or a 409 offering to unlock."""
+    tier = tier_for(doc["footnote_count"])
+    earlier = _load_result(doc["seen_of"]) if doc["seen_of"] else None
+    if earlier is None:
+        raise HTTPException(409, {
+            "message": "We've already checked this essay. Its free preview has been deleted, as our privacy policy "
+                       "says, but you can unlock it to see every correction: it will be checked again in full.",
+            "seen": True, "session_id": doc["session_id"], "filename": doc["filename"], "tier": tier,
+            "credits_needed": TIER_CREDITS[tier], "price": _price(tier),
+        })
+    shown = preview(earlier, footnote_count=doc["footnote_count"])
+    return {**shown, "id": doc["session_id"], "filename": doc["filename"], "seen": True, "message": SEEN_MESSAGE,
+            "failed_footnotes": [], "payable": True, "reruns_left": 0}
+
+
+def claim_run(session_id: str) -> tuple[sqlite3.Row, dict]:
+    """Start the paid run of a seen document: 402 until it is unlocked, 409 if it has no run
+    waiting, and "running" (raised as 202) if it has started already. Returns the document
+    and the options it was uploaded with."""
+    store = get_store()
+    doc = store.document(session_id)
+    _require_not_purged(doc)
+    if doc is None:
+        raise HTTPException(404, "Session not found or expired")
+    if not _awaiting_run(doc):
+        raise HTTPException(409, "This document has already been checked.")
+    if not doc["unlocked_at"]:
+        raise HTTPException(402, "Unlock this document to check it in full.")
+    if not store.set_status(session_id, "processing", expect="seen"):
+        raise HTTPException(202, "running")
+    try:
+        options = json.loads((_session_dir(session_id) / "options.json").read_text())
+    except (OSError, ValueError):
+        options = {}
+    return doc, options
+
+
+def run_failed(session_id: str) -> None:
+    """A paid run failed: it can be started again (the upload is kept)."""
+    get_store().set_status(session_id, "seen", expect="processing")
 
 
 def fail_document(session_id: str) -> None:
@@ -330,7 +458,13 @@ def save_result(session_id: str, filename: str, full: dict, *,
     """Keep the full result server-side (with what a re-run needs) and return what the page
     may see now."""
     full = write_result(_session_dir(session_id), filename, full, extraction=extraction, options=options)
-    get_store().finish_document(session_id, status="ready", footnote_count=len(full["footnotes"]))
+    store = get_store()
+    store.finish_document(session_id, status="ready", footnote_count=len(full["footnotes"]))
+    doc = store.document(session_id)
+    if doc["kind"] == "free" and not doc["unlocked_at"] and extraction_report(full)["payable"]:
+        # A preview worth having: later uploads of the same essay get it again, not a new one.
+        # (One the model mostly failed to read isn't, so the essay can be tried again.)
+        store.index_fingerprint(session_id)
     return view(session_id, full)
 
 
@@ -380,15 +514,16 @@ def preview_size(changed: int) -> int:
     return min(PREVIEW_FULL, max(PREVIEW_MIN, math.ceil(round(PREVIEW_SHARE * changed, 9))))
 
 
-def preview(full: dict) -> dict:
+def preview(full: dict, *, footnote_count: int | None = None) -> dict:
     """What an unpaid page may see. Every footnote's original text and status, all warnings
     (they describe problems, never the corrected citation), how many corrections there are,
     and the corrected text of only the first `preview_size` changed footnotes: always the
     same ones for the same document. Withheld until paid for: every other correction (with
     its explanation), the bibliography's entries (counted), the body-text fixes that were
     made (counted; the checks left for the student are shown, like warnings), and the cases
-    found or not checked on the footnotes that are locked (counted). No .docx."""
-    tier = tier_for(len(full["footnotes"]))
+    found or not checked on the footnotes that are locked (counted). No .docx. The price is
+    for `footnote_count` footnotes (default: the result's own)."""
+    tier = tier_for(len(full["footnotes"]) if footnote_count is None else footnote_count)
     changed = [fn["number"] for fn in full["footnotes"] if fn["changed"]]
     shown = set(changed[:preview_size(len(changed))])
     footnotes = []
@@ -440,6 +575,8 @@ def require_unlocked(session_id: str) -> None:
     if not doc["unlocked_at"]:
         price = PRODUCTS[tier_for(doc["footnote_count"])].display
         raise HTTPException(402, f"Unlock this document ({price}) to download it.")
+    if _awaiting_run(doc):
+        raise HTTPException(409, "This document is still being checked. Please wait for it to finish.")
     if not _files_present(session_id):
         _refund_missing(session_id)
         raise HTTPException(410, "This document's files are no longer available. Your payment has been refunded.")
@@ -463,8 +600,8 @@ def _unlockable(conn: sqlite3.Connection, session_id: str | None) -> bool:
     """Whether a pack bought from this document's unlock screen should unlock it now."""
     if not session_id:
         return False
-    doc = conn.execute("SELECT unlocked_at, purged_at FROM documents WHERE session_id = ?", (session_id,)).fetchone()
-    return doc is not None and not doc["unlocked_at"] and not doc["purged_at"] and _files_present(session_id)
+    doc = conn.execute("SELECT * FROM documents WHERE session_id = ?", (session_id,)).fetchone()
+    return doc is not None and not doc["unlocked_at"] and not doc["purged_at"] and _can_deliver(doc)
 
 
 def _unlock_with_credits(conn: sqlite3.Connection, code_id: str, session_id: str) -> bool:
@@ -503,11 +640,11 @@ def _settle(conn: sqlite3.Connection, order: sqlite3.Row, *, payment_id: str | N
         if _unlockable(conn, order["session_id"]) and _unlock_with_credits(conn, code_id, order["session_id"]):
             return "pack_unlocked"
         return "pack_granted"  # bought on its own, or the document has gone: the credits are kept
-    doc = conn.execute("SELECT unlocked_at FROM documents WHERE session_id = ?", (order["session_id"],)).fetchone()
+    doc = conn.execute("SELECT * FROM documents WHERE session_id = ?", (order["session_id"],)).fetchone()
     if doc["unlocked_at"]:
         store.update_order(order["id"], conn, status="refunding", note="document was already paid for")
         return "duplicate_payment"
-    if not _files_present(order["session_id"]):
+    if not _can_deliver(doc):
         store.update_order(order["id"], conn, status="refunding", note="document files missing")
         return "files_missing"
     conn.execute(
@@ -758,11 +895,11 @@ def _payable_document(session_id: str) -> sqlite3.Row:
     """The document a checkout or a credit is for: 404/410/409 unless it can be unlocked now."""
     doc = get_store().document(session_id)
     _require_not_purged(doc)
-    if doc is None or doc["status"] != "ready":
+    if doc is None or (doc["status"] != "ready" and not _awaiting_run(doc)):
         raise HTTPException(404, "Session not found or output not ready")
-    if not doc["unlocked_at"] and not _files_present(session_id):
+    if not doc["unlocked_at"] and not _can_deliver(doc):
         raise HTTPException(410, "This document has expired. Please process it again.")
-    if not doc["unlocked_at"] and not extraction_report(_load_result(session_id))["payable"]:
+    if not doc["unlocked_at"] and not _awaiting_run(doc) and not extraction_report(_load_result(session_id))["payable"]:
         raise HTTPException(409, "Some footnotes couldn't be read. Re-run them (free) before unlocking.")
     return doc
 
@@ -859,6 +996,15 @@ def get_results(session_id: str) -> dict:
     session_id = check_session_id(session_id)
     doc = get_store().document(session_id)
     _require_not_purged(doc)
+    if doc is not None and _awaiting_run(doc):
+        if not doc["unlocked_at"]:
+            return seen_view(doc)
+        if not _can_deliver(doc):
+            _refund_missing(session_id)
+            raise HTTPException(410, "This document's files are no longer available. Your payment has been refunded.")
+        # paid for, not yet run: the page starts the run (POST /api/run/{id})
+        return {"id": session_id, "filename": doc["filename"], "locked": False, "needs_run": True,
+                "running": doc["status"] == "processing", "footnotes": []}
     full = _load_result(session_id) if doc else None
     if doc is None or (full is None and not doc["unlocked_at"]):
         raise HTTPException(404, "Session not found or expired")

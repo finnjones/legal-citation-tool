@@ -916,8 +916,42 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 showAppError(await detailOf(response, "These results have expired. Please check the document again."));
                 return false;
             }
-            displayResults(await response.json());
+            const data = await response.json();
+            if (data.needs_run) return runPaidDocument(data);
+            displayResults(data);
             return true;
+        }
+
+        // A seen essay whose free preview has gone: nothing to show, but it can be unlocked
+        function showSeenUnlock(detail) {
+            if (config.payments) history.replaceState(null, "", `/?session=${encodeURIComponent(detail.session_id)}`);
+            displayResults({ id: detail.session_id, filename: detail.filename, footnotes: [], warnings: [], locked: true,
+                seen: true, payable: true, tier: detail.tier, price: detail.price, credits_needed: detail.credits_needed,
+                message: detail.message });
+        }
+
+        // Paid for before it was checked (an essay we'd seen): check it in full now
+        async function runPaidDocument(data) {
+            showView("landing");
+            const progress = startProgress(data.filename || "your document");
+            try {
+                let response;
+                const form = new FormData();
+                form.append("progress", "true");
+                response = await fetch(`/api/run/${encodeURIComponent(data.id)}`, { method: "POST", body: form });
+                if (!response.ok && response.status !== 202) throw new Error(await detailOf(response, "Your document couldn't be checked. Refresh this page to try again."));
+                let full = await response.json();
+                if (response.status === 202) full = await followProgress(data.id, progress);
+                await progress.finish();
+                full.filename = full.filename || data.filename;
+                displayResults(full);
+                announce("Your footnotes have been checked.");
+                return true;
+            } catch (error) {
+                progress.stop();
+                showAppError(`${error.message} You've paid for this document, so checking it again is free.`);
+                return false;
+            }
         }
 
         function showAppError(message) {
@@ -1032,6 +1066,14 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     response = await fetch("/api/process", { method: "POST", body: formData });
                 } catch {
                     throw new Error("We couldn't reach the server. Check your connection and try again.");
+                }
+                if (response.status === 409) {  // an essay we've checked before, whose preview has gone
+                    const body = await response.clone().json().catch(() => ({}));
+                    if (body.detail?.seen) {
+                        progress.stop();
+                        showSeenUnlock(body.detail);
+                        return;
+                    }
                 }
                 if (!response.ok) throw new Error(await detailOf(response, "Something went wrong processing your document. Please try again."));
                 let data = await response.json();
@@ -1391,6 +1433,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             next.hidden = counts.check === 0;
             next.textContent = `Next Check (${counts.check})`;
 
+            if (data.seen && !data.footnotes.length) document.getElementById("summary").textContent = "";
             renderBanners(data, general, failed);
             renderRegister();
             renderBodyFixes(data);
@@ -1450,8 +1493,11 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 
             const locked = Boolean(data.locked);
             const bib = data.bibliography_entries;
+            setBanner("seen", data.seen && locked ? banner("check", data.message || "We've already checked this essay.",
+                data.footnotes.length ? "Each essay gets one free preview, so this is the same preview as before. "
+                    + "Unlock it to see every correction: your document will be checked again in full." : "") : "");
             const found = data.changed_count ?? data.footnotes.filter(f => f.changed).length;
-            setBanner("preview", locked && data.payable !== false ? banner("", `Free preview: ${plural(found, "correction")} found`,
+            setBanner("preview", locked && data.payable !== false && data.footnotes.length ? banner("", `Free preview: ${plural(found, "correction")} found`,
                 `Every footnote's status and every Check item is shown. `
                 + (data.locked_count ? `${data.preview_count === 1 ? "The first correction is" : `The first ${data.preview_count} corrections are`} in full; the other ${data.locked_count} show your original with the result hidden. ` : "Every correction is shown in full. ")
                 + (data.body_fixes_locked ? `${plural(data.body_fixes_locked, "fix", "fixes")} to the body text ${data.body_fixes_locked === 1 ? "unlocks" : "unlock"} with them. ` : "")
@@ -1805,6 +1851,13 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     + (left ? "" : " The free re-reads are used up; please check it again later.");
                 button.textContent = left ? "Try again (free)" : "Check another document";
                 button.dataset.action = left ? "rerun" : "home";
+            } else if (data.seen && !data.footnotes.length) {
+                const price = data.price?.display;
+                text.innerHTML = `<strong>We've already checked this essay.</strong> Unlock it to have it checked again in full.`;
+                button.textContent = `Unlock this document${price ? ` — ${price}` : ""}`;
+                button.dataset.action = "checkout";
+                const need = data.credits_needed || 1;
+                creditsButton.textContent = `Use ${need === 1 ? "a credit" : `${need} credits`}`;
             } else {
                 const total = data.changed_count ?? entries.filter(e => e.changed).length;
                 const shown = total - (data.locked_count || 0);
@@ -2153,7 +2206,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             </div>`;
         }
 
-        const BANNER_ORDER = ["payment", "pack", "error", "credits", "failed", "preview", "general", "cases"];
+        const BANNER_ORDER = ["payment", "pack", "error", "seen", "credits", "failed", "preview", "general", "cases"];
         const banners = {};
         function setBanner(key, html) {
             banners[key] = html;

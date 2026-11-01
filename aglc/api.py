@@ -227,7 +227,9 @@ async def process_document(
 
     Returns:
         JSON with id, footnotes, bibliography, warnings, body_fixes. With payments on
-        (see aglc/billing.py) this is a redacted preview with `locked: true`.
+        (see aglc/billing.py) this is a redacted preview with `locked: true`; for an essay
+        that has had its free preview already, that preview again (`seen: true`, no model
+        run, answered at once even with `progress`), or 409 if it has been deleted.
     """
     # Validate file type
     if not file.filename or not file.filename.lower().endswith(".docx"):
@@ -266,10 +268,16 @@ async def process_document(
         )
         job = _Job(session_id, session_dir, file.filename, paid, process, options)
         if paid:
-            await run_in_threadpool(billing.check_footnote_cap, input_file)  # 413, before any LLM call
+            footnotes = await run_in_threadpool(billing.read_capped, input_file)  # 413, before any LLM call
+            fp = await run_in_threadpool(billing.fingerprint_of, footnotes)
+            earlier = await run_in_threadpool(billing.seen_before, fp)
+            if earlier is not None:  # this essay has had its free preview: no second one
+                seen = billing.start_seen
+                return await run_in_threadpool(lambda: seen(session_id, file.filename, visitor, footnote_count=len(
+                    footnotes), fp=fp, earlier=earlier, options=options))
             slot = billing.processing_slot()  # 503 when too many documents are in flight
             slot.__enter__()
-            billing.start_document(session_id, file.filename, visitor)
+            billing.start_document(session_id, file.filename, visitor, footnote_count=len(footnotes), fp=fp)
             started = True
         if progress:
             job.start(slot)  # the job releases the slot when it finishes
@@ -282,8 +290,10 @@ async def process_document(
                 slot.__exit__(None, None, None)
 
     except Exception as e:
-        # Clean up on error
-        shutil.rmtree(session_dir, ignore_errors=True)
+        # Clean up on error (a seen document's 409 keeps its upload, for the paid run)
+        seen_409 = isinstance(e, HTTPException) and e.status_code == 409 and isinstance(e.detail, dict)
+        if not seen_409:
+            shutil.rmtree(session_dir, ignore_errors=True)
         if started:
             billing.fail_document(session_id)
         if slot is not None and (progress or not started):
@@ -295,11 +305,21 @@ async def process_document(
 
 
 class _Job:
-    """One document's processing: the pipeline, the paid second pass, saving the result."""
+    """One document's processing: the pipeline, the paid second pass, saving the result.
+    A paid run (`paid_run`) keeps the upload if it fails, so it can be started again."""
 
-    def __init__(self, session_id: str, session_dir: Path, filename: str, paid: bool, process, options: dict) -> None:
+    def __init__(self, session_id: str, session_dir: Path, filename: str, paid: bool, process, options: dict,
+                 *, paid_run: bool = False) -> None:
         self.session_id, self.session_dir, self.filename = session_id, session_dir, filename
-        self.paid, self.process, self.options = paid, process, options
+        self.paid, self.process, self.options, self.paid_run = paid, process, options, paid_run
+
+    def failed(self) -> None:
+        if self.paid_run:
+            billing.run_failed(self.session_id)
+            return
+        shutil.rmtree(self.session_dir, ignore_errors=True)
+        if self.paid:
+            billing.fail_document(self.session_id)
 
     def run(self, progress: Progress | None = None) -> dict:
         """Process and save; the response body (with payments on, the preview)."""
@@ -331,9 +351,7 @@ class _Job:
                 jobs.finish(self.session_id, result=self.run(report))
             except Exception as e:  # noqa: BLE001 - reported to the page, logged in full here
                 log.exception("processing session %s failed", self.session_id[:8])
-                shutil.rmtree(self.session_dir, ignore_errors=True)
-                if self.paid:
-                    billing.fail_document(self.session_id)
+                self.failed()
                 status_code = e.status_code if isinstance(e, HTTPException) else _status_for(e)
                 detail = e.detail if isinstance(e, HTTPException) else _describe(e)
                 jobs.finish(self.session_id, error={"status": status_code, "detail": detail})
@@ -354,6 +372,53 @@ async def get_progress(session_id: str) -> dict:
     if snapshot is None:
         raise HTTPException(status_code=404, detail="That document isn't being processed (it may have finished a while ago).")
     return snapshot
+
+
+@app.post("/api/run/{session_id}")
+async def run_paid_document(
+    session_id: str, response: Response, progress: Annotated[bool, Form()] = False,
+) -> dict:
+    """Check in full a document that was paid for before it was run: an essay that had had
+    its free preview already (a "seen" upload, aglc/billing.py). The run is fresh, on the
+    upload that was paid for, with the options it was uploaded with. 402 until paid for;
+    with `progress`, 202 and GET /api/progress/{id} as for /api/process (also when the run
+    has already started)."""
+    if not billing.enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    session_id = billing.check_session_id(session_id)
+    slot = billing.processing_slot()
+    slot.__enter__()  # 503 when too many documents are in flight
+    try:
+        doc, options = billing.claim_run(session_id)
+    except HTTPException as e:
+        slot.__exit__(None, None, None)
+        if e.status_code == 202:  # already running: follow it
+            response.status_code = status.HTTP_202_ACCEPTED
+            return {"id": session_id, "status": "processing"}
+        raise
+    session_dir = billing.sessions_dir() / session_id
+    input_file, output_file = session_dir / "input.docx", session_dir / "output.docx"
+    opts = {"model": None, "bibliography": options.get("bibliography", True),
+            "track_changes": options.get("track_changes", True), "fix_body": options.get("fix_body", True)}
+    process = lambda **again: pipeline.process_docx(  # noqa: E731
+        input_file, output_file, None, bibliography=opts["bibliography"], track_changes=opts["track_changes"],
+        fix_body=opts["fix_body"], session=session_id, **again,
+    )
+    job = _Job(session_id, session_dir, doc["filename"], True, process, opts, paid_run=True)
+    if progress:
+        job.start(slot)  # the job releases the slot when it finishes
+        response.status_code = status.HTTP_202_ACCEPTED
+        return {"id": session_id, "status": "processing"}
+    try:
+        return await run_in_threadpool(job.run)
+    except Exception as e:
+        job.failed()
+        if isinstance(e, HTTPException):
+            raise
+        log.exception("processing session %s failed", session_id[:8])
+        raise HTTPException(status_code=_status_for(e), detail=_describe(e)) from e
+    finally:
+        slot.__exit__(None, None, None)
 
 
 @app.post("/api/rerun/{session_id}")

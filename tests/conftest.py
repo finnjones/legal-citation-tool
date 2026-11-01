@@ -12,8 +12,11 @@ def _isolate_from_local_env(monkeypatch):
                 "AGLC_LLM_FALLBACK", "AGLC_PLAUSIBLE_DOMAIN",
                 "AGLC_OPENROUTER_IGNORE", "AGLC_OPENROUTER_DATA_COLLECTION", "AGLC_OWNER_NAME",
                 "AGLC_CONTACT_EMAIL", "AGLC_ABN", "AGLC_STATE", "AGLC_OWNER_ABOUT", "AGLC_LOG_RETENTION_DAYS",
-                "AGLC_GST_REGISTERED", "AGLC_EMAIL", "RESEND_API_KEY", "AGLC_EMAIL_FROM"):
+                "AGLC_GST_REGISTERED", "AGLC_EMAIL", "RESEND_API_KEY", "AGLC_EMAIL_FROM", "AGLC_FINGERPRINT_DAYS"):
         monkeypatch.delenv(var, raising=False)
+    # Most tests upload the same sample essay again and again; the one-free-preview-per-essay
+    # check (tests/test_seen.py turns it back on) would answer the second upload without a run.
+    monkeypatch.setenv("AGLC_SEEN_OVERLAP", "0")
 
 
 @pytest.fixture(autouse=True)

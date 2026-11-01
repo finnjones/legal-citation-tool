@@ -76,6 +76,10 @@ aglc/mailer.py            email (off unless RESEND_API_KEY + AGLC_EMAIL_FROM): a
   conditional UPDATE in the unlock's transaction (no double spend, never below zero). A pack
   bought from a document's unlock screen unlocks it with the first credits. Any refund of a
   pack removes its unspent credits; documents it unlocked stay unlocked.
+- One free preview per essay (`aglc/fingerprint.py`): per-footnote HMAC hashes (never the
+  text), kept `AGLC_FINGERPRINT_DAYS`. A free upload mostly contained in an earlier free
+  preview (`AGLC_SEEN_OVERLAP`, at least 5 footnotes) runs no model and gets that preview
+  again; paying for it runs the upload fresh (`POST /api/run/{id}`).
 - Webhooks are verified, deduplicated by event id and applied in one transaction; a late
   webhook is reconciled by `retrieve()` when the page polls `/api/entitlement`.
 - If a paid document's files are missing, or a document is paid for twice, it is refunded.

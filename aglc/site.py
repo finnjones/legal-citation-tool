@@ -24,6 +24,7 @@ and analytics are set in one place:
     {{analytics_note}} whether analytics is on ($AGLC_PLAUSIBLE_DOMAIN)
     {{payment_provider}} "Stripe" when $AGLC_PAYMENTS=stripe, otherwise "Square"
     {{email_note}}    whether a credit pack's code is emailed (aglc/mailer.py)
+    {{fingerprint_days}} how long upload fingerprints are kept: $AGLC_FINGERPRINT_DAYS
     {{rule_pages}}    index only: where each rule is in the AGLC4 PDF (aglc/guide_pdf.py)
     {{> name}}        web/partials/<name>.html
 
@@ -43,7 +44,7 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
-from . import billing, guide_pdf, reports, retention
+from . import billing, fingerprint, guide_pdf, reports, retention
 
 #: The product's name ("aforecited": cited above, which is what Ibid and (n x) do). Set here only.
 BRAND = "Aforecite"
@@ -211,6 +212,7 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "payment_provider": payment_provider(),
         "log_retention": log_retention(),
         "email_note": email_note(),
+        "fingerprint_days": f"{fingerprint.keep_days():g}",
         **(extra or {}),
     }
     return re.sub(r"\{\{\s*([a-z0-9_]+)\s*\}\}", lambda m: values.get(m[1], m[0]), html)

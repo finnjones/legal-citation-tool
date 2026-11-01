@@ -16,6 +16,9 @@ results. What counts as "after the window":
   any document whose files are gone.
 - A credit pack's code, held only until the buyer's page collects it: the same window
   from the payment (the database keeps only a hash of it).
+- Fingerprints (keyed hashes of each upload's footnotes, aglc/fingerprint.py): kept
+  longer, $AGLC_FINGERPRINT_DAYS (default 180), so an essay can't have a second free
+  preview the day after its first was deleted.
 
 A deleted document's database row is kept, without its filename, with `purged_at` set: it
 still counts towards today's free-use limits, its orders stay for the accounts, and asking
@@ -87,9 +90,12 @@ def sweep(temp_dir: Path | None, *, at: datetime | None = None) -> int:
     from .store import data_dir
 
     if (data_dir() / "aglc.db").is_file():  # only made with payments on
+        from .fingerprint import keep_days
         from .store import get_store
 
-        get_store().purge_pickups(cutoff.isoformat(timespec="seconds"))
+        store = get_store()
+        store.purge_pickups(cutoff.isoformat(timespec="seconds"))
+        store.purge_fingerprints((at - timedelta(days=keep_days())).isoformat(timespec="seconds"))
     sessions = data_dir() / "sessions"
     if sessions.is_dir():
         deleted += _sweep_paid(sessions, cutoff)
