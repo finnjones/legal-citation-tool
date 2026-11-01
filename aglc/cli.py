@@ -178,6 +178,23 @@ def format_json(
         raise typer.Exit(code=1)
 
 
+@app.command("reissue-code")
+def reissue_code(
+    order_id: Annotated[str, typer.Argument(help="The pack's order id (orders.id in $AGLC_DATA_DIR/aglc.db)")],
+) -> None:
+    """Give a credit pack a new code when its buyer has lost the old one (which stops working).
+    Prints the new code once: send it to the buyer, and don't keep it."""
+    from . import billing
+
+    try:
+        code, left = billing.reissue_code(order_id)
+    except LookupError as e:
+        rprint(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+    print(code)
+    rprint(f"[dim]{left} credits left on it; the old code no longer works.[/dim]")
+
+
 @app.command("reports")
 def list_reports(
     limit: Annotated[int, typer.Option("--limit", "-n", help="How many, newest first")] = 20,

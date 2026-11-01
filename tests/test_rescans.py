@@ -83,6 +83,8 @@ def test_documents_paid_for_before_entitlements_keep_working(tmp_path, monkeypat
         conn.execute("DROP TABLE entitlements")
         conn.execute("ALTER TABLE documents DROP COLUMN entitlement_id")
         conn.execute("ALTER TABLE documents DROP COLUMN seen_shown")
+        conn.execute("DROP INDEX orders_buyer")
+        conn.execute("ALTER TABLE orders DROP COLUMN buyer_anon")
         conn.execute("DELETE FROM fingerprints")
         conn.execute("PRAGMA user_version = 5")
     store = Store(path)

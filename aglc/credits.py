@@ -8,7 +8,8 @@ only its SHA-256 hash with the credits left. A single essay uses 1 credit, a lon
 
 Every change to a code's credits is one row in `credit_ledger`: the grant (with the pack's
 payment id), each spend (with the document it unlocked), a refund of the pack (its unspent
-credits removed) and a return (a spend given back because the document's files had gone).
+credits removed), a return (a spend given back because the document's files had gone) and
+a reissue (a lost code replaced by an operator, `aglc reissue-code`: same credits, new hash).
 `spend` is a single conditional UPDATE inside the caller's write transaction, so two spends
 at once can't both take the last credit, and credits can't go below zero.
 
@@ -99,6 +100,15 @@ def give_back(conn: sqlite3.Connection, code_id: str, session_id: str) -> int:
                  (spent, code_id))
     _ledger(conn, code_id, spent, "return", session_id=session_id)
     return spent
+
+
+def reissue(conn: sqlite3.Connection, code_id: str) -> str:
+    """Replace a code (lost by its buyer) with a new one carrying the same credits; the old
+    one stops working. A ledger row records it, with no change to the credits."""
+    code = new_code()
+    conn.execute("UPDATE credit_codes SET code_hash = ? WHERE id = ?", (code_hash(code), code_id))
+    _ledger(conn, code_id, 0, "reissue")
+    return code
 
 
 def revoke(conn: sqlite3.Connection, order_id: str, *, payment_id: str | None) -> int | None:

@@ -855,9 +855,9 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         async function resumeSession() {
             const params = new URLSearchParams(location.search);
             const sessionId = params.get("session");
-            const packOrder = params.get("pack");
-            if (config.payments && packOrder && params.get("paid") === "1") {
-                const pack = await collectPack(packOrder, sessionId);
+            // A pack's return URL carries no order id: the server finds it by this browser's cookie
+            if (config.payments && params.get("pack") && params.get("paid") === "1") {
+                const pack = await collectPack(sessionId);
                 if (!sessionId) return;
                 history.replaceState(null, "", `/?session=${encodeURIComponent(sessionId)}`);
                 if (!(await loadResults(sessionId))) return;
@@ -2080,7 +2080,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         }
 
         // After paying for a pack (?paid=1&pack=…): wait for the payment, then show its code once
-        async function collectPack(orderId, sessionId) {
+        async function collectPack(sessionId) {
             showView("results");
             if (!sessionId) {
                 document.getElementById("docTitle").textContent = "Your credits";
@@ -2092,7 +2092,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             let pack = null;
             while (Date.now() < deadline) {
                 try {
-                    const response = await fetch(`/api/pack/${encodeURIComponent(orderId)}`);
+                    const response = await fetch("/api/pack/latest");
                     if (response.status === 404) break;
                     if (response.ok) {
                         pack = await response.json();
@@ -2112,6 +2112,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 return pack;
             }
             showPackCode(pack);
+            // The server holds the code until this page has it; then only its hash is kept
+            if (pack.code) fetch(`/api/pack/${encodeURIComponent(pack.order_id)}/received`, { method: "POST" }).catch(() => {});
             return pack;
         }
 
@@ -2119,7 +2121,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             const code = pack.code || storedCodes()[0]?.code;
             if (!code) {
                 setBanner("pack", banner("ok", "Your credits are ready",
-                    `This pack's code was already shown${pack.emailed ? " and emailed to you" : ""}. If you saved it, enter it on any document's unlock screen.`));
+                    pack.code_elsewhere ? "This pack's code is shown only in the browser it was bought in. Open this page there."
+                        : `This pack's code was already shown${pack.emailed ? " and emailed to you" : ""}. If you saved it, enter it on any document's unlock screen.`));
                 setBanner("payment", "");
                 return;
             }

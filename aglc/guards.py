@@ -133,9 +133,12 @@ class RedactSessionIds(logging.Filter):
 
 
 def install_log_redaction() -> None:
-    access = logging.getLogger("uvicorn.access")
-    if not any(isinstance(f, RedactSessionIds) for f in access.filters):
-        access.addFilter(RedactSessionIds())
+    """On uvicorn's access log, and on the app's own loggers as a second line of defence
+    (their messages already cut ids to 8 characters)."""
+    for name in ("uvicorn.access", "aglc", "aglc.stripe"):
+        logger = logging.getLogger(name)
+        if not any(isinstance(f, RedactSessionIds) for f in logger.filters):
+            logger.addFilter(RedactSessionIds())
 
 
 def install_app_logging() -> None:

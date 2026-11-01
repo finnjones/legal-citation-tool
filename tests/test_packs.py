@@ -35,9 +35,12 @@ def _buy_pack(client, fake, product="pack3", session_id=None, email=None, delive
     return order_id, poid, outcome
 
 
-def _code(client, order_id):
+def _code(client, order_id, received=True):
+    """The pack as the buying browser's page sees it, confirming it has the code."""
     r = client.get(f"/api/pack/{order_id}")
     assert r.status_code == 200, r.text
+    if received and "code" in r.json():
+        assert client.post(f"/api/pack/{order_id}/received").json() == {"ok": True}
     return r.json()
 
 
@@ -92,7 +95,7 @@ def test_buying_a_pack_shows_its_code_once_and_keeps_only_a_hash(paid, client, f
     assert first["status"] == "paid" and first["credits"] == 3 and first["credits_remaining"] == 3
     code = first["code"]
     assert re.fullmatch(r"AFC-[23456789ABCDEFGHJKMNPQRSTWXYZ]{4}(-[23456789ABCDEFGHJKMNPQRSTWXYZ]{4}){2}", code)
-    assert "code" not in _code(client, order_id)  # shown once
+    assert "code" not in _code(client, order_id)  # forgotten once the page said it had it
     raw = get_store().path.read_bytes() + get_store().path.with_name("aglc.db-wal").read_bytes()
     assert code.encode() not in raw and code.replace("-", "").encode() not in raw
     with sqlite3.connect(get_store().path) as conn:
@@ -199,7 +202,7 @@ def test_a_pack_bought_from_the_unlock_screen_unlocks_that_document(paid, client
     sid = _process(client).json()["id"]
     r = client.post("/api/checkout", json={"session_id": sid, "product": "pack3"})
     poid = _provider_order_id(r.json()["order_id"])
-    assert get_payment_redirect(fake, poid).endswith(f"/?paid=1&session={sid}&pack={r.json()['order_id']}")
+    assert get_payment_redirect(fake, poid).endswith(f"/?paid=1&session={sid}&pack=1")  # no order id in the URL
     fake.pay(poid)
     assert _webhook(client, fake, poid)[0].json()["outcome"] == "pack_unlocked"
     data = _code(client, r.json()["order_id"])
@@ -351,3 +354,64 @@ def test_pages_show_every_price_from_the_server(monkeypatch):
     assert "one-way hash of the pack's code" in privacy and "We don't email codes" in privacy
     monkeypatch.setenv("AGLC_EMAIL", "fake")
     assert "through our email provider" in client.get("/privacy").text
+
+
+# ---- the code goes only to the buyer's browser (review findings) -------------------- #
+
+
+def test_only_the_buying_browser_can_collect_the_code(paid, client, fake):
+    """Regression: GET /api/pack/{order_id} gave the code to whoever asked first, and the
+    order id was in the app log and the return URL."""
+    order_id, _, _ = _buy_pack(client, fake)
+    stranger = TestClient(api.app)
+    other = stranger.get(f"/api/pack/{order_id}").json()
+    assert "code" not in other and other["code_elsewhere"] is True and other["status"] == "paid"
+    assert stranger.post(f"/api/pack/{order_id}/received").status_code == 403
+    assert "code" in client.get(f"/api/pack/{order_id}").json()  # still there for the buyer
+
+
+def test_order_ids_are_not_in_the_app_log(paid, client, fake, caplog):
+    caplog.set_level(logging.DEBUG)
+    order_id, poid, _ = _buy_pack(client, fake)
+    _webhook(client, fake, poid, status="refunded")
+    assert order_id not in caplog.text and order_id[:8] in caplog.text
+
+
+def test_the_redaction_filter_guards_the_app_log_too(caplog):
+    guards.install_log_redaction()
+    caplog.set_level(logging.INFO)
+    logging.getLogger("aglc").info("order %s", "0123456789abcdef0123456789abcdef")
+    assert "0123456789abcdef0123456789abcdef" not in caplog.text
+
+
+def test_the_page_finds_its_pack_by_cookie(paid, client, fake):
+    order_id, _, _ = _buy_pack(client, fake)
+    latest = client.get("/api/pack/latest").json()
+    assert latest["order_id"] == order_id and latest["code"]
+    assert TestClient(api.app).get("/api/pack/latest").status_code == 404
+
+
+def test_the_code_is_kept_until_the_page_confirms_it(paid, client, fake):
+    """Regression: the code was deleted on the first GET, received or not."""
+    order_id, _, _ = _buy_pack(client, fake)
+    first = client.get(f"/api/pack/{order_id}").json()["code"]
+    assert client.get(f"/api/pack/{order_id}").json()["code"] == first  # the first answer was lost: ask again
+    client.post(f"/api/pack/{order_id}/received")
+    assert "code" not in client.get(f"/api/pack/{order_id}").json()
+
+
+def test_an_operator_can_reissue_a_lost_code(paid, client, fake):
+    from typer.testing import CliRunner
+    from aglc.cli import app as cli
+
+    order_id, _, _ = _buy_pack(client, fake)
+    old = _code(client, order_id)["code"]
+    sid = _process(client).json()["id"]
+    client.post("/api/redeem", json={"session_id": sid, "code": old})
+    result = CliRunner().invoke(cli, ["reissue-code", order_id])
+    assert result.exit_code == 0, result.output
+    new = result.output.split()[0]
+    assert new != old and credits.normalise(new)
+    assert client.post("/api/credits", json={"code": old}).status_code == 404
+    assert client.post("/api/credits", json={"code": new}).json()["credits_remaining"] == 2
+    assert CliRunner().invoke(cli, ["reissue-code", "0" * 32]).exit_code == 1

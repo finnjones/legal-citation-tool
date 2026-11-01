@@ -27,7 +27,9 @@ bought from a document's unlock screen unlocks that document with its first cred
     GET  /api/entitlement/{session_id}  unlocked yet? (asks the provider if the webhook is late);
                                         status unlocked | pending | refunded | expired | none
     GET  /api/results/{session_id}      the full result once unlocked, else the preview
-    GET  /api/pack/{order_id}           a pack's status, and its code the first time it is asked for
+    GET  /api/pack/latest               this browser's newest pack: status, and its code until confirmed
+    GET  /api/pack/{order_id}           a pack's status (its code only to the browser that bought it)
+    POST /api/pack/{order_id}/received  the buyer's page has the code: forget it
     POST /api/redeem {session_id, code} unlock a document with credits
     POST /api/credits {code}            credits left on a code
     POST /api/rescan-link/{session_id}  a paid document's re-scan token (a new one each time)
@@ -885,7 +887,7 @@ def _settle(conn: sqlite3.Connection, order: sqlite3.Row, *, payment_id: str | N
     the document it was bought from), inside the caller's transaction."""
     if amount != order["amount"] or currency.upper() != order["currency"]:
         log.error("order %s: paid %s %s, expected %s %s; not unlocking",
-                  order["id"], amount, currency, order["amount"], order["currency"])
+                  order["id"][:8], amount, currency, order["amount"], order["currency"])
         return "amount_mismatch"
     if order["status"] != "pending":
         return f"already_{order['status']}"
@@ -926,7 +928,7 @@ def _mark_refunded(conn: sqlite3.Connection, order: sqlite3.Row, event: WebhookE
     get_store().update_order(order["id"], conn, status="refunded", refunded_at=now())
     if is_pack:
         removed = credits.revoke(conn, order["id"], payment_id=order["payment_id"])
-        log.info("pack order %s refunded: %s unspent credits removed", order["id"], removed or 0)
+        log.info("pack order %s refunded: %s unspent credits removed", order["id"][:8], removed or 0)
         return "pack_refunded"
     locked = conn.execute(
         "UPDATE documents SET unlocked_at = NULL, unlocked_by = NULL, entitlement_id = NULL"
@@ -966,7 +968,7 @@ def apply_event(provider: str, event: WebhookEvent) -> tuple[str, str | None]:
         order_id = order["id"] if order else None
         conn.execute("UPDATE webhook_events SET outcome = ?, order_id = ? WHERE event_id = ?",
                      (outcome, order_id, event.event_id))
-    log.info("webhook %s %s: %s (order %s)", provider, event.type, outcome, order_id)
+    log.info("webhook %s %s: %s (order %s)", provider, event.type, outcome, order_id and order_id[:8])
     return outcome, order_id
 
 
@@ -1024,10 +1026,10 @@ def _refund(order_id: str) -> None:
             idempotency_key=f"refund-{order_id}",
         )
     except PaymentError as e:
-        log.error("automatic refund of order %s failed: %s", order_id, e)
+        log.error("automatic refund of order %s failed: %s", order_id[:8], e)
         store.update_order(order_id, status="refund_failed", note=f"{order['note']}; refund failed: {e}")
         return
-    log.warning("refunded order %s: %s", order_id, order["note"])
+    log.warning("refunded order %s: %s", order_id[:8], order["note"])
     store.update_order(order_id, status="refunded", refund_id=refund.refund_id, refunded_at=now())
 
 
@@ -1075,14 +1077,14 @@ def _reconcile_order(order: sqlite3.Row) -> str | None:
     try:
         status = get_payment_provider(order["provider"]).retrieve(order["provider_order_id"])
     except PaymentError as e:
-        log.warning("could not check order %s: %s", order["id"], e)
+        log.warning("could not check order %s: %s", order["id"][:8], e)
         return None
     if not status.paid:
         return None
     with get_store().transaction() as conn:
         fresh = conn.execute("SELECT * FROM orders WHERE id = ?", (order["id"],)).fetchone()
         outcome = _settle(conn, fresh, payment_id=status.payment_id, amount=status.amount, currency=status.currency)
-    log.info("reconciled order %s: %s", order["id"], outcome)
+    log.info("reconciled order %s: %s", order["id"][:8], outcome)
     after_payment(outcome, order["id"], status.email)
     return outcome
 
@@ -1181,7 +1183,7 @@ def _payable_document(session_id: str) -> sqlite3.Row:
 
 
 @router.post("/api/checkout")
-def create_checkout(body: CheckoutRequest, request: Request) -> dict:
+def create_checkout(body: CheckoutRequest, request: Request, response: Response) -> dict:
     _require_enabled()
     store = get_store()
     is_pack = body.product in PACK_CREDITS
@@ -1206,14 +1208,17 @@ def create_checkout(body: CheckoutRequest, request: Request) -> dict:
 
     provider = get_payment_provider()
     order_id = uuid.uuid4().hex
+    buyer = _buyer(request, response) if is_pack else None
     store.add_order(order_id, session_id, product=product.id, amount=product.amount,
-                    currency=product.currency, provider=provider.name)
+                    currency=product.currency, provider=provider.name, buyer_anon=buyer)
     back = f"{_public_base(request)}/?paid=1"
-    redirect = (f"{back}&session={session_id}" if session_id else back) + (f"&pack={order_id}" if is_pack else "")
+    # A pack's order id stays out of the URL (and so out of logs and analytics): the page
+    # finds its pack by the browser's cookie (GET /api/pack/latest).
+    redirect = (f"{back}&session={session_id}" if session_id else back) + ("&pack=1" if is_pack else "")
     try:
         session = provider.create_checkout(order_id=order_id, product=product, redirect_url=redirect)
     except PaymentError as e:
-        log.error("checkout for order %s failed: %s", order_id, e)
+        log.error("checkout for order %s failed: %s", order_id[:8], e)
         store.update_order(order_id, status="failed", note=str(e))
         raise HTTPException(502, "The payment provider is unavailable. Please try again shortly.") from e
     store.update_order(order_id, checkout_id=session.checkout_id, checkout_url=session.url,
@@ -1293,23 +1298,54 @@ def get_results(session_id: str) -> dict:
 # ---- Credit packs ------------------------------------------------------------- #
 
 
+def _buyer(request: Request, response: Response) -> str:
+    """The browser's anonymous id (set now if it has none): a pack's code goes only to it."""
+    v = _visitor(request)
+    if v.new_cookie:
+        response.set_cookie(ANON_COOKIE, v.anon_id, max_age=365 * 86400, httponly=True, samesite="lax",
+                            secure=request.url.scheme == "https")
+    return v.anon_id
+
+
+def _is_buyer(request: Request, order: sqlite3.Row) -> bool:
+    anon = request.cookies.get(ANON_COOKIE) or ""
+    return bool(order["buyer_anon"]) and secrets.compare_digest(anon, order["buyer_anon"])
+
+
 def _code_balance(conn: sqlite3.Connection, code_row: sqlite3.Row | None) -> int:
     return code_row["credits_remaining"] if code_row is not None and not code_row["revoked_at"] else 0
 
 
-@router.get("/api/pack/{order_id}")
-def get_pack(order_id: str) -> dict:
-    """A pack's order: `pending` (asks the provider if the webhook is late), `paid` or
-    `refunded`. The first time it is asked for once paid, it carries the code, which is then
-    forgotten: the page shows it once and keeps it in the browser. `emailed` says whether it
-    was also emailed to the address given at checkout."""
-    _require_enabled()
+def _pack_order(order_id: str) -> sqlite3.Row:
     if not re.fullmatch(r"[0-9a-f]{32}", order_id):
         raise HTTPException(404, "Unknown order")
-    store = get_store()
-    order = store.order(order_id)
+    order = get_store().order(order_id)
     if order is None or order["product"] not in PACK_CREDITS:
         raise HTTPException(404, "Unknown order")
+    return order
+
+
+@router.get("/api/pack/latest")
+def get_latest_pack(request: Request) -> dict:
+    """This browser's newest pack, for the page it returns to after paying (whose URL
+    carries no order id)."""
+    _require_enabled()
+    order = get_store().latest_pack_order(request.cookies.get(ANON_COOKIE) or "") if request.cookies.get(
+        ANON_COOKIE) else None
+    if order is None:
+        raise HTTPException(404, "No pack bought in this browser")
+    return get_pack(order["id"], request)
+
+
+@router.get("/api/pack/{order_id}")
+def get_pack(order_id: str, request: Request) -> dict:
+    """A pack's order: `pending` (asks the provider if the webhook is late), `paid` or
+    `refunded`. To the browser that bought it, once paid, it carries the code until that
+    page confirms it has it (POST .../received), which is then forgotten; anyone else gets
+    the status only. `emailed` says whether it was also emailed to the checkout's address."""
+    _require_enabled()
+    store = get_store()
+    order = _pack_order(order_id)
     if order["status"] == "pending":
         _reconcile_order(order)
         order = store.order(order_id)
@@ -1317,18 +1353,50 @@ def get_pack(order_id: str) -> dict:
                  "session_id": order["session_id"], "email_enabled": mailer.enabled()}
     if order["status"] not in ("paid", "refunded"):
         return out
-    with store.transaction() as conn:
+    with store.read() as conn:
         pickup = conn.execute("SELECT code, emailed FROM code_pickup WHERE order_id = ?", (order_id,)).fetchone()
-        conn.execute("DELETE FROM code_pickup WHERE order_id = ?", (order_id,))
         row = conn.execute("SELECT * FROM credit_codes WHERE order_id = ?", (order_id,)).fetchone()
         out["credits_remaining"] = _code_balance(conn, row)
     if pickup is not None:
-        store.scrub_wal()  # the code is now only in the response
-        out["code"], out["emailed"] = pickup["code"], bool(pickup["emailed"])
+        out["emailed"] = bool(pickup["emailed"])
+        if _is_buyer(request, order):
+            out["code"] = pickup["code"]
+        else:
+            out["code_elsewhere"] = True  # held for the browser that bought it
     if order["session_id"]:
         doc = store.document(order["session_id"])
         out["unlocked"] = bool(doc and doc["unlocked_at"] and doc["unlocked_by"] == f"credit:{row['id'] if row else ''}")
     return out
+
+
+@router.post("/api/pack/{order_id}/received")
+def pack_received(order_id: str, request: Request) -> dict:
+    """The buyer's page has shown and kept the code: forget it (only the hash stays)."""
+    _require_enabled()
+    order = _pack_order(order_id)
+    if not _is_buyer(request, order):
+        raise HTTPException(403, "Only the browser that bought this pack can do that.")
+    with get_store().transaction() as conn:
+        deleted = conn.execute("DELETE FROM code_pickup WHERE order_id = ?", (order_id,)).rowcount
+    if deleted:
+        get_store().scrub_wal()
+    return {"ok": True}
+
+
+def reissue_code(order_id: str) -> tuple[str, int]:
+    """For an operator (`aglc reissue-code`): give a paid pack a new code, with the credits
+    its old one had left; the old code stops working. Returns (the new code, credits)."""
+    with get_store().transaction() as conn:
+        row = conn.execute("SELECT * FROM credit_codes WHERE order_id = ?", (order_id,)).fetchone()
+        if row is None:
+            raise LookupError("That order has no code (not a paid pack?)")
+        if row["revoked_at"]:
+            raise LookupError("That pack was refunded")
+        code = credits.reissue(conn, row["id"])
+        conn.execute("DELETE FROM code_pickup WHERE order_id = ?", (order_id,))
+    get_store().scrub_wal()
+    log.info("pack order %s: code reissued", order_id[:8])
+    return code, row["credits_remaining"]
 
 
 class CodeRequest(BaseModel):

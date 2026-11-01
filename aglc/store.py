@@ -13,8 +13,8 @@ to MIGRATIONS, never edit one that has shipped.
                     and the credits left (aglc/credits.py)
     credit_ledger   every grant, spend and refund of credits, with the document a spend
                     unlocked and the pack's payment id
-    code_pickup     a new pack's code, held only until the buyer's page collects it (or the
-                    retention window ends), so it can be shown once
+    code_pickup     a new pack's code, held only until the buyer's browser confirms it has it
+                    (or the retention window ends); only that browser can collect it
     fingerprints    keyed hashes of each upload's footnotes (aglc/fingerprint.py), never the
                     text; kept $AGLC_FINGERPRINT_DAYS
     fingerprint_index  footnote hash -> session, for free previews only: finds an essay
@@ -207,6 +207,11 @@ MIGRATIONS: list[str] = [
     # 7: a seen upload is shown the earlier preview only if the same browser made it
     """
     ALTER TABLE documents ADD COLUMN seen_shown INTEGER NOT NULL DEFAULT 0
+    """,
+    # 8: a pack's code is given only to the browser that bought it (its aglc_anon cookie)
+    """
+    ALTER TABLE orders ADD COLUMN buyer_anon TEXT;
+    CREATE INDEX orders_buyer ON orders(buyer_anon, created_at)
     """,
 ]
 
@@ -470,12 +475,12 @@ class Store:
     # ---- orders ------------------------------------------------------------- #
 
     def add_order(self, order_id: str, session_id: str | None, *, product: str, amount: int, currency: str,
-                  provider: str) -> None:
+                  provider: str, buyer_anon: str | None = None) -> None:
         with self.transaction() as conn:
             conn.execute(
-                "INSERT INTO orders (id, session_id, product, amount, currency, provider, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (order_id, session_id, product, amount, currency, provider, now(), now()),
+                "INSERT INTO orders (id, session_id, product, amount, currency, provider, created_at, updated_at,"
+                " buyer_anon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (order_id, session_id, product, amount, currency, provider, now(), now(), buyer_anon),
             )
 
     def update_order(self, order_id: str, conn: sqlite3.Connection | None = None, **fields) -> None:
@@ -490,6 +495,14 @@ class Store:
     def order(self, order_id: str) -> sqlite3.Row | None:
         with self.read() as conn:
             return conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+
+    def latest_pack_order(self, buyer_anon: str) -> sqlite3.Row | None:
+        """The newest credit pack this browser has bought (or started to)."""
+        with self.read() as conn:
+            return conn.execute(
+                "SELECT * FROM orders WHERE buyer_anon = ? AND product LIKE 'pack%'"
+                " ORDER BY created_at DESC, rowid DESC LIMIT 1", (buyer_anon,),
+            ).fetchone()
 
     def purge_pickups(self, cutoff: str) -> int:
         """Forget pack codes nobody collected before `cutoff` (the retention sweep)."""

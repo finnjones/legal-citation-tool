@@ -80,7 +80,8 @@ aglc/mailer.py            email (off unless RESEND_API_KEY + AGLC_EMAIL_FROM): a
   the re-scan count drops in the same transaction; an essay-tier entitlement doesn't cover a
   version grown past 150 footnotes. Separate from `MAX_RERUNS`.
 - A pack's webhook makes a random code, stores only its hash with the credits, and holds the
-  code until the buyer's page collects it once (or the retention window ends); it is also
+  code for the browser that bought it (its cookie is on the order) until that page confirms it
+  has it (or the retention window ends; `aglc reissue-code` replaces a lost one); it is also
   emailed once if email is configured and the checkout gave an address. Spending is one
   conditional UPDATE in the unlock's transaction (no double spend, never below zero). A pack
   bought from a document's unlock screen unlocks it with the first credits. Any refund of a

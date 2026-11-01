@@ -146,19 +146,27 @@ documents, so the provider setup in sections 3 and 3a doesn't change.
 
 - **The code.** When a pack's payment is applied (webhook, or the late-webhook check when
   the buyer's page polls), the server makes a random code (`AFC-XXXX-XXXX-XXXX`) and stores
-  only its SHA-256 hash and the credits left. The code itself is held in `code_pickup` only
-  until the buyer's page collects it, once, and is deleted then (or by the retention sweep
-  after `AGLC_RETENTION_HOURS`); SQLite's `secure_delete` and a WAL checkpoint keep it out of
-  the database files afterwards. The page shows it with a copy button, keeps it in the
-  browser's localStorage, and tells the buyer to save it. **We can't show a code again**:
-  if a buyer loses it, look up their pack by order (the dashboard's payment reference is on
-  the order row) and refund it or sell them a new one.
+  only its SHA-256 hash and the credits left. The code itself is held in `code_pickup` for
+  the browser that bought the pack (its `aglc_anon` cookie is kept on the order at
+  checkout): only that browser is given it (`GET /api/pack/latest`; anyone else asking about
+  the order gets its status only), and it is deleted when that page confirms it has the code
+  (`POST /api/pack/{order}/received`), or by the retention sweep after
+  `AGLC_RETENTION_HOURS`. SQLite's `secure_delete` and a WAL checkpoint keep it out of the
+  database files afterwards. The return URL carries no order id (`?paid=1&pack=1`), and the
+  app log has only the first 8 characters of order ids. The page shows the code with a copy
+  button, keeps it in the browser's localStorage, and tells the buyer to save it.
+- **A lost code.** We can't show a code again, but you can replace it: find the order (the
+  provider dashboard's payment reference is on the `orders` row) and run
+  `aglc reissue-code <order id>` on the server (with the service's `AGLC_DATA_DIR`). It prints
+  a new code carrying the credits the old one had left; the old one stops working, and the
+  ledger records a `reissue`. Send the new code to the buyer and don't keep it.
 - **Email (optional).** Set `RESEND_API_KEY` and `AGLC_EMAIL_FROM` (a sender on a domain
   verified with Resend) and the code is also emailed once, at purchase, to the address the
   checkout collected (Stripe Checkout always asks for one; Square payment links do when the
   buyer gives it). The address is never stored. Without these settings nothing is emailed and
   the success page says it is the only place the code appears. There is no "resend my code":
-  a code we only hold as a hash can't be sent again.
+  a code we only hold as a hash can't be sent again (but see "A lost code"). **Turn email on
+  in production**: it is the buyer's only copy if their browser loses the page.
 - **Refunds.** Refund a pack from the provider's dashboard as for any payment. Any refund of a
   pack, full or partial, removes all its unspent credits (Stripe reports a partial refund
   with `charge.refunded` too); documents it already unlocked stay unlocked. So for a
