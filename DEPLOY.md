@@ -138,9 +138,11 @@ Update `POLICY_DATE` in `aglc/site.py` whenever you change those pages.
 ## 4b. Prices, credit packs and emailing codes
 
 Prices live in `aglc/billing.py` (`PRODUCTS`) and nowhere else: `/api/config` sends them and
-the pages render from them. A document is an essay (A$5, up to 150 footnotes) or a long
-document (A$9, up to `AGLC_MAX_FOOTNOTES`), chosen by the server from its footnote count.
-Credit packs are A$12 for 3 and A$35 for 10; an essay uses 1 credit, a long document 2.
+the pages render from them. A document is an essay (A$1, up to 150 footnotes) or a long
+document (A$2, up to `AGLC_MAX_FOOTNOTES`), chosen by the server from its footnote count.
+A credit pack is A$8 for 10 credits; an essay uses 1 credit, a long document 2. (A 3-credit
+pack, `pack3`, is no longer sold, but `PACK_CREDITS` keeps it so orders and codes from
+before still work.)
 Credits never expire and nothing renews. Packs go through the same checkout and webhooks as
 documents, so the provider setup in sections 3 and 3a doesn't change.
 
