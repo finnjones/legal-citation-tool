@@ -370,6 +370,18 @@ def test_only_the_buying_browser_can_collect_the_code(paid, client, fake):
     assert "code" in client.get(f"/api/pack/{order_id}").json()  # still there for the buyer
 
 
+def test_a_stranger_with_the_order_id_cant_find_the_document_the_pack_unlocked(paid, client, fake):
+    """Regression (browser test): GET /api/pack/{order_id} returned the unlocked document's
+    session id to anyone, and that id opens the full result and the .docx."""
+    sid = _process(client).json()["id"]
+    order_id, _, _ = _buy_pack(client, fake, session_id=sid)
+    mine = client.get(f"/api/pack/{order_id}").json()
+    assert mine["session_id"] == sid and mine["unlocked"] is True
+    other = TestClient(api.app).get(f"/api/pack/{order_id}").json()
+    assert other["status"] == "paid" and "session_id" not in other and "unlocked" not in other
+    assert sid not in str(other)
+
+
 def test_order_ids_are_not_in_the_app_log(paid, client, fake, caplog):
     caplog.set_level(logging.DEBUG)
     order_id, poid, _ = _buy_pack(client, fake)

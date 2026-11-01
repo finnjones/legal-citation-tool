@@ -1366,8 +1366,11 @@ def get_pack(order_id: str, request: Request) -> dict:
     if order["status"] == "pending":
         _reconcile_order(order)
         order = store.order(order_id)
+    buyer = _is_buyer(request, order)
     out: dict = {"order_id": order_id, "status": order["status"], "credits": PACK_CREDITS[order["product"]],
-                 "session_id": order["session_id"], "email_enabled": mailer.enabled()}
+                 "email_enabled": mailer.enabled()}
+    if buyer:  # the document a pack unlocked is the buyer's to know: its id opens the full result
+        out["session_id"] = order["session_id"]
     if order["status"] not in ("paid", "refunded"):
         return out
     with store.read() as conn:
@@ -1376,11 +1379,11 @@ def get_pack(order_id: str, request: Request) -> dict:
         out["credits_remaining"] = _code_balance(conn, row)
     if pickup is not None:
         out["emailed"] = bool(pickup["emailed"])
-        if _is_buyer(request, order):
+        if buyer:
             out["code"] = pickup["code"]
         else:
             out["code_elsewhere"] = True  # held for the browser that bought it
-    if order["session_id"]:
+    if buyer and order["session_id"]:
         doc = store.document(order["session_id"])
         out["unlocked"] = bool(doc and doc["unlocked_at"] and doc["unlocked_by"] == f"credit:{row['id'] if row else ''}")
     return out
