@@ -108,7 +108,7 @@ def test_the_same_essay_gets_its_free_preview_once(seen):
     assert data["id"] != first.json()["id"] and data["filename"] == "renamed.docx"
     assert first.json()["id"] not in json.dumps(data)
     assert data["locked"] is True and _shown(data) == _shown(first.json())  # the same preview footnotes
-    assert data["changed_count"] == 10 and data["price"]["display"] == "A$5"
+    assert data["changed_count"] == 10 and data["price"]["display"] == billing.PRODUCTS["essay"].display == "A$1"
     doc = get_store().document(data["id"])
     assert (doc["kind"], doc["seen_of"], doc["status"], doc["seen_shown"]) == ("seen", first.json()["id"], "seen", 1)
     assert client.get(f"/api/results/{data['id']}").json()["seen"] is True
@@ -217,7 +217,7 @@ def test_a_seen_essay_can_be_paid_for_and_is_run_fresh(seen, fake):
     assert client.post(f"/api/run/{sid}").status_code == 402
     assert client.get(f"/api/download/{sid}").status_code == 402
     order = _checkout(client, sid)
-    assert get_store().order(order["order_id"])["amount"] == 500
+    assert get_store().order(order["order_id"])["amount"] == billing.PRODUCTS["essay"].amount
     poid = _provider_order_id(order["order_id"])
     fake.pay(poid)
     assert _webhook(client, fake, poid)[0].json()["outcome"] == "unlocked"
@@ -250,7 +250,7 @@ def test_a_swept_preview_gets_a_409_offering_to_unlock(seen, fake):
     _, again = _upload(client=client)
     assert again.status_code == 409 and seen.call_count == 1
     detail = again.json()["detail"]
-    assert detail["seen"] is True and detail["price"]["display"] == "A$5" and "Unlock" in detail["message"]
+    assert detail["seen"] is True and detail["price"]["display"] == billing.PRODUCTS["essay"].display and "Unlock" in detail["message"]
     sid = detail["session_id"]
     assert (billing.sessions_dir() / sid / "input.docx").is_file()  # kept for the paid run
     poid = _provider_order_id(_checkout(client, sid)["order_id"])
@@ -273,7 +273,7 @@ def _seen_session(ip="2.2.2.2"):
 
 def test_a_seen_essay_can_be_unlocked_with_credits(seen, fake):
     client, sid = _seen_session()
-    r = client.post("/api/checkout", json={"product": "pack3"})
+    r = client.post("/api/checkout", json={"product": "pack10"})
     poid = _provider_order_id(r.json()["order_id"])
     fake.pay(poid)
     _webhook(client, fake, poid)

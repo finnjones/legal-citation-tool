@@ -4,9 +4,9 @@ Pages live in web/ and use a few placeholders, filled in here so the brand name,
 and analytics are set in one place:
 
     {{brand}}         BRAND below (a placeholder until the name is chosen)
-    {{price}}         the price of an essay, eg "A$5" (billing.PRODUCTS, as are the next)
-    {{price_long}} {{price_pack3}} {{price_pack10}}
-                      a long document, and the 3- and 10-credit packs
+    {{price}}         the price of an essay, eg "A$1" (billing.PRODUCTS, as are the next)
+    {{price_long}} {{price_pack10}}
+                      a long document, and the 10-credit pack
     {{essay_max}}     the most footnotes an essay can have (more is a long document)
     {{free_rescans}} {{rescan_days}}
                       free re-scans of a paid document, and for how many days
@@ -260,7 +260,6 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "brand": escape(BRAND),
         "price": escape(billing.PRODUCTS["essay"].display),
         "price_long": escape(billing.PRODUCTS["long"].display),
-        "price_pack3": escape(billing.PRODUCTS["pack3"].display),
         "price_pack10": escape(billing.PRODUCTS["pack10"].display),
         "essay_max": str(billing.ESSAY_MAX_FOOTNOTES),
         "free_rescans": str(billing.FREE_RESCANS),
@@ -635,8 +634,8 @@ def llms_txt(request: Request) -> PlainTextResponse:
             f"- A free preview shows every footnote's status, every Check item and up to "
             f"{billing.PREVIEW_FULL} fixes in full. Unlocking the whole document costs "
             f"{billing.PRODUCTS['essay'].display} per essay (up to {billing.ESSAY_MAX_FOOTNOTES} footnotes) or "
-            f"{billing.PRODUCTS['long'].display} for a long document, or use credit packs "
-            f"({billing.PRODUCTS['pack3'].display} for 3, {billing.PRODUCTS['pack10'].display} for 10). "
+            f"{billing.PRODUCTS['long'].display} for a long document, or buy a 10-credit pack for "
+            f"{billing.PRODUCTS['pack10'].display} (an essay uses 1 credit, a long document 2). "
             f"Each unlock includes {billing.FREE_RESCANS} free re-scans of a revised version for "
             f"{billing.RESCAN_DAYS} days."
         )

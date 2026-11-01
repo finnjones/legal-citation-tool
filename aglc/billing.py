@@ -16,9 +16,12 @@ before entitlements existed were given one by the migration and keep working.
 
 What can be bought is in PRODUCTS (prices live there only): a document is an `essay` (up to
 ESSAY_MAX_FOOTNOTES footnotes) or a `long` document (up to $AGLC_MAX_FOOTNOTES), chosen
-here from its footnote count, never by the page; or a pack of credits (`pack3`, `pack10`)
-with a redeem code (aglc/credits.py). An essay takes 1 credit, a long document 2. A pack
-bought from a document's unlock screen unlocks that document with its first credits.
+here from its footnote count, never by the page; or a pack of 10 credits (`pack10`) with a
+redeem code (aglc/credits.py). An essay takes 1 credit, a long document 2. A pack bought
+from a document's unlock screen unlocks that document with its first credits. A 3-credit
+pack (`pack3`) used to be sold too: it is no longer in PRODUCTS, so it can't be bought, but
+PACK_CREDITS still knows it, so its orders settle, refund and reissue and its codes still
+redeem.
 
     GET  /api/config                    what the page needs to know (prices, payments on/off)
     POST /api/checkout {session_id?, product?}
@@ -96,14 +99,16 @@ log = logging.getLogger("aglc")
 
 #: What can be bought. Prices live here only; the client never sends one.
 PRODUCTS: dict[str, Product] = {
-    "essay": Product(id="essay", name="AGLC4 citation check: one essay (up to 150 footnotes)", amount=500, currency="AUD"),
-    "long": Product(id="long", name="AGLC4 citation check: one long document (151 to 400 footnotes)", amount=900,
+    "essay": Product(id="essay", name="AGLC4 citation check: one essay (up to 150 footnotes)", amount=100, currency="AUD"),
+    "long": Product(id="long", name="AGLC4 citation check: one long document (151 to 400 footnotes)", amount=200,
                     currency="AUD"),
-    "pack3": Product(id="pack3", name="AGLC4 citation check: 3 credits", amount=1200, currency="AUD"),
-    "pack10": Product(id="pack10", name="AGLC4 citation check: 10 credits", amount=3500, currency="AUD"),
+    "pack10": Product(id="pack10", name="AGLC4 citation check: 10 credits", amount=800, currency="AUD"),
 }
 ESSAY_MAX_FOOTNOTES = 150  # an essay up to this many footnotes; a long document up to $AGLC_MAX_FOOTNOTES
 TIER_CREDITS = {"essay": 1, "long": 2}  # credits a document of each tier takes
+#: Credits in each pack ever sold, keyed by product id. Keep a pack here after it leaves
+#: PRODUCTS (as `pack3` has): orders already paid for it are settled, refunded, shown and
+#: reissued by this, never by PRODUCTS, and their codes keep working.
 PACK_CREDITS = {"pack3": 3, "pack10": 10}
 
 PREVIEW_FULL = 3  # at most this many changed footnotes are shown in full before paying,
@@ -1160,7 +1165,7 @@ async def get_config() -> dict:
 
 class CheckoutRequest(BaseModel):
     session_id: str | None = None
-    #: a pack (`pack3`, `pack10`); omitted, or a document's tier, means "this document", whose
+    #: a pack on sale (`pack10`); omitted, or a document's tier, means "this document", whose
     #: tier is chosen here from its footnote count whatever the page asks for
     product: str | None = None
 
@@ -1202,9 +1207,9 @@ def _payable_document(session_id: str) -> sqlite3.Row:
 def create_checkout(body: CheckoutRequest, request: Request, response: Response) -> dict:
     _require_enabled()
     store = get_store()
-    is_pack = body.product in PACK_CREDITS
-    if body.product is not None and body.product not in PRODUCTS:
+    if body.product is not None and body.product not in PRODUCTS:  # incl. a pack no longer sold
         raise HTTPException(422, "Unknown product")
+    is_pack = body.product in PACK_CREDITS
     session_id = check_session_id(body.session_id) if body.session_id else None
     if session_id is None and not is_pack:
         raise HTTPException(422, "Which document?")

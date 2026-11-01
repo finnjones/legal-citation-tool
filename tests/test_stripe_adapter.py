@@ -37,7 +37,7 @@ EXTRACTION = (FIXTURES / "sample_essay_extraction.json").read_text()
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 SECRET = "whsec_test_secret"
-PRODUCT = Product(id="essay", name="AGLC4 citation check: one essay (up to 150 footnotes)", amount=500, currency="AUD")
+PRODUCT = Product(id="essay", name="AGLC4 citation check: one essay (up to 150 footnotes)", amount=100, currency="AUD")
 REDIRECT = "https://aglc.example/?paid=1&session=abc123"
 
 
@@ -56,14 +56,14 @@ def event(kind: str, obj: dict, event_id: str = "evt_1") -> dict:
 def completed_session(**overrides) -> dict:
     return {
         "id": "cs_test_1", "object": "checkout.session", "status": "complete", "payment_status": "paid",
-        "payment_intent": "pi_1", "amount_total": 500, "currency": "aud", "client_reference_id": "order-1",
+        "payment_intent": "pi_1", "amount_total": 100, "currency": "aud", "client_reference_id": "order-1",
         **overrides,
     }
 
 
 def charge(**overrides) -> dict:
     return {"id": "ch_1", "object": "charge", "payment_intent": "pi_1", "refunded": True,
-            "amount": 500, "amount_refunded": 500, "currency": "aud", **overrides}
+            "amount": 100, "amount_refunded": 100, "currency": "aud", **overrides}
 
 
 def session_object(**values):
@@ -97,14 +97,14 @@ def test_completed_session_is_paid_with_amount_and_payment_intent(provider):
     assert (e.event_id, e.type, e.status) == ("evt_paid", "checkout.session.completed", "paid")
     assert e.provider_order_id == "cs_test_1"
     assert e.payment_id == "pi_1"
-    assert (e.amount, e.currency) == (500, "AUD")  # Stripe says "aud"; billing compares upper case
+    assert (e.amount, e.currency) == (100, "AUD")  # Stripe says "aud"; billing compares upper case
 
 
 def test_unpaid_completion_waits_for_the_async_event(provider):
     unpaid = completed_session(payment_status="unpaid", payment_intent=None)
     assert parse(provider, event("checkout.session.completed", unpaid)).status == "ignored"
     later = parse(provider, event("checkout.session.async_payment_succeeded", completed_session(), "evt_2"))
-    assert (later.status, later.provider_order_id, later.amount) == ("paid", "cs_test_1", 500)
+    assert (later.status, later.provider_order_id, later.amount) == ("paid", "cs_test_1", 100)
 
 
 def test_bad_signatures_are_rejected(provider):
@@ -139,7 +139,7 @@ def test_unknown_events_are_ignored(provider):
 def test_full_refund_is_matched_to_the_order_through_its_checkout_session(provider, api_client):
     api_client.v1.checkout.sessions.list.return_value = {"data": [{"id": "cs_test_1"}]}
     e = parse(provider, event("charge.refunded", charge(), "evt_refund"))
-    assert (e.status, e.provider_order_id, e.payment_id, e.amount, e.currency) == ("refunded", "cs_test_1", "pi_1", 500, "AUD")
+    assert (e.status, e.provider_order_id, e.payment_id, e.amount, e.currency) == ("refunded", "cs_test_1", "pi_1", 100, "AUD")
     api_client.v1.checkout.sessions.list.assert_called_once_with(params={"payment_intent": "pi_1", "limit": 1})
 
 
@@ -147,8 +147,8 @@ def test_partial_and_unmatched_refunds(provider, api_client):
     # A partial refund is reported, not full: it leaves a document unlocked (billing decides),
     # but removes a credit pack's unspent credits.
     api_client.v1.checkout.sessions.list.return_value = {"data": [{"id": "cs_test_1"}]}
-    partial = parse(provider, event("charge.refunded", charge(refunded=False, amount_refunded=100)))
-    assert (partial.status, partial.full, partial.amount, partial.provider_order_id) == ("refunded", False, 100, "cs_test_1")
+    partial = parse(provider, event("charge.refunded", charge(refunded=False, amount_refunded=50)))
+    assert (partial.status, partial.full, partial.amount, partial.provider_order_id) == ("refunded", False, 50, "cs_test_1")
     assert parse(provider, event("charge.refunded", charge())).full is True
     api_client.v1.checkout.sessions.list.return_value = {"data": []}  # not one of our checkouts
     e = parse(provider, event("charge.refunded", charge()))
@@ -174,7 +174,7 @@ def test_create_checkout_sends_the_right_parameters(provider, api_client):
     assert params["client_reference_id"] == "order-1" and params["metadata"] == {"order_id": "order-1"}
     assert params["line_items"] == [{
         "quantity": 1,
-        "price_data": {"currency": "aud", "unit_amount": 500,
+        "price_data": {"currency": "aud", "unit_amount": 100,
                        "product_data": {"name": "AGLC4 citation check: one essay (up to 150 footnotes)"}},
     }]
     assert params["success_url"] == REDIRECT  # carries our own session id, no {CHECKOUT_SESSION_ID}
@@ -210,7 +210,7 @@ def test_retrieve_maps_statuses(provider, api_client):
     get = api_client.v1.checkout.sessions.retrieve
     get.return_value = session_object(**completed_session())
     status = provider.retrieve("cs_test_1")
-    assert (status.paid, status.amount, status.currency, status.payment_id) == (True, 500, "AUD", "pi_1")
+    assert (status.paid, status.amount, status.currency, status.payment_id) == (True, 100, "AUD", "pi_1")
     get.assert_called_with("cs_test_1")
     get.return_value = session_object(**completed_session(status="open", payment_status="unpaid", payment_intent=None))
     assert provider.retrieve("cs_test_1").paid is False  # pending
@@ -225,15 +225,15 @@ def test_retrieve_maps_statuses(provider, api_client):
 
 def test_refund_is_idempotent_by_key(provider, api_client):
     api_client.v1.refunds.create.return_value = stripe.Refund.construct_from({"id": "re_1", "status": "succeeded"}, "k")
-    refund = provider.refund(payment_id="pi_1", amount=500, currency="AUD", reason="Automatic refund: gone",
+    refund = provider.refund(payment_id="pi_1", amount=100, currency="AUD", reason="Automatic refund: gone",
                              idempotency_key="refund-order-1")
     assert (refund.refund_id, refund.status) == ("re_1", "succeeded")
     kwargs = api_client.v1.refunds.create.call_args.kwargs
-    assert kwargs["params"]["payment_intent"] == "pi_1" and kwargs["params"]["amount"] == 500
+    assert kwargs["params"]["payment_intent"] == "pi_1" and kwargs["params"]["amount"] == 100
     assert kwargs["options"] == {"idempotency_key": "refund-order-1"}
     api_client.v1.refunds.create.side_effect = stripe.InvalidRequestError("already refunded", "payment_intent")
     with pytest.raises(PaymentError):
-        provider.refund(payment_id="pi_1", amount=500, currency="AUD", reason="", idempotency_key="k")
+        provider.refund(payment_id="pi_1", amount=100, currency="AUD", reason="", idempotency_key="k")
 
 
 def test_cancel_checkout_expires_the_session_and_swallows_already_closed(provider, api_client):
@@ -360,7 +360,7 @@ def test_missing_files_refund_the_payment_intent(stripe_api, api_client):
     r = _webhook(client, event("checkout.session.completed", completed_session(), "evt_paid"))
     assert r.json()["outcome"] == "files_missing"
     kwargs = api_client.v1.refunds.create.call_args.kwargs
-    assert kwargs["params"]["payment_intent"] == "pi_1" and kwargs["params"]["amount"] == 500
+    assert kwargs["params"]["payment_intent"] == "pi_1" and kwargs["params"]["amount"] == 100
     assert kwargs["options"] == {"idempotency_key": f"refund-{order_id}"}
     assert get_store().order(order_id)["status"] == "refunded"
 
