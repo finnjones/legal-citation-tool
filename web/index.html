@@ -9,12 +9,12 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 <html lang="en-AU">
 <head>
     {{> head}}
-    <title>AGLC4 Footnote Generator &amp; Citation Checker for Word | {{brand}}</title>
+    <title>AGLC4 Referencing Generator &amp; Footnote Checker | {{brand}}</title>
     <meta name="description" content="AGLC4 referencing generator for your Word essay: every footnote is fixed to AGLC4, with Ibid, (n x), short titles and an optional bibliography, returned as Word tracked changes. {{price}} per document; the first {{preview_full}} fixes are free.">
     <link rel="canonical" href="{{base_url}}/">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{brand}}">
-    <meta property="og:title" content="AGLC4 Footnote Generator &amp; Citation Checker for Word | {{brand}}">
+    <meta property="og:title" content="AGLC4 Referencing Generator &amp; Footnote Checker | {{brand}}">
     <meta property="og:description" content="Fix every AGLC4 footnote in your essay, as Word tracked changes. {{price}} per document, first {{preview_full}} fixes free, no account.">
     <meta property="og:url" content="{{base_url}}/">
     <meta property="og:image" content="{{base_url}}/assets/og.png">
@@ -23,6 +23,9 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
     <meta property="og:image:alt" content="A footnote before and after AGLC4 formatting, shown as a tracked change.">
     <meta property="og:locale" content="en_AU">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="AGLC4 Referencing Generator &amp; Footnote Checker | {{brand}}">
+    <meta name="twitter:image" content="{{base_url}}/assets/og.png">
+    {{jsonld}}
     <style>
         /* ---- Hero ---------------------------------------------------------- */
         .hero { padding: 72px 0 96px; }
@@ -657,7 +660,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                         <details>
                             <summary>Is this allowed under my university's academic integrity rules?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
                             <div class="answer">
-                                <p>It changes formatting only: the punctuation, order, italics and abbreviations of your citations. It never touches your argument, your quotations or your choice of sources, and it doesn't write anything for you.</p>
+                                <p>It changes formatting only: the punctuation, order, italics and abbreviations of your citations. It never touches your argument, your quotations or your choice of sources, and it doesn't write anything for you. Every change is listed for you to review before you download and, with tracked changes on (the default), shown in your .docx as a Word tracked change, so you decide what stays.</p>
                                 <p>Rules about AI tools differ between universities and units. <strong>Check your unit's AI policy</strong> before you use it on assessed work, and ask your lecturer if you're unsure.</p>
                             </div>
                         </details>
@@ -691,6 +694,43 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <summary>Which file types work?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
                             <div class="answer">
                                 <p>Word .docx files up to 10 MB, with real Word footnotes. If you write in Pages or Google Docs, export to Word (.docx) first. An older .doc file needs to be saved as .docx in Word.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>Does it change the text of my essay?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>It never rewrites your sentences. Outside the footnotes it fixes only formatting: a footnote number typed before a full stop or comma is moved after it, case names and Act titles in your text are italicised, and section ranges become “ss” with an en dash.</p>
+                                <p>Each fix is listed for you to review, and is a Word tracked change if tracked changes are on (the default). Anything it can spot but can't safely fix is marked Check and left for you.</p>
+                            </div>
+                        </details>
+                        <details data-paid>
+                            <summary>What does the free preview show?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Before you pay, you see every footnote's status (Amended, Check or Unchanged), every Check item, and the first {{preview_full}} fixes in full. Paying unlocks the rest of the corrections, the bibliography and the .docx with tracked changes.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>Does it do Ibid and (n&nbsp;x)?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Yes. It works out Ibid and (n&nbsp;x) for the whole essay from the order of your footnotes, and defines short titles where a source is cited again. An Ibid or (n&nbsp;x) with no pinpoint is marked Check, because it can't invent the page. See <a href="/guides/ibid">how Ibid works</a> and <a href="/guides/subsequent-references">subsequent references</a>.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>Can it make my bibliography?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Yes, with “Add a bibliography” ticked. It is built from the first citation of every source in your footnotes, grouped into the AGLC4 categories and sorted alphabetically, and added at the end of your document. Check whether your assignment asks for one. See <a href="/guides/bibliography">the AGLC4 bibliography</a>.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>What are the most common AGLC4 footnote mistakes?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>Writing “above n” instead of (n&nbsp;x), putting “at” before a pinpoint, full stops in abbreviations such as C.L.R., using Ibid where it isn't allowed, and leaving out pinpoints. <a href="/guides/common-mistakes">The full checklist</a> shows each one fixed.</p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>Does it follow AGLC4 or AGLC5?<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></summary>
+                            <div class="answer">
+                                <p>AGLC4, the current edition of the <cite>Australian Guide to Legal Citation</cite>. <a href="/guides/aglc4-vs-aglc5">What we know about a fifth edition</a>.</p>
                             </div>
                         </details>
                     </div>

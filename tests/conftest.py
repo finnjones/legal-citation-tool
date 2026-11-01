@@ -12,7 +12,7 @@ def _isolate_from_local_env(monkeypatch):
                 "AGLC_LLM_FALLBACK", "AGLC_PLAUSIBLE_DOMAIN",
                 "AGLC_OPENROUTER_IGNORE", "AGLC_OPENROUTER_DATA_COLLECTION", "AGLC_OWNER_NAME",
                 "AGLC_CONTACT_EMAIL", "AGLC_ABN", "AGLC_STATE", "AGLC_OWNER_ABOUT", "AGLC_LOG_RETENTION_DAYS",
-                "AGLC_GST_REGISTERED"):
+                "AGLC_GST_REGISTERED", "AGLC_BLOCK_AI_TRAINING"):
         monkeypatch.delenv(var, raising=False)
 
 

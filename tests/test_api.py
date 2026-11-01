@@ -6,6 +6,7 @@ import json
 import re
 import tempfile
 import uuid
+from html import unescape
 from io import BytesIO
 from pathlib import Path
 from unittest import mock
@@ -89,7 +90,7 @@ def test_root_serves_html():
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<title>AGLC4 Footnote Generator &amp; Citation Checker for Word | Aforecite</title>" in response.text
+    assert "<title>AGLC4 Referencing Generator &amp; Footnote Checker | Aforecite</title>" in response.text
     assert "{{" not in response.text  # every placeholder filled
     assert site.BRAND in response.text
 
@@ -668,6 +669,253 @@ def test_robots_txt_allows_the_site_but_not_the_api():
 def test_robots_txt_names_the_sitemap_on_the_public_url(monkeypatch):
     monkeypatch.setenv("AGLC_PUBLIC_URL", "https://cite.example.com")
     assert "Sitemap: https://cite.example.com/sitemap.xml" in client.get("/robots.txt").text.splitlines()
+
+
+# ---- Tests: search and answer engines (canonical, social tags, JSON-LD, llms.txt) ---- #
+
+
+def _head_tag(text: str, pattern: str) -> list[str]:
+    return re.findall(pattern, text)
+
+
+def _jsonld(text: str) -> list[dict]:
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)
+    return [json.loads(b) for b in blocks]
+
+
+def _nodes(text: str) -> list[dict]:
+    (data,) = _jsonld(text)  # exactly one JSON-LD block per page
+    assert data["@context"] == "https://schema.org"
+    assert all("@type" in node for node in data["@graph"])
+    return data["@graph"]
+
+
+def _types(text: str) -> list[str]:
+    return [node["@type"] for node in _nodes(text)]
+
+
+@pytest.mark.parametrize("path", site.PUBLIC_PATHS)
+def test_every_public_page_has_a_canonical_url_and_social_tags(path, monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://cite.example.com/")
+    text = client.get(path).text
+    url = "https://cite.example.com" + path
+    assert "{{" not in text
+    assert _head_tag(text, r'<link rel="canonical" href="([^"]+)">') == [url]
+    assert f'<meta property="og:url" content="{url}">' in text
+    assert '<meta property="og:image" content="https://cite.example.com/assets/og.png">' in text
+    assert '<meta name="twitter:card" content="summary_large_image">' in text
+    assert re.search(r'<meta property="og:title" content="[^"]+">', text)
+    assert '<html lang="en-AU">' in text
+
+
+@pytest.mark.parametrize("path", site.PUBLIC_PATHS)
+def test_every_public_page_has_valid_json_ld_with_no_reviews(path):
+    text = client.get(path).text
+    types = _types(text)
+    assert "Organization" in types and "WebSite" in types
+    def all_types(value):
+        if isinstance(value, dict):
+            yield from ([value["@type"]] if "@type" in value else [])
+            for v in value.values():
+                yield from all_types(v)
+        elif isinstance(value, list):
+            for v in value:
+                yield from all_types(v)
+
+    found = set(all_types(_jsonld(text)))
+    assert not found & {"Review", "AggregateRating", "Rating"}  # there are no reviews (PRODUCT.md)
+    assert not any(key in json.dumps(_jsonld(text)) for key in ('"review"', '"aggregateRating"', '"reviewRating"'))
+
+
+def test_titles_and_descriptions_are_unique_and_short():
+    titles, descriptions = {}, {}
+    for path in site.PUBLIC_PATHS:
+        text = client.get(path).text
+        (title,) = re.findall(r"<title>(.*?)</title>", text)
+        (description,) = re.findall(r'<meta name="description" content="([^"]*)">', text)
+        titles[path], descriptions[path] = title, description
+        assert len(title.replace("&amp;", "&")) <= 60, (path, title)
+        if path != "/":  # the home page's description carries the price and is left to the pricing work
+            assert len(description) <= 160, (path, description)
+    assert len(set(titles.values())) == len(titles)
+    assert len(set(descriptions.values())) == len(descriptions)
+    for guide in site.GUIDES.values():
+        assert len(guide.title) <= 48 and len(guide.description) <= 155, guide.slug
+
+
+@pytest.mark.parametrize("path", [p for p in site.PUBLIC_PATHS if p != "/"])
+def test_every_page_has_one_h1_and_images_have_alt_text(path):
+    # The home page also has the results view's <h1>, hidden until a document is checked.
+    text = client.get(path).text
+    assert text.count("<h1") == 1
+    assert all("alt=" in img for img in re.findall(r"<img\b[^>]*>", text))
+
+
+def test_home_page_structured_data():
+    nodes = {node["@type"]: node for node in _nodes(client.get("/").text)}
+    assert set(nodes) == {"Organization", "WebSite", "WebApplication", "FAQPage"}
+    app = nodes["WebApplication"]
+    assert app["name"] == site.BRAND and app["operatingSystem"] == "Web"
+    assert app["applicationCategory"] and app["description"] == site.SITE_DESCRIPTION
+    assert "offers" not in app  # payments off: nothing to buy
+    assert nodes["Organization"]["name"] == site.BRAND  # no AGLC_OWNER_NAME
+
+
+def test_home_page_offer_is_the_live_price_when_payments_are_on(monkeypatch):
+    from aglc import billing
+
+    monkeypatch.setenv("AGLC_PAYMENTS", "fake")
+    app = next(n for n in _nodes(client.get("/").text) if n["@type"] == "WebApplication")
+    product = billing.PRODUCTS["document"]
+    assert app["offers"]["price"] == f"{product.amount / 100:.2f}"
+    assert app["offers"]["priceCurrency"] == product.currency
+
+
+def test_owner_name_is_the_publisher_when_set(monkeypatch):
+    monkeypatch.setenv("AGLC_OWNER_NAME", "Jane Citizen")
+    org = next(n for n in _nodes(client.get("/guides/ibid").text) if n["@type"] == "Organization")
+    assert org["name"] == "Jane Citizen"
+
+
+def _visible_faq(text: str) -> list[str]:
+    """The questions on the page, read independently of site.page_faq."""
+    faq = re.search(r'<div class="faq">(.*?)</section>', text, re.S)
+    if faq:
+        details = re.findall(r"<details( data-paid)?>\s*<summary>(.*?)<svg", faq[1], re.S)
+        return [(bool(paid), " ".join(unescape(re.sub(r"<[^>]+>", "", q)).split())) for paid, q in details]
+    section = re.search(r'<section class="g-faq".*?</section>', text, re.S)
+    return [(False, " ".join(unescape(re.sub(r"<[^>]+>", "", q)).split()))
+            for q in re.findall(r"<h3>(.*?)</h3>", section[0])] if section else []
+
+
+@pytest.mark.parametrize("payments", [False, True])
+def test_home_page_faq_markup_matches_the_visible_questions(payments, monkeypatch):
+    if payments:
+        monkeypatch.setenv("AGLC_PAYMENTS", "fake")
+    text = client.get("/").text
+    faq = next(n for n in _nodes(text) if n["@type"] == "FAQPage")
+    marked = [q["name"] for q in faq["mainEntity"]]
+    visible = [q for paid, q in _visible_faq(text) if payments or not paid]  # data-paid is hidden with payments off
+    assert marked == visible
+    assert len(marked) >= 10
+    assert ("What does the free preview show?" in marked) is payments
+    assert all(q["acceptedAnswer"]["text"] for q in faq["mainEntity"])
+    assert 'href="/guides/common-mistakes"' in text  # the checklist is linked from the FAQ
+
+
+@pytest.mark.parametrize("path", GUIDE_PATHS)
+def test_guide_structured_data(path):
+    slug = path.rsplit("/", 1)[1]
+    guide = site.GUIDES[slug]
+    text = client.get(path).text
+    nodes = {node["@type"]: node for node in _nodes(text)}
+    article = nodes["TechArticle"]
+    assert article["headline"] == guide.title and article["description"] == guide.description
+    assert article["dateModified"] == guide.updated
+    assert article["url"] == "http://testserver" + path
+    crumbs = [item["item"] for item in nodes["BreadcrumbList"]["itemListElement"]]
+    assert crumbs == ["http://testserver/", "http://testserver/guides", "http://testserver" + path]
+    assert 'aria-label="Breadcrumb"' in text and f'<time datetime="{guide.updated}">' in text
+    # FAQPage only where the page shows its questions, and then exactly those questions
+    visible = [q for _, q in _visible_faq(text)]
+    if visible:
+        assert [q["name"] for q in nodes["FAQPage"]["mainEntity"]] == visible
+    else:
+        assert "FAQPage" not in nodes
+
+
+def test_every_guide_has_common_questions_and_links_to_the_tool():
+    for path in GUIDE_PATHS:
+        text = client.get(path).text
+        assert 3 <= len(_visible_faq(text)) <= 5, path
+        assert "Fix every footnote in your essay" in text and 'href="/#uploadCard"' in text
+
+
+def test_static_pages_and_guides_index_structured_data():
+    about = {n["@type"]: n for n in _nodes(client.get("/about").text)}
+    assert "AboutPage" in about and "BreadcrumbList" in about
+    index = {n["@type"]: n for n in _nodes(client.get("/guides").text)}
+    listed = [item["url"] for item in index["CollectionPage"]["mainEntity"]["itemListElement"]]
+    assert listed == ["http://testserver" + path for path in GUIDE_PATHS]
+
+
+def test_faq_reader_reads_only_faq_containers_and_skips_hidden_answers():
+    html = """<h3>Not a question</h3><p>Not an answer</p>
+    <div class="faq"><details><summary>One?<svg><path d="x"/></svg></summary><div class="answer"><p>Yes &amp; <a href="/">no</a>.</p></div></details>
+    <details data-paid><summary>Paid?</summary><div class="answer"><p>Hidden.</p></div></details></div>
+    <section class="g-faq"><h2>Common questions</h2><h3>Two?</h3><p>First.<br>Second.</p></section>"""
+    assert site.page_faq(html) == [("One?", "Yes & no."), ("Two?", "First.Second.")]
+
+
+def test_json_ld_cannot_close_its_script_element():
+    script = site.jsonld_script([{"@type": "Thing", "name": "</script><script>alert(1)</script>"}])
+    assert script.count("</script>") == 1
+    assert json.loads(script.split(">", 1)[1].rsplit("<", 1)[0])["@graph"][0]["name"].startswith("</script>")
+
+
+def test_sitemap_has_a_lastmod_for_every_url():
+    import xml.etree.ElementTree as ET
+
+    root = ET.fromstring(client.get("/sitemap.xml").text)
+    ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    urls = root.findall("s:url", ns)
+    assert len(urls) == len(site.PUBLIC_PATHS)
+    for url, path in zip(urls, site.PUBLIC_PATHS):
+        lastmod = url.find("s:lastmod", ns).text
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", lastmod) and lastmod == site.lastmod(path)
+    assert site.lastmod("/guides/ibid") == site.GUIDES["ibid"].updated
+    assert site.lastmod("/privacy") == "2026-10-23"  # from POLICY_DATE
+    assert site.lastmod("/about") == "2026-10-18"  # unchanged by this work: its real last change
+    assert not any("/api/" in el.text for el in root.iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc"))
+
+
+def _robots_groups(text: str) -> list[tuple[list[str], list[str]]]:
+    groups = []
+    for block in text.strip().split("\n\n"):
+        lines = [line for line in block.splitlines() if not line.startswith("#")]
+        agents = [line.split(": ", 1)[1] for line in lines if line.startswith("User-agent: ")]
+        if agents:
+            groups.append((agents, [line for line in lines if not line.startswith("User-agent: ")]))
+    return groups
+
+
+def test_robots_txt_welcomes_search_and_ai_answer_crawlers_but_keeps_out_of_the_api():
+    groups = _robots_groups(client.get("/robots.txt").text)
+    named = [agent for agents, _ in groups for agent in agents]
+    for crawler in ("Googlebot", "Bingbot", "GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot",
+                    "Claude-SearchBot", "PerplexityBot", "Google-Extended", "Applebot-Extended"):
+        assert crawler in named
+    for agents, rules in groups:  # each group is obeyed on its own, so each keeps the API out
+        assert rules == ["Allow: /", "Disallow: /api/"], agents
+
+
+def test_robots_txt_can_shut_out_ai_training_only(monkeypatch):
+    monkeypatch.setenv("AGLC_BLOCK_AI_TRAINING", "1")
+    groups = dict((tuple(agents), rules) for agents, rules in _robots_groups(client.get("/robots.txt").text))
+    assert groups[site.TRAINING_CRAWLERS] == ["Disallow: /"]
+    assert groups[site.SEARCH_CRAWLERS] == ["Allow: /", "Disallow: /api/"]
+    assert groups[("*",)] == ["Allow: /", "Disallow: /api/"]
+
+
+def test_llms_txt_describes_the_tool_and_lists_every_guide(monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://cite.example.com/")
+    response = client.get("/llms.txt")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    text = response.text
+    assert text.startswith(f"# {site.BRAND}\n\n> ")
+    assert "It writes no essay content" in text and "Every change is listed for the student to review" in text and "By default (an option they can turn off)" in text
+    assert "isn't affiliated" in text and "{{" not in text
+    for slug, guide in site.GUIDES.items():
+        assert f"- [{guide.name}](https://cite.example.com/guides/{slug}): {guide.summary}" in text
+    assert "A$" not in text and "free preview" not in text  # payments off: no price to state
+
+
+def test_llms_txt_states_the_live_price_only_when_payments_are_on(monkeypatch):
+    from aglc import billing
+
+    monkeypatch.setenv("AGLC_PAYMENTS", "fake")
+    assert f"one payment of {billing.PRODUCTS['document'].display}" in client.get("/llms.txt").text
 
 
 # ---- Guard tests: the guides may only cite rules and examples this repo knows -------- #

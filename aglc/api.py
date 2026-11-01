@@ -160,6 +160,12 @@ async def robots(request: Request) -> Response:
     return site.robots(request)
 
 
+@app.get("/llms.txt", include_in_schema=False)
+async def llms_txt(request: Request) -> Response:
+    """What the site is, in plain words for AI models, with every guide."""
+    return site.llms_txt(request)
+
+
 @app.get("/api/sample")
 async def sample_essay() -> FileResponse:
     """The demo essay (examples/test_essay.docx), so "Try a sample essay" needs no upload."""
