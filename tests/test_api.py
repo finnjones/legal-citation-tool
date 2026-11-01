@@ -554,8 +554,9 @@ def test_price_on_the_page_comes_from_the_server():
     from aglc import billing
 
     text = client.get("/").text
-    assert f"{billing.PRODUCTS['document'].display} per document" in text
-    assert f"first {billing.PREVIEW_FULL} fixes free" in text
+    assert f"{billing.PRODUCTS['essay'].display} per essay" in text
+    assert billing.PRODUCTS["long"].display in text and billing.PRODUCTS["pack10"].display in text
+    assert f"the first {billing.PREVIEW_FULL} in full" in text
 
 
 # ---- Tests: the AGLC4 guides, sitemap and robots.txt ------------------------------ #

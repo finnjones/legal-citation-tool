@@ -135,6 +135,41 @@ AGLC_GST_REGISTERED=false               # true once registered: the price then "
 
 Update `POLICY_DATE` in `aglc/site.py` whenever you change those pages.
 
+## 4b. Prices, credit packs and emailing codes
+
+Prices live in `aglc/billing.py` (`PRODUCTS`) and nowhere else: `/api/config` sends them and
+the pages render from them. A document is an essay (A$5, up to 150 footnotes) or a long
+document (A$9, up to `AGLC_MAX_FOOTNOTES`), chosen by the server from its footnote count.
+Credit packs are A$12 for 3 and A$35 for 10; an essay uses 1 credit, a long document 2.
+Credits never expire and nothing renews. Packs go through the same checkout and webhooks as
+documents, so the provider setup in sections 3 and 3a doesn't change.
+
+- **The code.** When a pack's payment is applied (webhook, or the late-webhook check when
+  the buyer's page polls), the server makes a random code (`AFC-XXXX-XXXX-XXXX`) and stores
+  only its SHA-256 hash and the credits left. The code itself is held in `code_pickup` only
+  until the buyer's page collects it, once, and is deleted then (or by the retention sweep
+  after `AGLC_RETENTION_HOURS`); SQLite's `secure_delete` and a WAL checkpoint keep it out of
+  the database files afterwards. The page shows it with a copy button, keeps it in the
+  browser's localStorage, and tells the buyer to save it. **We can't show a code again**:
+  if a buyer loses it, look up their pack by order (the dashboard's payment reference is on
+  the order row) and refund it or sell them a new one.
+- **Email (optional).** Set `RESEND_API_KEY` and `AGLC_EMAIL_FROM` (a sender on a domain
+  verified with Resend) and the code is also emailed once, at purchase, to the address the
+  checkout collected (Stripe Checkout always asks for one; Square payment links do when the
+  buyer gives it). The address is never stored. Without these settings nothing is emailed and
+  the success page says it is the only place the code appears. There is no "resend my code":
+  a code we only hold as a hash can't be sent again.
+- **Refunds.** Refund a pack from the provider's dashboard as for any payment. Any refund of a
+  pack, full or partial, removes all its unspent credits (Stripe reports a partial refund
+  with `charge.refunded` too); documents it already unlocked stay unlocked. So for a
+  partly used pack, refund the unused credits' share (price / credits x unused) as a partial
+  refund, which is what the Refunds page promises within 14 days of purchase. A document
+  is still locked again only by a full refund of its own payment. If a document unlocked with
+  credits has lost its files when downloaded, the credits go back on the code automatically.
+- **The ledger.** `credit_ledger` has a row for every grant (with the payment id), spend (with
+  the document it unlocked), refund and return, so a code's history can be read back:
+  `sqlite3 aglc.db "SELECT * FROM credit_ledger WHERE code_id = '...'"`.
+
 ## 5. The deploy script and workflow
 
 The workflow tests with `uv sync --all-extras` and then runs the server-side `deploy` script.
@@ -195,7 +230,9 @@ Model time is bounded by `AGLC_REQUEST_DEADLINE` (per request, default 90s) and
 - `AGLC_PAYMENTS=fake` must never be used on the public site: its checkout page marks
   anything paid.
 - Do one Square **sandbox** run end to end (pay, late webhook, refund from the dashboard)
-  with the real tunnel before switching `SQUARE_ENVIRONMENT=production`.
+  with the real tunnel before switching `SQUARE_ENVIRONMENT=production`. Do it for a credit
+  pack too: buy one on its own, use its code, buy one from a document's unlock screen, and
+  refund one from the dashboard (its unspent credits should go).
 - Turn on Apple Pay and Google Pay in Square Dashboard > Payment links > Settings.
 - For Stripe: do one **test-mode** run end to end (`stripe listen`, pay with the 4242 card,
   refund from the Dashboard) before switching to the live keys, and register the live webhook

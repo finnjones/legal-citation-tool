@@ -14,6 +14,8 @@ results. What counts as "after the window":
   was paid after all (a lost webhook); if so it is unlocked and kept for a window.
   A payment that arrives after its document was deleted is refunded automatically, as for
   any document whose files are gone.
+- A credit pack's code, held only until the buyer's page collects it: the same window
+  from the payment (the database keeps only a hash of it).
 
 A deleted document's database row is kept, without its filename, with `purged_at` set: it
 still counts towards today's free-use limits, its orders stay for the accounts, and asking
@@ -84,6 +86,10 @@ def sweep(temp_dir: Path | None, *, at: datetime | None = None) -> int:
 
     from .store import data_dir
 
+    if (data_dir() / "aglc.db").is_file():  # only made with payments on
+        from .store import get_store
+
+        get_store().purge_pickups(cutoff.isoformat(timespec="seconds"))
     sessions = data_dir() / "sessions"
     if sessions.is_dir():
         deleted += _sweep_paid(sessions, cutoff)

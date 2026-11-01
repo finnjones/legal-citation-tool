@@ -5,8 +5,15 @@ webhook writes. The schema is versioned with `PRAGMA user_version`: append a mig
 to MIGRATIONS, never edit one that has shipped.
 
     documents       one row per processed upload (the session id is the entitlement in v1)
-    orders          one row per checkout; status pending -> paid -> refunding -> refunded
+    orders          one row per checkout; status pending -> paid -> refunding -> refunded.
+                    A document's order has its session id; a credit pack's may have none
     webhook_events  every webhook applied, keyed by the provider's event id (idempotency)
+    credit_codes    one per credit pack bought: a hash of its redeem code, never the code,
+                    and the credits left (aglc/credits.py)
+    credit_ledger   every grant, spend and refund of credits, with the document a spend
+                    unlocked and the pack's payment id
+    code_pickup     a new pack's code, held only until the buyer's page collects it (or the
+                    retention window ends), so it can be shown once
     meta            small settings, eg the salt for hashing IP addresses
 """
 
@@ -84,6 +91,63 @@ MIGRATIONS: list[str] = [
     ALTER TABLE documents ADD COLUMN purged_at TEXT;
     CREATE INDEX documents_created ON documents(created_at);
     """,
+    # 4: credit packs. orders.session_id may be NULL (a pack bought on its own), which
+    # SQLite can only allow by rebuilding the table (same columns, same order).
+    """
+    CREATE TABLE orders_new (
+        id                   TEXT PRIMARY KEY,
+        session_id           TEXT REFERENCES documents(session_id),
+        product              TEXT NOT NULL,
+        amount               INTEGER NOT NULL,
+        currency             TEXT NOT NULL,
+        provider             TEXT NOT NULL,
+        status               TEXT NOT NULL DEFAULT 'pending',
+        checkout_id          TEXT,
+        checkout_url         TEXT,
+        provider_order_id    TEXT,
+        payment_id           TEXT,
+        refund_id            TEXT,
+        note                 TEXT,
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL,
+        paid_at              TEXT,
+        refunded_at          TEXT
+    );
+    INSERT INTO orders_new SELECT * FROM orders;
+    DROP TABLE orders;
+    ALTER TABLE orders_new RENAME TO orders;
+    CREATE INDEX orders_session ON orders(session_id);
+    CREATE UNIQUE INDEX orders_provider_order ON orders(provider, provider_order_id);
+
+    CREATE TABLE credit_codes (
+        id                 TEXT PRIMARY KEY,
+        code_hash          TEXT NOT NULL UNIQUE,
+        order_id           TEXT NOT NULL UNIQUE REFERENCES orders(id),  -- one code per pack
+        credits_total      INTEGER NOT NULL,
+        credits_remaining  INTEGER NOT NULL CHECK (credits_remaining >= 0),
+        created_at         TEXT NOT NULL,
+        revoked_at         TEXT                                         -- the pack was refunded
+    );
+
+    CREATE TABLE credit_ledger (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        code_id     TEXT NOT NULL REFERENCES credit_codes(id),
+        delta       INTEGER NOT NULL,          -- + grant, - spend or refund
+        reason      TEXT NOT NULL,             -- grant | spend | refund | return
+        session_id  TEXT,                      -- the document a spend unlocked
+        order_id    TEXT,                      -- the pack's order
+        payment_id  TEXT,                      -- the pack's payment
+        created_at  TEXT NOT NULL
+    );
+    CREATE INDEX credit_ledger_code ON credit_ledger(code_id);
+
+    CREATE TABLE code_pickup (
+        order_id    TEXT PRIMARY KEY REFERENCES orders(id),
+        code        TEXT NOT NULL,
+        emailed     INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL
+    );
+    """,
 ]
 
 # A document whose retention window (see aglc/retention.py) ended before :cutoff: uploaded,
@@ -121,6 +185,7 @@ class Store:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=10000")
+        conn.execute("PRAGMA secure_delete=ON")  # deleted rows (eg a collected pack code) are overwritten
         return conn
 
     def _migrate(self, conn: sqlite3.Connection) -> None:
@@ -267,7 +332,8 @@ class Store:
 
     # ---- orders ------------------------------------------------------------- #
 
-    def add_order(self, order_id: str, session_id: str, *, product: str, amount: int, currency: str, provider: str) -> None:
+    def add_order(self, order_id: str, session_id: str | None, *, product: str, amount: int, currency: str,
+                  provider: str) -> None:
         with self.transaction() as conn:
             conn.execute(
                 "INSERT INTO orders (id, session_id, product, amount, currency, provider, created_at, updated_at)"
@@ -287,6 +353,20 @@ class Store:
     def order(self, order_id: str) -> sqlite3.Row | None:
         with self.read() as conn:
             return conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+
+    def purge_pickups(self, cutoff: str) -> int:
+        """Forget pack codes nobody collected before `cutoff` (the retention sweep)."""
+        with self.transaction() as conn:
+            deleted = conn.execute("DELETE FROM code_pickup WHERE created_at < ?", (cutoff,)).rowcount
+        if deleted:
+            self.scrub_wal()
+        return deleted
+
+    def scrub_wal(self) -> None:
+        """Copy the write-ahead log into the database and empty it, so a deleted secret (with
+        secure_delete on) is left in neither file. Best effort: readers can hold it back."""
+        with self.read() as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     def orders_for(self, session_id: str) -> list[sqlite3.Row]:
         with self.read() as conn:

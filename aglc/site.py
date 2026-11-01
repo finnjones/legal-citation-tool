@@ -4,7 +4,11 @@ Pages live in web/ and use a few placeholders, filled in here so the brand name,
 and analytics are set in one place:
 
     {{brand}}         BRAND below (a placeholder until the name is chosen)
-    {{price}}         the server's price, eg "A$4" (billing.PRODUCTS)
+    {{price}}         the price of an essay, eg "A$5" (billing.PRODUCTS, as are the next)
+    {{price_long}} {{price_pack3}} {{price_pack10}}
+                      a long document, and the 3- and 10-credit packs
+    {{essay_max}}     the most footnotes an essay can have (more is a long document)
+    {{max_footnotes}} the most footnotes any document can have ($AGLC_MAX_FOOTNOTES)
     {{preview_full}}  changed footnotes shown free before paying
     {{base_url}}      $AGLC_PUBLIC_URL or the request's own origin (for Open Graph URLs)
     {{analytics}}     the Plausible script, only when $AGLC_PLAUSIBLE_DOMAIN is set
@@ -19,6 +23,7 @@ and analytics are set in one place:
     {{gst_note}}      from $AGLC_GST_REGISTERED (default: not registered)
     {{analytics_note}} whether analytics is on ($AGLC_PLAUSIBLE_DOMAIN)
     {{payment_provider}} "Stripe" when $AGLC_PAYMENTS=stripe, otherwise "Square"
+    {{email_note}}    whether a credit pack's code is emailed (aglc/mailer.py)
     {{rule_pages}}    index only: where each rule is in the AGLC4 PDF (aglc/guide_pdf.py)
     {{> name}}        web/partials/<name>.html
 
@@ -44,7 +49,7 @@ from . import billing, guide_pdf, reports, retention
 BRAND = "Aforecite"
 
 #: When the policy pages (privacy, terms, refunds) last changed: update it with them.
-POLICY_DATE = "23 October 2026"
+POLICY_DATE = "1 November 2026"
 
 #: Who runs the site: placeholder -> (environment variable, what to set)
 OWNER_SETTINGS = {
@@ -165,6 +170,16 @@ def payment_provider() -> str:
     return "Stripe" if (os.environ.get("AGLC_PAYMENTS") or "").strip().lower() == "stripe" else "Square"
 
 
+def email_note() -> str:
+    """Whether a credit pack's code is emailed (aglc/mailer.py)."""
+    from . import mailer
+
+    if mailer.enabled():
+        return ("If the checkout gives us your email address, we email the code to it once, through our email "
+                "provider (Resend). We don't keep the address.")
+    return "We don't email codes. If the checkout passes us your email address, we don't keep it."
+
+
 def log_retention() -> str:
     days = (os.environ.get("AGLC_LOG_RETENTION_DAYS") or "").strip()
     if not days:
@@ -176,7 +191,12 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
     html = _PARTIAL.sub(lambda m: _read(WEB_DIR / "partials" / f"{m[1]}.html"), html)
     values = {
         "brand": escape(BRAND),
-        "price": escape(billing.PRODUCTS["document"].display),
+        "price": escape(billing.PRODUCTS["essay"].display),
+        "price_long": escape(billing.PRODUCTS["long"].display),
+        "price_pack3": escape(billing.PRODUCTS["pack3"].display),
+        "price_pack10": escape(billing.PRODUCTS["pack10"].display),
+        "essay_max": str(billing.ESSAY_MAX_FOOTNOTES),
+        "max_footnotes": str(billing.max_footnotes()),
         "preview_full": str(billing.PREVIEW_FULL),
         "base_url": escape(base_url(request)),
         "analytics": analytics_tag(),
@@ -190,9 +210,10 @@ def _fill(html: str, request: Request, extra: dict[str, str] | None = None) -> s
         "analytics_note": analytics_note(),
         "payment_provider": payment_provider(),
         "log_retention": log_retention(),
+        "email_note": email_note(),
         **(extra or {}),
     }
-    return re.sub(r"\{\{\s*([a-z_]+)\s*\}\}", lambda m: values.get(m[1], m[0]), html)
+    return re.sub(r"\{\{\s*([a-z0-9_]+)\s*\}\}", lambda m: values.get(m[1], m[0]), html)
 
 
 def _read(path: Path) -> str:

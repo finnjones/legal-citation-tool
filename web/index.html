@@ -10,12 +10,12 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
 <head>
     {{> head}}
     <title>AGLC4 Footnote Generator &amp; Citation Checker for Word | {{brand}}</title>
-    <meta name="description" content="AGLC4 referencing generator for your Word essay: every footnote is fixed to AGLC4, with Ibid, (n x), short titles and an optional bibliography, returned as Word tracked changes. {{price}} per document; the first {{preview_full}} fixes are free.">
+    <meta name="description" content="AGLC4 referencing generator for your Word essay: every footnote is fixed to AGLC4, with Ibid, (n x), short titles and an optional bibliography, returned as Word tracked changes. {{price}} per essay, {{price_long}} for a long document, or credit packs; a free preview first.">
     <link rel="canonical" href="{{base_url}}/">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{brand}}">
     <meta property="og:title" content="AGLC4 Footnote Generator &amp; Citation Checker for Word | {{brand}}">
-    <meta property="og:description" content="Fix every AGLC4 footnote in your essay, as Word tracked changes. {{price}} per document, first {{preview_full}} fixes free, no account.">
+    <meta property="og:description" content="Fix every AGLC4 footnote in your essay, as Word tracked changes. {{price}} per essay, free preview first, no account.">
     <meta property="og:url" content="{{base_url}}/">
     <meta property="og:image" content="{{base_url}}/assets/og.png">
     <meta property="og:image:width" content="1200">
@@ -198,6 +198,19 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         .pricing-card .price { font-family: var(--font-serif); font-size: 2.5rem; font-weight: 600; line-height: 1.1; letter-spacing: -0.015em; }
         .pricing-card .price span { font-family: var(--font-ui); font-size: 1rem; font-weight: 500; color: var(--muted); letter-spacing: 0; }
         .pricing-card .sub { margin-top: 8px; font-size: 1.0625rem; }
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 24px; max-width: 1144px; }
+        .pricing-grid .pricing-card { max-width: none; }
+        .pack-buttons { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+        .code-box {
+            font-family: var(--font-ui); font-size: 1.25rem; font-weight: 600; letter-spacing: 0.06em; background: var(--sheet-2);
+            border: 1px solid var(--hairline-strong); border-radius: 6px; padding: 8px 14px; color: var(--ink); overflow-wrap: anywhere;
+        }
+        .redeem-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+        .redeem-form input {
+            font: inherit; font-size: 0.9375rem; padding: 8px 10px; border: 1px solid var(--hairline-strong); border-radius: 6px;
+            background: var(--sheet); color: var(--ink); min-width: 0; flex: 1 1 14rem; max-width: 22rem; text-transform: uppercase;
+        }
+        .paybar .pay-actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
         .pricing-card ul { list-style: none; margin-top: 24px; border-top: 1px solid var(--hairline); }
         .pricing-card li { padding: 12px 0; border-bottom: 1px solid var(--hairline); display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; font-size: 0.9375rem; }
         .pricing-card li svg { width: 18px; height: 18px; color: var(--accent); margin-top: 3px; }
@@ -462,7 +475,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             .fix-count { grid-column: 3; }
             .fix-rule { grid-column: 2; grid-row: 3; }
             .fix-items { padding: 2px 16px 16px 16px; }
-            .paybar .btn { width: 100%; }
+            .paybar .btn, .paybar .pay-actions { width: 100%; }
         }
     </style>
 </head>
@@ -490,7 +503,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <span class="dz-sub" id="dzSub">or drop a .docx file here</span>
                         </button>
                         <input type="file" id="fileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
-                        <p class="limits" id="limits">.docx up to 10 MB<span data-paid> · {{price}} per document · first {{preview_full}} fixes free</span></p>
+                        <p class="limits" id="limits">.docx up to 10 MB<span data-paid> · {{price}} per essay ({{price_long}} over {{essay_max}} footnotes) · free preview first</span></p>
 
                         <fieldset class="options">
                             <legend class="sr-only">What to include</legend>
@@ -634,17 +647,31 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                     <div class="section-head">
                         <h2 id="pricingTitle">Pricing</h2>
                     </div>
-                    <div class="pricing-card">
-                        <p class="price">{{price}} <span>per document</span></p>
-                        <p class="sub">No account, no subscription.</p>
-                        <ul>
-                            <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Free first: every footnote's status, every Check item, and the first {{preview_full}} fixes in full.</span></li>
-                            <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Pay once to unlock every correction, the bibliography and the .docx with tracked changes.</span></li>
-                            <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>If the AI model can't read more than a few of your footnotes, you aren't asked to pay until it has. Re-reading them is free.</span></li>
-                        </ul>
-                        <a class="btn btn-primary" href="#main" data-start>Check my footnotes</a>
+                    <div class="pricing-grid">
+                        <div class="pricing-card">
+                            <p class="price">{{price}} <span>per essay</span></p>
+                            <p class="sub">Up to {{essay_max}} footnotes. A longer document (up to {{max_footnotes}}) is {{price_long}}. No account, no subscription.</p>
+                            <ul>
+                                <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Free first: every footnote's status, every Check item, how many corrections were found, and the first {{preview_full}} in full.</span></li>
+                                <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Pay once to unlock every correction, the bibliography and the .docx with tracked changes. The price is set by how many footnotes your document has.</span></li>
+                                <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>If the AI model can't read more than a few of your footnotes, you aren't asked to pay until it has. Re-reading them is free.</span></li>
+                            </ul>
+                            <a class="btn btn-primary" href="#main" data-start>Check my footnotes</a>
+                        </div>
+                        <div class="pricing-card packs">
+                            <p class="price">{{price_pack3}} <span>for 3 credits</span></p>
+                            <p class="sub">Or {{price_pack10}} for 10. An essay uses 1 credit, a longer document 2.</p>
+                            <ul>
+                                <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>You get a code to unlock documents with. Keep it: it's shown once, and we only keep a scrambled copy.</span></li>
+                                <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Credits never expire, and nothing renews.</span></li>
+                            </ul>
+                            <div class="pack-buttons">
+                                <button type="button" class="btn btn-secondary" data-buy-pack="pack3">Buy 3 credits</button>
+                                <button type="button" class="btn btn-secondary" data-buy-pack="pack10">Buy 10 credits</button>
+                            </div>
+                        </div>
                     </div>
-                    <p class="refund-line">If a paid document can't be delivered, the payment is refunded automatically. For anything else, see <a href="/refunds">Refunds</a>.</p>
+                    <p class="refund-line">If a paid document can't be delivered, the payment is refunded automatically (or the credits are given back). For anything else, see <a href="/refunds">Refunds</a>.</p>
                 </div>
             </section>
 
@@ -750,7 +777,10 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
     <div class="paybar" id="paybar" hidden>
         <div class="container">
             <p id="paybarText"></p>
-            <button type="button" class="btn btn-primary" id="paybarButton"></button>
+            <div class="pay-actions">
+                <button type="button" class="btn btn-secondary" id="paybarCredits" hidden>Use a credit</button>
+                <button type="button" class="btn btn-primary" id="paybarButton"></button>
+            </div>
         </div>
     </div>
 
@@ -821,6 +851,15 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         async function resumeSession() {
             const params = new URLSearchParams(location.search);
             const sessionId = params.get("session");
+            const packOrder = params.get("pack");
+            if (config.payments && packOrder && params.get("paid") === "1") {
+                const pack = await collectPack(packOrder, sessionId);
+                if (!sessionId) return;
+                history.replaceState(null, "", `/?session=${encodeURIComponent(sessionId)}`);
+                if (!(await loadResults(sessionId))) return;
+                if (pack?.unlocked) showPaid();
+                return;
+            }
             if (!config.payments || !sessionId) return;
             showView("results");
             document.getElementById("summary").textContent = "Loading your results…";
@@ -888,10 +927,10 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 `<a class="btn btn-secondary" href="/">Check a document</a>`));
         }
 
-        function showPaid() {
+        function showPaid(note = "") {
             const link = reDownloadLink();
-            setBanner("payment", banner("ok", "Payment received",
-                `Every correction is unlocked and your .docx is ready.`,
+            setBanner("payment", banner("ok", note ? "Unlocked" : "Payment received",
+                `Every correction is unlocked and your .docx is ready.${note ? ` ${escapeHtml(note)}` : ""}`,
                 `<button type="button" class="btn btn-primary" data-download>Download ${escapeHtml(downloadName())}</button>`,
                 `<div class="copy-row"><span>To download it again later, keep this link:</span><code>${escapeHtml(link)}</code><button type="button" class="btn btn-secondary" data-copy-link>Copy link</button></div>
                  <p>It works for as long as we keep your document; see <a href="/privacy">Privacy</a>.</p>`));
@@ -1746,8 +1785,10 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             if (!show) return;
             const text = document.getElementById("paybarText");
             const button = document.getElementById("paybarButton");
+            const creditsButton = document.getElementById("paybarCredits");
             const failed = (data.failed_footnotes || []).length;
             button.disabled = false;
+            creditsButton.hidden = data.payable === false;
             if (data.payable === false) {
                 const left = data.reruns_left ?? 0;
                 text.innerHTML = `<strong>We couldn't read ${plural(failed, "footnote")}</strong>, so there's nothing to pay for yet.`
@@ -1759,8 +1800,12 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 const shown = total - (data.locked_count || 0);
                 text.innerHTML = `Free preview: <strong>${shown} of ${plural(total, "correction")}</strong> shown.`;
                 const price = data.price?.display || config.price?.display;
+                const tier = data.tier === "long" ? `long document, over ${config.essay_max_footnotes ?? 150} footnotes` : "essay";
                 button.textContent = `Unlock all ${plural(total, "correction")} and the .docx${price ? ` — ${price}` : ""}`;
+                button.title = `Priced as ${tier === "essay" ? "an essay" : `a ${tier}`}`;
                 button.dataset.action = "checkout";
+                const need = data.credits_needed || 1;
+                creditsButton.textContent = `Use ${need === 1 ? "a credit" : `${need} credits`}`;
             }
             requestAnimationFrame(updateStickyHeights);
         }
@@ -1798,7 +1843,8 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             document.getElementById("copyBib").addEventListener("click", copyBibliography);
             document.getElementById("downloadButton").addEventListener("click", downloadDocument);
             document.getElementById("paybarButton").addEventListener("click", (e) =>
-                ({ rerun: rerunDocument, home: () => { location.href = "/"; } }[e.currentTarget.dataset.action] || startCheckout)());
+                ({ rerun: rerunDocument, home: () => { location.href = "/"; } }[e.currentTarget.dataset.action] || (() => startCheckout()))());
+            document.getElementById("paybarCredits").addEventListener("click", showCreditsPanel);
             document.addEventListener("click", (e) => {
                 if (e.target.closest("[data-rerun]")) rerunDocument();
                 const jump = e.target.closest("[data-jump]");
@@ -1810,32 +1856,179 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                 if (report) openReport(Number(report.dataset.report));
                 const cancel = e.target.closest("[data-report-cancel]");
                 if (cancel) closeReport(Number(cancel.dataset.reportCancel));
+                const pack = e.target.closest("[data-buy-pack]");
+                if (pack) startCheckout(pack.dataset.buyPack, pack, pack.hasAttribute("data-for-document"));
+                const saved = e.target.closest("[data-use-code]");
+                if (saved) redeemCode(saved.dataset.useCode, saved);
+                const copyCode = e.target.closest("[data-copy-code]");
+                if (copyCode) copyText(copyCode.dataset.copyCode, copyCode, "Code copied");
             });
             document.addEventListener("submit", (e) => {
                 const form = e.target.closest("[data-report-form]");
                 if (form) { e.preventDefault(); sendReport(form); }
+                const redeem = e.target.closest("[data-redeem-form]");
+                if (redeem) { e.preventDefault(); redeemCode(redeem.elements.code.value, redeem.querySelector("button")); }
             });
         }
 
-        async function startCheckout() {
-            const button = document.getElementById("paybarButton");
+        // A document's checkout (the server sets its price from its footnote count), or a pack's:
+        // from a document's unlock screen, the pack unlocks that document with its first credits
+        async function startCheckout(product = null, button = document.getElementById("paybarButton"), forDocument = !product) {
             const label = button.textContent;
             button.disabled = true;
             button.textContent = "Opening checkout…";
             try {
+                const body = product ? { product } : {};
+                if (forDocument && result?.id) body.session_id = result.id;
                 const response = await fetch("/api/checkout", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ session_id: result.id }),
+                    body: JSON.stringify(body),
                 });
                 if (!response.ok) throw new Error(await detailOf(response, "The checkout couldn't be opened. Please try again."));
-                const body = await response.json();
-                if (body.unlocked) { await loadResults(result.id); return; }
-                location.href = body.checkout_url;
+                const answer = await response.json();
+                if (answer.unlocked) { await loadResults(result.id); return; }
+                location.href = answer.checkout_url;
             } catch (error) {
-                setBanner("error", banner("error", "Couldn't open the checkout", error.message));
+                if (document.body.dataset.view === "results") setBanner("error", banner("error", "Couldn't open the checkout", error.message));
+                else alert(error.message);
                 button.disabled = false;
                 button.textContent = label;
+            }
+        }
+
+        // ---- Credits: codes kept in this browser (localStorage), shown once by the server ----
+
+        const CODES_KEY = "aforecite.codes";
+
+        function storedCodes() {
+            try { return JSON.parse(localStorage.getItem(CODES_KEY) || "[]").filter(c => c && typeof c.code === "string"); }
+            catch { return []; }
+        }
+
+        function storeCode(code, credits) {
+            try {
+                const codes = storedCodes().filter(c => c.code !== code);
+                codes.unshift({ code, credits, at: new Date().toISOString() });
+                localStorage.setItem(CODES_KEY, JSON.stringify(codes.slice(0, 10)));
+                return true;
+            } catch { return false; }
+        }
+
+        function forgetCode(code) {
+            try { localStorage.setItem(CODES_KEY, JSON.stringify(storedCodes().filter(c => c.code !== code))); } catch {}
+        }
+
+        // After paying for a pack (?paid=1&pack=…): wait for the payment, then show its code once
+        async function collectPack(orderId, sessionId) {
+            showView("results");
+            if (!sessionId) {
+                document.getElementById("docTitle").textContent = "Your credits";
+                document.getElementById("summary").textContent = "";
+                document.getElementById("toolbar").hidden = true;
+            }
+            setBanner("payment", banner("", "Confirming your payment…", "It usually takes a few seconds."));
+            const deadline = Date.now() + 90000;
+            let pack = null;
+            while (Date.now() < deadline) {
+                try {
+                    const response = await fetch(`/api/pack/${encodeURIComponent(orderId)}`);
+                    if (response.status === 404) break;
+                    if (response.ok) {
+                        pack = await response.json();
+                        if (pack.status !== "pending") break;
+                    }
+                } catch {}
+                await new Promise(r => setTimeout(r, 1500));
+            }
+            if (!sessionId) history.replaceState(null, "", "/");
+            if (!pack || pack.status === "pending") {
+                setBanner("payment", banner("error", "Payment not confirmed yet",
+                    "Confirmation can take a minute. Refresh this page shortly. If you paid and nothing appears, keep this page's address and contact us."));
+                return pack;
+            }
+            if (pack.status === "refunded") {
+                setBanner("payment", banner("error", "This pack was refunded", "Its credits have been removed."));
+                return pack;
+            }
+            showPackCode(pack);
+            return pack;
+        }
+
+        function showPackCode(pack) {
+            const code = pack.code || storedCodes()[0]?.code;
+            if (!code) {
+                setBanner("pack", banner("ok", "Your credits are ready",
+                    `This pack's code was already shown${pack.emailed ? " and emailed to you" : ""}. If you saved it, enter it on any document's unlock screen.`));
+                setBanner("payment", "");
+                return;
+            }
+            const kept = pack.code ? storeCode(code, pack.credits) : true;
+            const where = pack.emailed ? "We've also emailed it to you."
+                : pack.email_enabled ? "We couldn't email it to you, so this page is the only place it appears."
+                : "We don't email codes, so this page is the only place it appears.";
+            const used = pack.unlocked ? ` ${pack.credits - (pack.credits_remaining ?? pack.credits)} of them unlocked this document.` : "";
+            setBanner("payment", "");
+            setBanner("pack", banner("ok", `Payment received: ${plural(pack.credits, "credit")}`,
+                `Save this code now. It's how you use your credits, and we can't show it again: we only keep a scrambled copy. ${where}${used}`,
+                `<button type="button" class="btn btn-primary" data-copy-code="${escapeHtml(code)}">Copy code</button>`
+                + (pack.session_id ? "" : `<a class="btn btn-secondary" href="/">Check a document</a>`),
+                `<p class="code-box">${escapeHtml(code)}</p>
+                 <p>${plural(pack.credits_remaining ?? pack.credits, "credit")} left. An essay uses 1, a longer document 2. Credits never expire.`
+                + (kept ? " This browser will remember the code, but save it somewhere else as well." : "") + `</p>`));
+            announce("Payment received. Save your code.");
+        }
+
+        // The unlock screen's other way to pay: a saved or typed code, or a pack
+        async function showCreditsPanel() {
+            const need = result?.credits_needed || 1;
+            const prices = config.prices || {};
+            const saved = storedCodes();
+            const balances = await Promise.all(saved.map(async c => {
+                try {
+                    const response = await fetch("/api/credits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: c.code }) });
+                    return response.ok ? (await response.json()).credits_remaining : null;
+                } catch { return null; }
+            }));
+            const usable = saved.map((c, i) => ({ ...c, left: balances[i] })).filter(c => c.left === null || c.left > 0);
+            const savedHtml = usable.map(c => `<button type="button" class="btn btn-primary" data-use-code="${escapeHtml(c.code)}">Use ${escapeHtml(c.code.slice(0, 4))}…${escapeHtml(c.code.slice(-4))}${c.left !== null ? ` (${plural(c.left, "credit")} left)` : ""}</button>`).join("");
+            const packs = ["pack3", "pack10"].filter(p => prices[p]).map(p =>
+                `<button type="button" class="btn btn-secondary" data-buy-pack="${p}" data-for-document>Buy ${prices[p].credits} credits — ${escapeHtml(prices[p].display)}</button>`).join("");
+            setBanner("credits", banner("", `Unlock with ${need === 1 ? "a credit" : `${need} credits`}`,
+                `This document uses ${plural(need, "credit")}${result?.tier === "long" ? " because it has more than " + (config.essay_max_footnotes ?? 150) + " footnotes" : ""}. `
+                + "Enter a code from a credit pack, or buy a pack: this document is unlocked with its first credits, and you keep the rest.",
+                packs,
+                `${savedHtml ? `<div class="actions">${savedHtml}</div>` : ""}
+                 <form class="redeem-form" data-redeem-form><label class="sr-only" for="codeInput">Credit code</label>
+                 <input id="codeInput" name="code" autocomplete="off" spellcheck="false" placeholder="AFC-XXXX-XXXX-XXXX" required>
+                 <button type="submit" class="btn btn-secondary">Use code</button></form>`));
+            document.getElementById("banners").scrollIntoView({ behavior: smooth(), block: "start" });
+            (usable.length ? document.querySelector("[data-use-code]") : document.getElementById("codeInput"))?.focus({ preventScroll: true });
+        }
+
+        async function redeemCode(code, button) {
+            code = (code || "").trim();
+            if (!code) return;
+            const label = button?.textContent;
+            if (button) { button.disabled = true; button.textContent = "Unlocking…"; }
+            try {
+                const response = await fetch("/api/redeem", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ session_id: result.id, code }),
+                });
+                if (!response.ok) {
+                    if (response.status === 404) forgetCode(code);
+                    throw new Error(await detailOf(response, "That code couldn't be used. Please try again."));
+                }
+                const answer = await response.json();
+                storeCode(code.toUpperCase(), null);
+                setBanner("credits", "");
+                if (!(await loadResults(result.id))) return;
+                showPaid(`${plural(answer.credits_spent, "credit")} used; ${plural(answer.credits_remaining, "credit")} left on that code.`);
+            } catch (error) {
+                setBanner("error", banner("error", "Couldn't use that code", error.message));
+                if (button) { button.disabled = false; button.textContent = label; }
             }
         }
 
@@ -1950,7 +2143,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             </div>`;
         }
 
-        const BANNER_ORDER = ["payment", "error", "failed", "preview", "general", "cases"];
+        const BANNER_ORDER = ["payment", "pack", "error", "credits", "failed", "preview", "general", "cases"];
         const banners = {};
         function setBanner(key, html) {
             banners[key] = html;

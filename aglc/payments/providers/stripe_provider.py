@@ -11,7 +11,7 @@ completes with payment_status "paid" (or later reports async_payment_succeeded).
 matched by the Checkout Session id that create_checkout returned (stored as the order's
 provider_order_id). A refund event carries a Charge, not a session, so the session is found
 from the charge's PaymentIntent (one `checkout/sessions` list call); only a full refund
-locks the document again. `checkout.session.expired` is subscribed for the dashboard's log
+locks a document again, while any refund removes a credit pack's unspent credits. `checkout.session.expired` is subscribed for the dashboard's log
 but needs no action: a session that expires took no money.
 
 Sessions expire an hour after they are made, so billing makes a fresh one when a pending
@@ -161,12 +161,14 @@ class StripeProvider(PaymentProvider):
                 payment_id=_id(_get(obj, "payment_intent")),
                 amount=int(_get(obj, "amount_total") or 0),
                 currency=str(_get(obj, "currency") or "").upper(),
+                email=_get(_get(obj, "customer_details"), "email"),
             )
         if kind == "charge.refunded":
             payment_intent = _id(_get(obj, "payment_intent"))
-            # A partial refund leaves the document unlocked; only a full one locks it.
-            if not payment_intent or not _get(obj, "refunded"):
-                return WebhookEvent(event_id=event_id, type=kind, status="ignored", payment_id=payment_intent)
+            if not payment_intent:
+                return WebhookEvent(event_id=event_id, type=kind, status="ignored")
+            # `full`: a partial refund leaves a document unlocked (billing decides); it still
+            # removes a credit pack's unspent credits.
             return WebhookEvent(
                 event_id=event_id,
                 type=kind,
@@ -175,6 +177,7 @@ class StripeProvider(PaymentProvider):
                 payment_id=payment_intent,
                 amount=int(_get(obj, "amount_refunded") or 0),
                 currency=str(_get(obj, "currency") or "").upper(),
+                full=bool(_get(obj, "refunded")),
             )
         return WebhookEvent(event_id=event_id, type=kind, status="ignored")
 
@@ -194,6 +197,7 @@ class StripeProvider(PaymentProvider):
             amount=int(_get(session, "amount_total") or 0),
             currency=str(_get(session, "currency") or "").upper(),
             payment_id=_id(_get(session, "payment_intent")),
+            email=_get(_get(session, "customer_details"), "email"),
         )
 
     def refund(self, *, payment_id: str, amount: int, currency: str, reason: str, idempotency_key: str) -> Refund:

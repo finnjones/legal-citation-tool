@@ -47,7 +47,9 @@ aglc/llm/providers/
 
 Off unless `AGLC_PAYMENTS` is set, so local use is unchanged. With it on, `/api/process`
 returns a redacted preview (`locked: true`: every stamp, all warnings, the first 3 changed
-footnotes in full) and keeps the full result server-side; paying A$4 per document unlocks it.
+footnotes in full) and keeps the full result server-side; paying unlocks it: A$5 for an
+essay (up to 150 footnotes), A$9 for a long document (151 to 400), or credits from a pack
+(A$12 for 3, A$35 for 10; an essay takes 1 credit, a long document 2).
 
 ```
 aglc/payments/base.py     PaymentProvider: create_checkout, parse_webhook (verifies the signature),
@@ -56,12 +58,23 @@ aglc/payments/providers/
     square_provider.py    square   (Checkout API payment links; HMAC-SHA256 over URL + raw body)
     fake.py               fake     (offline, HMAC-signed events; a stand-in checkout page)
 aglc/store.py             SQLite in $AGLC_DATA_DIR (WAL, user_version migrations):
-                          documents, orders, webhook_events
+                          documents, orders, webhook_events, credit_codes, credit_ledger, code_pickup
 aglc/billing.py           /api/config, /api/checkout, /api/webhooks/{provider},
-                          /api/entitlement/{id}, /api/results/{id}; free-use limits
+                          /api/entitlement/{id}, /api/results/{id}, /api/pack/{order},
+                          /api/redeem, /api/credits; free-use limits
+aglc/credits.py           redeem codes (AFC-XXXX-XXXX-XXXX, stored hashed) and the credits ledger
+aglc/mailer.py            email (off unless RESEND_API_KEY + AGLC_EMAIL_FROM): a pack's code, once
 ```
 
-- Prices live only in `billing.PRODUCTS`. In v1 the processing session id is the entitlement.
+- Prices live only in `billing.PRODUCTS`; `/api/config` sends them all and the pages render
+  from them. A document's tier (`essay` or `long`) is chosen by the server from its footnote
+  count; the page can't pick a cheaper one. In v1 the processing session id is the entitlement.
+- A pack's webhook makes a random code, stores only its hash with the credits, and holds the
+  code until the buyer's page collects it once (or the retention window ends); it is also
+  emailed once if email is configured and the checkout gave an address. Spending is one
+  conditional UPDATE in the unlock's transaction (no double spend, never below zero). A pack
+  bought from a document's unlock screen unlocks it with the first credits. Any refund of a
+  pack removes its unspent credits; documents it unlocked stay unlocked.
 - Webhooks are verified, deduplicated by event id and applied in one transaction; a late
   webhook is reconciled by `retrieve()` when the page polls `/api/entitlement`.
 - If a paid document's files are missing, or a document is paid for twice, it is refunded.

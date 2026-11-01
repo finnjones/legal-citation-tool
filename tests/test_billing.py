@@ -92,7 +92,11 @@ def test_payments_off_by_default(client):
 def test_config_reports_server_price(paid, client):
     cfg = client.get("/api/config").json()
     assert cfg["payments"] is True and cfg["provider"] == "fake"
-    assert cfg["price"] == {"amount": 400, "currency": "AUD", "display": "A$4"}
+    assert cfg["price"] == {"id": "essay", "amount": 500, "currency": "AUD", "display": "A$5", "credits": 1,
+                            "max_footnotes": 150}
+    assert {k: (p["amount"], p["credits"]) for k, p in cfg["prices"].items()} == {
+        "essay": (500, 1), "long": (900, 2), "pack3": (1200, 3), "pack10": (3500, 10)}
+    assert cfg["prices"]["long"]["max_footnotes"] == 400 and cfg["essay_max_footnotes"] == 150
 
 
 # ---- the preview ------------------------------------------------------------ #
@@ -172,7 +176,7 @@ def test_checkout_price_comes_from_server(paid, client):
     sid = _process(client).json()["id"]
     r = client.post("/api/checkout", json={"session_id": sid, "amount": 1, "currency": "USD"})
     order = get_store().order(r.json()["order_id"])
-    assert (order["amount"], order["currency"]) == (400, "AUD")
+    assert (order["amount"], order["currency"], order["product"]) == (500, "AUD", "essay")
 
 
 def test_checkout_reuses_pending_link(paid, client):
@@ -206,7 +210,7 @@ def test_bad_signature_is_rejected(paid, client, fake):
     body, headers = fake.signed_event(poid)
     r = client.post("/api/webhooks/fake", content=body, headers={**headers, "x-fake-signature": "0" * 64})
     assert r.status_code == 400
-    tampered = body.replace(b'"amount": 400', b'"amount": 401')
+    tampered = body.replace(b'"amount": 500', b'"amount": 501')
     assert client.post("/api/webhooks/fake", content=tampered, headers=headers).status_code == 400
     assert client.post("/api/webhooks/fake", content=body).status_code == 400  # unsigned
     assert get_store().document(sid)["unlocked_at"] is None
@@ -418,12 +422,12 @@ def test_square_checkout_uses_order_reference():
     client.checkout.payment_links.create.return_value.payment_link.configure_mock(
         id="link-1", url="https://square.link/u/abc", order_id="sq-order-1")
     sq = SquareProvider(client=client, location_id="LOC")
-    session = sq.create_checkout(order_id="our-order", product=billing.PRODUCTS["document"], redirect_url="https://x/?paid=1")
+    session = sq.create_checkout(order_id="our-order", product=billing.PRODUCTS["essay"], redirect_url="https://x/?paid=1")
     assert (session.url, session.provider_order_id) == ("https://square.link/u/abc", "sq-order-1")
     kwargs = client.checkout.payment_links.create.call_args.kwargs
     assert kwargs["idempotency_key"] == "our-order"
     assert kwargs["order"]["reference_id"] == "our-order" and kwargs["order"]["location_id"] == "LOC"
-    assert kwargs["order"]["line_items"][0]["base_price_money"] == {"amount": 400, "currency": "AUD"}
+    assert kwargs["order"]["line_items"][0]["base_price_money"] == {"amount": 500, "currency": "AUD"}
     assert kwargs["checkout_options"]["redirect_url"] == "https://x/?paid=1"
 
 
@@ -454,13 +458,13 @@ def square(paid, monkeypatch):
     client.checkout.payment_links.create.return_value.payment_link.configure_mock(
         id="link-1", url="https://square.link/u/abc", order_id="sq-order-1")
     client.orders.get.return_value.order.configure_mock(tenders=[])  # unpaid until a test says otherwise
-    client.orders.get.return_value.order.total_money.configure_mock(amount=400, currency="AUD")
+    client.orders.get.return_value.order.total_money.configure_mock(amount=500, currency="AUD")
     client.refunds.refund_payment.return_value.refund.configure_mock(id="sq-refund-1", status="PENDING")
     get_payment_provider("square", client=client, location_id="LOC", signature_key="sig-key", webhook_url=SQUARE_URL)
     return client
 
 
-def _square_webhook(client, *, order_id="sq-order-1", status="COMPLETED", payment_id="pay-1", amount=400,
+def _square_webhook(client, *, order_id="sq-order-1", status="COMPLETED", payment_id="pay-1", amount=500,
                     event_id=None, url=SQUARE_URL):
     body = json.dumps({
         "merchant_id": "M1", "type": "payment.updated", "event_id": event_id or f"evt-{status}-{order_id}-{payment_id}",
@@ -516,7 +520,7 @@ def test_square_reconciles_from_our_session_id_alone(square, client):
     billing._last_checked.clear()
     square.orders.get.return_value.order.configure_mock(tenders=[mock.MagicMock(payment_id="pay-9")])
     square.payments.get.return_value.payment.configure_mock(
-        id="pay-9", status="COMPLETED", amount_money=mock.MagicMock(amount=400))
+        id="pay-9", status="COMPLETED", amount_money=mock.MagicMock(amount=500))
     assert client.get(f"/api/entitlement/{sid}").json()["unlocked"] is True
     square.orders.get.assert_called_with("sq-order-1")
     assert get_store().order(order_id)["payment_id"] == "pay-9"
@@ -529,7 +533,7 @@ def test_square_refund_uses_the_webhook_payment_id(square, client):
     assert _square_webhook(client, payment_id="pay-77").json()["outcome"] == "files_missing"
     kwargs = square.refunds.refund_payment.call_args.kwargs
     assert kwargs["payment_id"] == "pay-77"
-    assert kwargs["amount_money"] == {"amount": 400, "currency": "AUD"}
+    assert kwargs["amount_money"] == {"amount": 500, "currency": "AUD"}
     assert kwargs["idempotency_key"] == f"refund-{order_id}"
     order = get_store().order(order_id)
     assert (order["status"], order["refund_id"]) == ("refunded", "sq-refund-1")

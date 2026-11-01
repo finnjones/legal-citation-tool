@@ -14,7 +14,8 @@ import re
 #: room for the multipart boundaries and the small form fields around the file
 MULTIPART_OVERHEAD = 64 * 1024
 
-_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+#: session ids, and order ids (32 hex digits: a pack's order id collects its code once)
+_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|\b[0-9a-f]{32}\b")
 
 
 def max_upload_bytes() -> int:
@@ -115,7 +116,8 @@ async def _too_large(send) -> None:
 
 
 def redact_ids(text: str) -> str:
-    """Session ids are the key to a (paid) document: log only enough to tell them apart."""
+    """Session ids are the key to a (paid) document, and a pack's order id to its code: log
+    only enough to tell them apart."""
     return _UUID.sub(lambda m: m[0][:8] + "…", text)
 
 

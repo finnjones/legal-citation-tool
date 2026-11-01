@@ -23,6 +23,7 @@
 
                 <h2>Payments</h2>
                 <p>Payments are taken on {{payment_provider}}'s own checkout page. Your card details go to {{payment_provider}} and never reach our server. We keep a record of each order: the amount, its status, and {{payment_provider}}'s payment and order references, so we can confirm payment and give refunds.</p>
+                <p><strong>Credit packs:</strong> we keep a one-way hash of the pack's code (not the code itself, which can't be worked out from the hash), how many credits are left, and a ledger of each credit given, used or refunded, with the document it unlocked and the payment reference. These are kept while the credits can be used (they don't expire) and then for our accounts, like order records. The code itself is held on our server only until the page you return to after paying shows it to you, and for no more than {{retention_hours}} hours. {{email_note}}</p>
 
                 <h2>Free preview limits</h2>
                 <p>To limit free previews to a few a day, we set one cookie (<code>aglc_anon</code>) holding a random identifier, kept for a year. We also record a one-way hash of your IP address, salted and changed every day, so we can count previews per day without keeping your address in our database.</p>
