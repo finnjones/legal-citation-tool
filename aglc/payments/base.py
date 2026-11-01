@@ -57,6 +57,7 @@ class PaymentStatus:
     amount: int = 0
     currency: str = ""
     payment_id: str | None = None
+    email: str | None = None  # the buyer's email, if the checkout collected one (never stored)
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,12 @@ class WebhookEvent:
     payment_id: str | None = None
     amount: int = 0
     currency: str = ""
+    #: the buyer's email, if the checkout collected one: used once to email a credit pack's
+    #: code, never stored
+    email: str | None = None
+    #: for a refund: whether the whole payment was refunded (a partial refund leaves a paid
+    #: document unlocked, but removes a credit pack's unspent credits)
+    full: bool = True
 
 
 @dataclass(frozen=True)

@@ -46,8 +46,11 @@ aglc/llm/providers/
 ## Paid hosting (optional)
 
 Off unless `AGLC_PAYMENTS` is set, so local use is unchanged. With it on, `/api/process`
-returns a redacted preview (`locked: true`: every stamp, all warnings, the first 3 changed
-footnotes in full) and keeps the full result server-side; paying A$4 per document unlocks it.
+returns a redacted preview (`locked: true`: every original and stamp, all warnings, the
+number of corrections, and the first 1 to 3 changed footnotes in full: a tenth of them,
+rounded up; see docs/paywall-audit.md) and keeps the full result server-side; paying unlocks it: A$5 for an
+essay (up to 150 footnotes), A$9 for a long document (151 to 400), or credits from a pack
+(A$12 for 3, A$35 for 10; an essay takes 1 credit, a long document 2).
 
 ```
 aglc/payments/base.py     PaymentProvider: create_checkout, parse_webhook (verifies the signature),
@@ -56,12 +59,40 @@ aglc/payments/providers/
     square_provider.py    square   (Checkout API payment links; HMAC-SHA256 over URL + raw body)
     fake.py               fake     (offline, HMAC-signed events; a stand-in checkout page)
 aglc/store.py             SQLite in $AGLC_DATA_DIR (WAL, user_version migrations):
-                          documents, orders, webhook_events
+                          documents, orders, webhook_events, credit_codes, credit_ledger, code_pickup,
+                          fingerprints, fingerprint_index, entitlements
 aglc/billing.py           /api/config, /api/checkout, /api/webhooks/{provider},
-                          /api/entitlement/{id}, /api/results/{id}; free-use limits
+                          /api/entitlement/{id}, /api/results/{id}, /api/pack/{order},
+                          /api/redeem, /api/credits, /api/rescan-link/{id}; free-use limits
+aglc/credits.py           redeem codes (AFC-XXXX-XXXX-XXXX, stored hashed) and the credits ledger
+aglc/fingerprint.py       keyed hashes of footnotes: one free preview per essay, re-scan matching
+aglc/mailer.py            email (off unless RESEND_API_KEY + AGLC_EMAIL_FROM): a pack's code, once
 ```
 
-- Prices live only in `billing.PRODUCTS`. In v1 the processing session id is the entitlement.
+- Prices live only in `billing.PRODUCTS`; `/api/config` sends them all and the pages render
+  from them. A document's tier (`essay` or `long`) is chosen by the server from its footnote
+  count; the page can't pick a cheaper one.
+- Paying (card or credits) creates an entitlement (`entitlements`, migration 6; documents paid
+  for earlier were given one): the paid document, its tier, its fingerprint as written and as
+  corrected, a hashed re-scan token and 3 free re-scans for 14 days (`FREE_RESCANS`,
+  `RESCAN_DAYS`). An upload carrying the token that is a revision of the paid document, both
+  ways round (`AGLC_RESCAN_OVERLAP`, default 0.5, of the upload's and of the paid document's
+  footnotes, at least 5, and no more new footnotes than half the paid document's; measured
+  against the paid document only, never a re-scan) is checked in full, unlocked, and
+  the re-scan count drops in the same transaction; an essay-tier entitlement doesn't cover a
+  version grown past 150 footnotes. Separate from `MAX_RERUNS`.
+- A pack's webhook makes a random code, stores only its hash with the credits, and holds the
+  code for the browser that bought it (its cookie is on the order) until that page confirms it
+  has it (or the retention window ends; `aglc reissue-code` replaces a lost one); it is also
+  emailed once if email is configured and the checkout gave an address. Spending is one
+  conditional UPDATE in the unlock's transaction (no double spend, never below zero). A pack
+  bought from a document's unlock screen unlocks it with the first credits. Any refund of a
+  pack removes its unspent credits; documents it unlocked stay unlocked.
+- One free preview per essay (`aglc/fingerprint.py`): per-footnote HMAC hashes (never the
+  text), kept `AGLC_FINGERPRINT_DAYS`. A free upload mostly contained in an earlier free
+  preview (`AGLC_SEEN_OVERLAP`, at least 5 footnotes) runs no model; the same browser gets its
+  own preview again, anyone else a 409 offering to unlock (never the earlier essay); paying
+  for it runs the upload fresh (`POST /api/run/{id}`).
 - Webhooks are verified, deduplicated by event id and applied in one transaction; a late
   webhook is reconciled by `retrieve()` when the page polls `/api/entitlement`.
 - If a paid document's files are missing, or a document is paid for twice, it is refunded.

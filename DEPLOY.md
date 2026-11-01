@@ -135,6 +135,118 @@ AGLC_GST_REGISTERED=false               # true once registered: the price then "
 
 Update `POLICY_DATE` in `aglc/site.py` whenever you change those pages.
 
+## 4b. Prices, credit packs and emailing codes
+
+Prices live in `aglc/billing.py` (`PRODUCTS`) and nowhere else: `/api/config` sends them and
+the pages render from them. A document is an essay (A$5, up to 150 footnotes) or a long
+document (A$9, up to `AGLC_MAX_FOOTNOTES`), chosen by the server from its footnote count.
+Credit packs are A$12 for 3 and A$35 for 10; an essay uses 1 credit, a long document 2.
+Credits never expire and nothing renews. Packs go through the same checkout and webhooks as
+documents, so the provider setup in sections 3 and 3a doesn't change.
+
+- **The code.** When a pack's payment is applied (webhook, or the late-webhook check when
+  the buyer's page polls), the server makes a random code (`AFC-XXXX-XXXX-XXXX`) and stores
+  only its SHA-256 hash and the credits left. The code itself is held in `code_pickup` for
+  the browser that bought the pack (its `aglc_anon` cookie is kept on the order at
+  checkout): only that browser is given it (`GET /api/pack/latest`; anyone else asking about
+  the order gets its status only), and it is deleted when that page confirms it has the code
+  (`POST /api/pack/{order}/received`), or by the retention sweep after
+  `AGLC_RETENTION_HOURS`. SQLite's `secure_delete` and a WAL checkpoint keep it out of the
+  database files afterwards. The return URL carries the order id (`?paid=1&pack=<id>`), which
+  the page removes from the address before the analytics script runs; the id alone collects
+  nothing, and the app log has only its first 8 characters. The page shows the code with a copy
+  button, keeps it in the browser's localStorage, and tells the buyer to save it.
+- **A lost code.** We can't show a code again, but you can replace it:
+  1. Verify the buyer first: ask for the payment provider's reference (Square payment id,
+     or Stripe receipt or PaymentIntent) and match it to `orders.payment_id`; that row's `id`
+     is the order id. Don't reissue on an email address or a pack size alone.
+  2. Run it as the service's user with the production data directory, eg
+     `sudo -u aglc env AGLC_DATA_DIR=/var/lib/aglc aglc reissue-code <order id>`. Without
+     `AGLC_DATA_DIR` it opens an empty database in the home directory and reports "no code".
+  3. It prints a new code carrying the credits the old one had left; the old one stops
+     working, and the ledger records a `reissue`. The code is printed to the terminal: send
+     it to the buyer only, don't paste it anywhere else (chats, tickets), and clear the
+     scrollback afterwards.
+- **Email (optional).** Set `RESEND_API_KEY` and `AGLC_EMAIL_FROM` (a sender on a domain
+  verified with Resend) and the code is also emailed once, at purchase, to the address the
+  checkout collected (Stripe Checkout always asks for one; Square payment links do when the
+  buyer gives it). The address is never stored. Without these settings nothing is emailed and
+  the success page says it is the only place the code appears. There is no "resend my code":
+  a code we only hold as a hash can't be sent again (but see "A lost code"). **Turn email on
+  in production**: it is the buyer's only copy if their browser loses the page.
+- **Refunds.** Refund a pack from the provider's dashboard as for any payment. Any refund of a
+  pack, full or partial, removes all its unspent credits (Stripe reports a partial refund
+  with `charge.refunded` too); documents it already unlocked stay unlocked. So for a
+  partly used pack, refund the unused credits' share (price / credits x unused) as a partial
+  refund, which is what the Refunds page promises within 14 days of purchase. A document
+  is still locked again only by a full refund of its own payment. If a document unlocked with
+  credits has lost its files when downloaded, the credits go back on the code automatically.
+- **The ledger.** `credit_ledger` has a row for every grant (with the payment id), spend (with
+  the document it unlocked), refund and return, so a code's history can be read back:
+  `sqlite3 aglc.db "SELECT * FROM credit_ledger WHERE code_id = '...'"`.
+
+## 4c. One free preview per essay
+
+Every upload is fingerprinted before any model call (`aglc/fingerprint.py`): each footnote is
+normalised (case, quotes, dashes, punctuation and spacing don't matter) and hashed with
+HMAC-SHA256 under a random key kept in the database (`meta.fingerprint_key`). Only the hashes
+are stored, never the text. A free upload whose distinctive footnotes are at least
+`AGLC_SEEN_OVERLAP` (default 0.6) contained in one earlier free preview, with at least 5
+matching, is "seen": no model runs. If the same browser (the `aglc_anon` cookie, never the
+IP address, which a campus shares) made the earlier preview, it gets that preview again (the
+same footnotes in full). Anyone else, or once that preview has been deleted, gets a 409
+built only from their own upload: "An essay with these footnotes has already had its free
+preview. Unlock to see every correction." Nothing of the earlier essay is ever shown to
+another browser. Paying for a seen essay (card or credits) runs the new upload fresh
+(`POST /api/run/{id}`).
+
+- Containment of the new document, not Jaccard similarity, so cutting footnotes out of an
+  essay (eg the ones the preview showed) still matches it. Bare Ibids, bare (n x) references
+  and anything under 12 characters don't count: they are common to every essay. A document
+  with fewer than 5 distinctive footnotes never matches, so short documents don't collide.
+- Only a preview worth having is matched against: one that finished and could be paid for.
+  A run that failed, or one the model mostly couldn't read, doesn't use up the essay's preview.
+- The sample essay is never "seen". A seen upload counts against the free daily limits like
+  any free upload, so the check can't be used as an unlimited lookup.
+- Fingerprints are kept `AGLC_FINGERPRINT_DAYS` (default 180), well past the 24-hour
+  document retention, and then deleted by the retention sweep. The privacy page says so.
+- Two students whose essays share most of their distinctive footnotes would collide: the
+  second is told the essay has had its free preview and offered the unlock (it sees nothing
+  of the first's essay). With 60% containment of at least 5 full citations, that is in
+  practice the same essay. Lower the false-positive risk by raising `AGLC_SEEN_OVERLAP`, or
+  set it to `0` to turn the check off.
+
+## 4d. Entitlements and free re-scans
+
+Paying for a document, by card or with credits, creates an entitlement (`entitlements`): the
+paid session, its tier, its fingerprint (as written and as corrected, so a revision with the
+tracked changes accepted is recognised), a re-scan token stored as a SHA-256 hash, and 3 free
+re-scans until 14 days after payment (`FREE_RESCANS`, `RESCAN_DAYS` in `aglc/billing.py`).
+Migration 6 gave every document already paid for an entitlement too (its fingerprint and
+token are made the first time they are needed), so existing paid links keep working.
+
+- The paid page asks for the token (`POST /api/rescan-link/{id}`), keeps it in the browser's
+  localStorage and offers a copyable link (`/#rescan=<token>`: in the fragment, so it never
+  reaches the server's access log). Asking again makes a new token and the old one stops
+  working; whoever has the results link already has the document.
+- An upload sent with the token that is a revision of the paid document, measured both ways
+  (`fingerprint.is_revision`): at least `AGLC_RESCAN_OVERLAP` (default 0.5) of the upload's
+  distinctive footnotes, and at least 5, are the paid document's (as written or as
+  corrected); at least that share of the paid document's footnotes are in the upload; and
+  it adds no more new footnotes than half as many as the paid document had. It is measured
+  against the paid document only: a re-scan never widens the entitlement's fingerprint, so
+  re-scans can't drift to a different essay. Within the tier, it is processed in full and
+  unlocked; the re-scan count is decremented in the same transaction that records it. It
+  isn't held to the free limits. A different essay, an expired or used-up token, or an
+  essay-tier entitlement and a version grown past 150 footnotes: the upload is treated as a
+  normal free one (preview, or the seen-essay check), with a note saying why. A re-scan whose
+  run fails gives the re-scan back.
+- A full refund of the document's payment revokes its entitlement (no more re-scans). The
+  retention sweep forgets an entitlement's fingerprint and token hash when its re-scans end;
+  the rest of the row stays with the order.
+- Re-scans are separate from the free re-reads of footnotes the model failed to read
+  (`MAX_RERUNS`), which are unchanged.
+
 ## 5. The deploy script and workflow
 
 The workflow tests with `uv sync --all-extras` and then runs the server-side `deploy` script.
@@ -195,7 +307,9 @@ Model time is bounded by `AGLC_REQUEST_DEADLINE` (per request, default 90s) and
 - `AGLC_PAYMENTS=fake` must never be used on the public site: its checkout page marks
   anything paid.
 - Do one Square **sandbox** run end to end (pay, late webhook, refund from the dashboard)
-  with the real tunnel before switching `SQUARE_ENVIRONMENT=production`.
+  with the real tunnel before switching `SQUARE_ENVIRONMENT=production`. Do it for a credit
+  pack too: buy one on its own, use its code, buy one from a document's unlock screen, and
+  refund one from the dashboard (its unspent credits should go).
 - Turn on Apple Pay and Google Pay in Square Dashboard > Payment links > Settings.
 - For Stripe: do one **test-mode** run end to end (`stripe listen`, pay with the 4242 card,
   refund from the Dashboard) before switching to the live keys, and register the live webhook

@@ -238,6 +238,17 @@ figcaption + .g-row { border-top: 0; }
 .prose .g-index a:hover .g-name { text-decoration: underline; text-underline-offset: 3px; }
 .prose .g-index .g-sum { display: block; margin-top: 2px; color: var(--muted); }
 
+/* The shape of a citation, with each part named: in the citation serif, the names in Muted */
+.g-pattern { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.6; overflow-wrap: anywhere; margin: 0; }
+.g-pattern var { font-style: normal; color: var(--muted); }
+.g-pattern var em { font-style: italic; }
+
+/* Common questions: visible questions and answers (the page's FAQPage markup is read from these) */
+.prose .g-faq { margin-top: 48px; border-top: 1px solid var(--hairline); }
+.prose .g-faq h2 { margin-top: 32px; }
+.prose .g-faq h3 { margin-top: 24px; }
+.prose .g-faq h3 + p { margin-top: 4px; }
+
 .prose .g-related { list-style: none; padding: 0; }
 .prose .g-related li { margin-top: 4px; }
 

@@ -4,14 +4,30 @@ One file, `$AGLC_DATA_DIR/aglc.db`, in WAL mode so the web workers can read whil
 webhook writes. The schema is versioned with `PRAGMA user_version`: append a migration
 to MIGRATIONS, never edit one that has shipped.
 
-    documents       one row per processed upload (the session id is the entitlement in v1)
-    orders          one row per checkout; status pending -> paid -> refunding -> refunded
+    documents       one row per processed upload; unlocked_at is set only with an entitlement
+                    (entitlement_id), or by a re-scan of one
+    orders          one row per checkout; status pending -> paid -> refunding -> refunded.
+                    A document's order has its session id; a credit pack's may have none
     webhook_events  every webhook applied, keyed by the provider's event id (idempotency)
+    credit_codes    one per credit pack bought: a hash of its redeem code, never the code,
+                    and the credits left (aglc/credits.py)
+    credit_ledger   every grant, spend and refund of credits, with the document a spend
+                    unlocked and the pack's payment id
+    code_pickup     a new pack's code, held only until the buyer's browser confirms it has it
+                    (or the retention window ends); only that browser can collect it
+    fingerprints    keyed hashes of each upload's footnotes (aglc/fingerprint.py), never the
+                    text; kept $AGLC_FINGERPRINT_DAYS
+    fingerprint_index  footnote hash -> session, for free previews only: finds an essay
+                    that has had its free preview already
+    entitlements    one per document paid for (by card or credits): its tier, the paid
+                    document's fingerprint, a hashed re-scan token and the free re-scans
+                    left until expires_at (aglc/billing.py)
     meta            small settings, eg the salt for hashing IP addresses
 """
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import sqlite3
@@ -84,6 +100,119 @@ MIGRATIONS: list[str] = [
     ALTER TABLE documents ADD COLUMN purged_at TEXT;
     CREATE INDEX documents_created ON documents(created_at);
     """,
+    # 4: credit packs. orders.session_id may be NULL (a pack bought on its own), which
+    # SQLite can only allow by rebuilding the table (same columns, same order).
+    """
+    CREATE TABLE orders_new (
+        id                   TEXT PRIMARY KEY,
+        session_id           TEXT REFERENCES documents(session_id),
+        product              TEXT NOT NULL,
+        amount               INTEGER NOT NULL,
+        currency             TEXT NOT NULL,
+        provider             TEXT NOT NULL,
+        status               TEXT NOT NULL DEFAULT 'pending',
+        checkout_id          TEXT,
+        checkout_url         TEXT,
+        provider_order_id    TEXT,
+        payment_id           TEXT,
+        refund_id            TEXT,
+        note                 TEXT,
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL,
+        paid_at              TEXT,
+        refunded_at          TEXT
+    );
+    INSERT INTO orders_new SELECT * FROM orders;
+    DROP TABLE orders;
+    ALTER TABLE orders_new RENAME TO orders;
+    CREATE INDEX orders_session ON orders(session_id);
+    CREATE UNIQUE INDEX orders_provider_order ON orders(provider, provider_order_id);
+
+    CREATE TABLE credit_codes (
+        id                 TEXT PRIMARY KEY,
+        code_hash          TEXT NOT NULL UNIQUE,
+        order_id           TEXT NOT NULL UNIQUE REFERENCES orders(id),  -- one code per pack
+        credits_total      INTEGER NOT NULL,
+        credits_remaining  INTEGER NOT NULL CHECK (credits_remaining >= 0),
+        created_at         TEXT NOT NULL,
+        revoked_at         TEXT                                         -- the pack was refunded
+    );
+
+    CREATE TABLE credit_ledger (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        code_id     TEXT NOT NULL REFERENCES credit_codes(id),
+        delta       INTEGER NOT NULL,          -- + grant, - spend or refund
+        reason      TEXT NOT NULL,             -- grant | spend | refund | return
+        session_id  TEXT,                      -- the document a spend unlocked
+        order_id    TEXT,                      -- the pack's order
+        payment_id  TEXT,                      -- the pack's payment
+        created_at  TEXT NOT NULL
+    );
+    CREATE INDEX credit_ledger_code ON credit_ledger(code_id);
+
+    CREATE TABLE code_pickup (
+        order_id    TEXT PRIMARY KEY REFERENCES orders(id),
+        code        TEXT NOT NULL,
+        emailed     INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL
+    );
+    """,
+    # 5: fingerprints, and documents that were refused a second free preview ("seen")
+    """
+    ALTER TABLE documents ADD COLUMN kind TEXT NOT NULL DEFAULT 'free';  -- free | seen
+    ALTER TABLE documents ADD COLUMN seen_of TEXT;                       -- the earlier preview it matched
+
+    CREATE TABLE fingerprints (
+        session_id  TEXT PRIMARY KEY,
+        doc_hash    TEXT NOT NULL,
+        hashes      TEXT NOT NULL,             -- JSON list of the counted footnotes' hashes
+        indexed     INTEGER NOT NULL DEFAULT 0, -- in fingerprint_index: a free preview
+        created_at  TEXT NOT NULL
+    );
+    CREATE INDEX fingerprints_created ON fingerprints(created_at);
+
+    CREATE TABLE fingerprint_index (
+        hash        TEXT NOT NULL,
+        session_id  TEXT NOT NULL,
+        PRIMARY KEY (hash, session_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX fingerprint_index_session ON fingerprint_index(session_id);
+    """,
+    # 6: entitlements (a paid document's record, with its free re-scans). Documents paid for
+    # before this get one each, with no fingerprint or token yet (both are filled in on demand).
+    """
+    CREATE TABLE entitlements (
+        id                 TEXT PRIMARY KEY,
+        session_id         TEXT NOT NULL UNIQUE REFERENCES documents(session_id),
+        tier               TEXT NOT NULL,          -- essay | long
+        source             TEXT NOT NULL,          -- the order id, or credit:<code id>
+        fingerprint        TEXT,                   -- JSON: per paid footnote, its hashes as written and as corrected
+        token_hash         TEXT UNIQUE,            -- the re-scan token's SHA-256, NULL until one is made
+        rescans_remaining  INTEGER NOT NULL CHECK (rescans_remaining >= 0),
+        paid_at            TEXT NOT NULL,
+        expires_at         TEXT NOT NULL,          -- re-scans end
+        revoked_at         TEXT                    -- refunded
+    );
+    ALTER TABLE documents ADD COLUMN entitlement_id TEXT;
+    INSERT INTO entitlements (id, session_id, tier, source, rescans_remaining, paid_at, expires_at)
+        SELECT lower(hex(randomblob(16))), session_id,
+               CASE WHEN footnote_count > 150 THEN 'long' ELSE 'essay' END,
+               COALESCE(unlocked_by, 'legacy'), 3, unlocked_at,
+               strftime('%Y-%m-%dT%H:%M:%S+00:00', unlocked_at, '+14 days')
+        FROM documents WHERE unlocked_at IS NOT NULL;
+    UPDATE documents SET entitlement_id =
+        (SELECT e.id FROM entitlements e WHERE e.session_id = documents.session_id)
+        WHERE unlocked_at IS NOT NULL
+    """,
+    # 7: a seen upload is shown the earlier preview only if the same browser made it
+    """
+    ALTER TABLE documents ADD COLUMN seen_shown INTEGER NOT NULL DEFAULT 0
+    """,
+    # 8: a pack's code is given only to the browser that bought it (its aglc_anon cookie)
+    """
+    ALTER TABLE orders ADD COLUMN buyer_anon TEXT;
+    CREATE INDEX orders_buyer ON orders(buyer_anon, created_at)
+    """,
 ]
 
 # A document whose retention window (see aglc/retention.py) ended before :cutoff: uploaded,
@@ -121,6 +250,7 @@ class Store:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=10000")
+        conn.execute("PRAGMA secure_delete=ON")  # deleted rows (eg a collected pack code) are overwritten
         return conn
 
     def _migrate(self, conn: sqlite3.Connection) -> None:
@@ -174,7 +304,8 @@ class Store:
     # ---- documents ---------------------------------------------------------- #
 
     def add_document(self, session_id: str, filename: str, *, ip_hash: str | None, anon_id: str | None,
-                     limits: tuple[int, int, int] | None = None) -> str | None:
+                     limits: tuple[int, int, int] | None = None, footnote_count: int = 0, kind: str = "free",
+                     status: str = "processing", seen_of: str | None = None, seen_shown: bool = False) -> str | None:
         """Record a document. With `limits` (per IP, per browser, global), only while today's
         free uses are under them: the count and the insert are one transaction, so two
         uploads at once can't both take the last free run. Returns the limit that refused it
@@ -188,8 +319,10 @@ class Store:
                 if by_browser >= per_browser or by_ip >= per_ip:
                     return "visitor"
             conn.execute(
-                "INSERT INTO documents (session_id, filename, ip_hash, anon_id, day, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (session_id, filename, ip_hash, anon_id, today(), now()),
+                "INSERT INTO documents (session_id, filename, ip_hash, anon_id, day, created_at, footnote_count, kind,"
+                " status, seen_of, seen_shown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (session_id, filename, ip_hash, anon_id, today(), now(), footnote_count, kind, status, seen_of,
+                 int(seen_shown)),
             )
         return None
 
@@ -256,7 +389,9 @@ class Store:
     @staticmethod
     def _free_uses(conn: sqlite3.Connection, *, ip_hash: str | None, anon_id: str | None) -> tuple[int, int, int]:
         def count(where: str, *args) -> int:
-            sql = f"SELECT COUNT(*) FROM documents WHERE day = ? AND unlocked_at IS NULL AND {where}"
+            # A re-scan is paid for (and one that failed is given back), so never a free use. A
+            # "seen" upload runs no model but is one, so the check can't be used as a lookup service.
+            sql = f"SELECT COUNT(*) FROM documents WHERE day = ? AND unlocked_at IS NULL AND kind != 'rescan' AND {where}"
             return conn.execute(sql, (today(), *args)).fetchone()[0]
 
         return (
@@ -265,14 +400,82 @@ class Store:
             count("1"),
         )
 
-    # ---- orders ------------------------------------------------------------- #
+    def set_status(self, session_id: str, status: str, *, expect: str | None = None) -> bool:
+        """Set a document's status (only if it is `expect`, when given); True if it was set."""
+        with self.transaction() as conn:
+            if expect is None:
+                return conn.execute("UPDATE documents SET status = ? WHERE session_id = ?",
+                                    (status, session_id)).rowcount == 1
+            return conn.execute("UPDATE documents SET status = ? WHERE session_id = ? AND status = ?",
+                                (status, session_id, expect)).rowcount == 1
 
-    def add_order(self, order_id: str, session_id: str, *, product: str, amount: int, currency: str, provider: str) -> None:
+    # ---- fingerprints -------------------------------------------------------- #
+
+    def add_fingerprint(self, session_id: str, doc_hash: str, hashes: tuple[str, ...]) -> None:
         with self.transaction() as conn:
             conn.execute(
-                "INSERT INTO orders (id, session_id, product, amount, currency, provider, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (order_id, session_id, product, amount, currency, provider, now(), now()),
+                "INSERT OR REPLACE INTO fingerprints (session_id, doc_hash, hashes, indexed, created_at)"
+                " VALUES (?, ?, ?, 0, ?)",
+                (session_id, doc_hash, json.dumps(list(hashes)), now()),
+            )
+
+    def fingerprint(self, session_id: str) -> tuple[str, ...] | None:
+        with self.read() as conn:
+            row = conn.execute("SELECT hashes FROM fingerprints WHERE session_id = ?", (session_id,)).fetchone()
+        return tuple(json.loads(row["hashes"])) if row else None
+
+    def index_fingerprint(self, session_id: str) -> None:
+        """Make a free preview's fingerprint findable by later uploads (once)."""
+        with self.transaction() as conn:
+            row = conn.execute("SELECT hashes FROM fingerprints WHERE session_id = ? AND indexed = 0",
+                               (session_id,)).fetchone()
+            if row is None:
+                return
+            conn.executemany("INSERT OR IGNORE INTO fingerprint_index (hash, session_id) VALUES (?, ?)",
+                             [(h, session_id) for h in json.loads(row["hashes"])])
+            conn.execute("UPDATE fingerprints SET indexed = 1 WHERE session_id = ?", (session_id,))
+
+    def fingerprint_candidates(self, hashes: tuple[str, ...], at_least: int, limit: int = 50) -> list[tuple[str, int]]:
+        """Indexed (free preview) sessions sharing at least `at_least` of `hashes`, as
+        (session id, how many), most shared first, then newest first. One query, the hashes
+        passed as a single JSON parameter and the threshold applied in SQL, so a citation
+        common to many essays can't hit SQLite's limit on parameters or slow an upload."""
+        with self.read() as conn:
+            rows = conn.execute(
+                "SELECT fi.session_id, COUNT(*) AS n, MAX(f.created_at) AS created"
+                " FROM json_each(?) AS up JOIN fingerprint_index AS fi ON fi.hash = up.value"
+                " JOIN fingerprints AS f ON f.session_id = fi.session_id"
+                " GROUP BY fi.session_id HAVING COUNT(*) >= ? ORDER BY n DESC, created DESC LIMIT ?",
+                (json.dumps(list(dict.fromkeys(hashes))), at_least, limit),
+            ).fetchall()
+        return [(r["session_id"], r["n"]) for r in rows]
+
+    def end_rescans(self, at: str) -> int:
+        """Forget the fingerprint and re-scan token of entitlements whose re-scans have ended
+        (expired or refunded) by `at`; the rest of the record stays with the order."""
+        with self.transaction() as conn:
+            return conn.execute(
+                "UPDATE entitlements SET fingerprint = NULL, token_hash = NULL"
+                " WHERE (expires_at < ? OR revoked_at IS NOT NULL) AND (fingerprint IS NOT NULL OR token_hash IS NOT NULL)",
+                (at,),
+            ).rowcount
+
+    def purge_fingerprints(self, cutoff: str) -> int:
+        """Delete fingerprints made before `cutoff` (the retention sweep)."""
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM fingerprint_index WHERE session_id IN"
+                         " (SELECT session_id FROM fingerprints WHERE created_at < ?)", (cutoff,))
+            return conn.execute("DELETE FROM fingerprints WHERE created_at < ?", (cutoff,)).rowcount
+
+    # ---- orders ------------------------------------------------------------- #
+
+    def add_order(self, order_id: str, session_id: str | None, *, product: str, amount: int, currency: str,
+                  provider: str, buyer_anon: str | None = None) -> None:
+        with self.transaction() as conn:
+            conn.execute(
+                "INSERT INTO orders (id, session_id, product, amount, currency, provider, created_at, updated_at,"
+                " buyer_anon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (order_id, session_id, product, amount, currency, provider, now(), now(), buyer_anon),
             )
 
     def update_order(self, order_id: str, conn: sqlite3.Connection | None = None, **fields) -> None:
@@ -287,6 +490,30 @@ class Store:
     def order(self, order_id: str) -> sqlite3.Row | None:
         with self.read() as conn:
             return conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+
+    def latest_pack_order(self, buyer_anon: str) -> sqlite3.Row | None:
+        """This browser's credit pack: the newest with a code waiting to be collected, else
+        the newest paid, else the newest (an abandoned checkout is never preferred)."""
+        with self.read() as conn:
+            return conn.execute(
+                "SELECT o.* FROM orders o WHERE o.buyer_anon = ? AND o.product LIKE 'pack%'"
+                " ORDER BY EXISTS (SELECT 1 FROM code_pickup p WHERE p.order_id = o.id) DESC,"
+                " o.status = 'paid' DESC, o.created_at DESC, o.rowid DESC LIMIT 1", (buyer_anon,),
+            ).fetchone()
+
+    def purge_pickups(self, cutoff: str) -> int:
+        """Forget pack codes nobody collected before `cutoff` (the retention sweep)."""
+        with self.transaction() as conn:
+            deleted = conn.execute("DELETE FROM code_pickup WHERE created_at < ?", (cutoff,)).rowcount
+        if deleted:
+            self.scrub_wal()
+        return deleted
+
+    def scrub_wal(self) -> None:
+        """Copy the write-ahead log into the database and empty it, so a deleted secret (with
+        secure_delete on) is left in neither file. Best effort: readers can hold it back."""
+        with self.read() as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     def orders_for(self, session_id: str) -> list[sqlite3.Row]:
         with self.read() as conn:
