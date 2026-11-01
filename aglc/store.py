@@ -492,11 +492,13 @@ class Store:
             return conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
 
     def latest_pack_order(self, buyer_anon: str) -> sqlite3.Row | None:
-        """The newest credit pack this browser has bought (or started to)."""
+        """This browser's credit pack: the newest with a code waiting to be collected, else
+        the newest paid, else the newest (an abandoned checkout is never preferred)."""
         with self.read() as conn:
             return conn.execute(
-                "SELECT * FROM orders WHERE buyer_anon = ? AND product LIKE 'pack%'"
-                " ORDER BY created_at DESC, rowid DESC LIMIT 1", (buyer_anon,),
+                "SELECT o.* FROM orders o WHERE o.buyer_anon = ? AND o.product LIKE 'pack%'"
+                " ORDER BY EXISTS (SELECT 1 FROM code_pickup p WHERE p.order_id = o.id) DESC,"
+                " o.status = 'paid' DESC, o.created_at DESC, o.rowid DESC LIMIT 1", (buyer_anon,),
             ).fetchone()
 
     def purge_pickups(self, cutoff: str) -> int:

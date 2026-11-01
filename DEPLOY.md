@@ -152,14 +152,21 @@ documents, so the provider setup in sections 3 and 3a doesn't change.
   the order gets its status only), and it is deleted when that page confirms it has the code
   (`POST /api/pack/{order}/received`), or by the retention sweep after
   `AGLC_RETENTION_HOURS`. SQLite's `secure_delete` and a WAL checkpoint keep it out of the
-  database files afterwards. The return URL carries no order id (`?paid=1&pack=1`), and the
-  app log has only the first 8 characters of order ids. The page shows the code with a copy
+  database files afterwards. The return URL carries the order id (`?paid=1&pack=<id>`), which
+  the page removes from the address before the analytics script runs; the id alone collects
+  nothing, and the app log has only its first 8 characters. The page shows the code with a copy
   button, keeps it in the browser's localStorage, and tells the buyer to save it.
-- **A lost code.** We can't show a code again, but you can replace it: find the order (the
-  provider dashboard's payment reference is on the `orders` row) and run
-  `aglc reissue-code <order id>` on the server (with the service's `AGLC_DATA_DIR`). It prints
-  a new code carrying the credits the old one had left; the old one stops working, and the
-  ledger records a `reissue`. Send the new code to the buyer and don't keep it.
+- **A lost code.** We can't show a code again, but you can replace it:
+  1. Verify the buyer first: ask for the payment provider's reference (Square payment id,
+     or Stripe receipt or PaymentIntent) and match it to `orders.payment_id`; that row's `id`
+     is the order id. Don't reissue on an email address or a pack size alone.
+  2. Run it as the service's user with the production data directory, eg
+     `sudo -u aglc env AGLC_DATA_DIR=/var/lib/aglc aglc reissue-code <order id>`. Without
+     `AGLC_DATA_DIR` it opens an empty database in the home directory and reports "no code".
+  3. It prints a new code carrying the credits the old one had left; the old one stops
+     working, and the ledger records a `reissue`. The code is printed to the terminal: send
+     it to the buyer only, don't paste it anywhere else (chats, tickets), and clear the
+     scrollback afterwards.
 - **Email (optional).** Set `RESEND_API_KEY` and `AGLC_EMAIL_FROM` (a sender on a domain
   verified with Resend) and the code is also emailed once, at purchase, to the address the
   checkout collected (Stripe Checkout always asks for one; Square payment links do when the

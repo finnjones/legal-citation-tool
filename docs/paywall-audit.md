@@ -32,7 +32,7 @@ Tests: `tests/test_paywall.py`, plus the preview tests in `tests/test_billing.py
 | `GET /api/download/{id}` (.docx) | 402 | file | ok |
 | `POST /api/rerun/{id}` | preview after the re-read | full | ok |
 | `POST /api/report/{id}` | `{"ok": true}`; the report is built from the saved result and kept server-side | same | ok |
-| `GET /api/pack/{order}`, `GET /api/pack/latest` | a pack's status; its code only to the browser that bought it (cookie on the order), until that page confirms it has it | same | **leak, fixed** in review: the code went to whoever asked first, and the order id was in the app log and the return URL |
+| `GET /api/pack/{order}`, `GET /api/pack/latest` | a pack's status; its code only to the browser that bought it (cookie on the order), until that page confirms it has it | same | **leak, fixed** in review: the code went to whoever asked first, and the full order id was in the app log. The return URL carries the order id again (so the page asks about the pack that was paid), but it collects nothing without the buyer's cookie and the page removes it from the address before analytics runs |
 | `POST /api/checkout` | `{checkout_url, order_id}` or `{unlocked: true}` | same | ok |
 | `GET /api/sample` | the sample essay's *input* .docx | same | ok: no output |
 | Bibliography | `bibliography: []`, `bibliography_entries` (count) | full | ok |

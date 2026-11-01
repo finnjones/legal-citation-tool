@@ -817,6 +817,20 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             ".rtf": "That's an RTF file. Save it as Word (.docx), then upload that.",
         };
 
+        // A pack's return URL (?paid=1&pack=<order id>): take the order id out of the address
+        // now, while the page is still loading, before the analytics script (deferred) runs
+        const PACK_ORDER = (() => {
+            try {
+                const params = new URLSearchParams(location.search);
+                const id = params.get("pack");
+                if (!id) return null;
+                params.delete("pack");
+                const rest = params.toString();
+                history.replaceState(null, "", `${location.pathname}${rest ? `?${rest}` : ""}${location.hash}`);
+                return /^[0-9a-f]{32}$/.test(id) ? id : "latest";
+            } catch { return null; }
+        })();
+
         let config = { payments: false };
         let selectedFile = null;
         let result = null;        // the last result from the server
@@ -855,8 +869,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
         async function resumeSession() {
             const params = new URLSearchParams(location.search);
             const sessionId = params.get("session");
-            // A pack's return URL carries no order id: the server finds it by this browser's cookie
-            if (config.payments && params.get("pack") && params.get("paid") === "1") {
+            if (config.payments && PACK_ORDER && params.get("paid") === "1") {  // PACK_ORDER: see the top
                 const pack = await collectPack(sessionId);
                 if (!sessionId) return;
                 history.replaceState(null, "", `/?session=${encodeURIComponent(sessionId)}`);
@@ -2092,7 +2105,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             let pack = null;
             while (Date.now() < deadline) {
                 try {
-                    const response = await fetch("/api/pack/latest");
+                    const response = await fetch(`/api/pack/${encodeURIComponent(PACK_ORDER)}`);
                     if (response.status === 404) break;
                     if (response.ok) {
                         pack = await response.json();

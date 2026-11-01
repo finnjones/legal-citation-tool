@@ -17,7 +17,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from lxml.etree import XMLSyntaxError
@@ -319,6 +319,12 @@ async def process_document(
             billing.fail_document(session_id)
         if slot is not None and (progress or not started):
             slot.__exit__(None, None, None)  # the job never started
+        if seen_409:
+            # Returned, not raised, so the browser's new cookie (set by `admit` on `response`)
+            # goes with it: otherwise every probe would look like a new browser.
+            answer = JSONResponse({"detail": e.detail}, status_code=409)
+            answer.raw_headers.extend(h for h in response.raw_headers if h[0] == b"set-cookie")
+            return answer
         if isinstance(e, HTTPException):
             raise
         log.exception("processing session %s failed", session_id[:8])

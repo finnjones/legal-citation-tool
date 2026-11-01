@@ -27,7 +27,7 @@ bought from a document's unlock screen unlocks that document with its first cred
     GET  /api/entitlement/{session_id}  unlocked yet? (asks the provider if the webhook is late);
                                         status unlocked | pending | refunded | expired | none
     GET  /api/results/{session_id}      the full result once unlocked, else the preview
-    GET  /api/pack/latest               this browser's newest pack: status, and its code until confirmed
+    GET  /api/pack/latest               fallback: this browser's pack with a code waiting, else its newest paid one
     GET  /api/pack/{order_id}           a pack's status (its code only to the browser that bought it)
     POST /api/pack/{order_id}/received  the buyer's page has the code: forget it
     POST /api/redeem {session_id, code} unlock a document with credits
@@ -1228,9 +1228,10 @@ def create_checkout(body: CheckoutRequest, request: Request, response: Response)
     store.add_order(order_id, session_id, product=product.id, amount=product.amount,
                     currency=product.currency, provider=provider.name, buyer_anon=buyer)
     back = f"{_public_base(request)}/?paid=1"
-    # A pack's order id stays out of the URL (and so out of logs and analytics): the page
-    # finds its pack by the browser's cookie (GET /api/pack/latest).
-    redirect = (f"{back}&session={session_id}" if session_id else back) + ("&pack=1" if is_pack else "")
+    # A pack's order id is in the return URL so the page asks about the pack that was paid
+    # for. That is safe: only the buying browser's cookie collects the code, the logs keep 8
+    # characters of it, and the page removes it from the URL before analytics loads.
+    redirect = (f"{back}&session={session_id}" if session_id else back) + (f"&pack={order_id}" if is_pack else "")
     try:
         session = provider.create_checkout(order_id=order_id, product=product, redirect_url=redirect)
     except PaymentError as e:
@@ -1343,8 +1344,8 @@ def _pack_order(order_id: str) -> sqlite3.Row:
 
 @router.get("/api/pack/latest")
 def get_latest_pack(request: Request) -> dict:
-    """This browser's newest pack, for the page it returns to after paying (whose URL
-    carries no order id)."""
+    """A fallback for a page that has lost its pack's order id: this browser's newest pack
+    with a code still waiting, else its newest paid one, else its newest."""
     _require_enabled()
     order = get_store().latest_pack_order(request.cookies.get(ANON_COOKIE) or "") if request.cookies.get(
         ANON_COOKIE) else None

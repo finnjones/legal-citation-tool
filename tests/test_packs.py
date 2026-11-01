@@ -202,7 +202,7 @@ def test_a_pack_bought_from_the_unlock_screen_unlocks_that_document(paid, client
     sid = _process(client).json()["id"]
     r = client.post("/api/checkout", json={"session_id": sid, "product": "pack3"})
     poid = _provider_order_id(r.json()["order_id"])
-    assert get_payment_redirect(fake, poid).endswith(f"/?paid=1&session={sid}&pack=1")  # no order id in the URL
+    assert get_payment_redirect(fake, poid).endswith(f"/?paid=1&session={sid}&pack={r.json()['order_id']}")
     fake.pay(poid)
     assert _webhook(client, fake, poid)[0].json()["outcome"] == "pack_unlocked"
     data = _code(client, r.json()["order_id"])
@@ -428,3 +428,29 @@ def test_giving_credits_back_to_a_refunded_pack_writes_no_ledger_row(paid, clien
         assert credits.give_back(conn, code_id, sid) == 0
     with sqlite3.connect(get_store().path) as conn:
         assert [r[0] for r in conn.execute("SELECT reason FROM credit_ledger ORDER BY id")] == ["grant", "spend", "refund"]
+
+
+
+def test_the_return_page_asks_about_the_pack_that_was_paid_not_an_abandoned_one(paid, client, fake):
+    """Regression: /api/pack/latest picked the newest order, so paying a 3-pack after opening
+    (and abandoning) a 10-pack showed "payment not confirmed" and left the code uncollected."""
+    three = client.post("/api/checkout", json={"product": "pack3"}).json()
+    client.post("/api/checkout", json={"product": "pack10"})  # opened, then abandoned
+    poid = _provider_order_id(three["order_id"])
+    assert fake.checkouts[poid].redirect_url.endswith(f"/?paid=1&pack={three['order_id']}")
+    fake.pay(poid)
+    _webhook(client, fake, poid)
+    assert client.get(f"/api/pack/{three['order_id']}").json()["code"]
+    latest = client.get("/api/pack/latest").json()  # the fallback prefers a waiting code, then a paid pack
+    assert latest["order_id"] == three["order_id"] and latest["code"]
+    client.post(f"/api/pack/{three['order_id']}/received")
+    assert client.get("/api/pack/latest").json()["order_id"] == three["order_id"]  # paid beats pending
+
+
+def test_the_page_takes_the_order_id_out_of_the_address_before_analytics(monkeypatch):
+    monkeypatch.setenv("AGLC_PLAUSIBLE_DOMAIN", "cite.example.com")
+    html = TestClient(api.app).get("/").text
+    strip = html.index("const PACK_ORDER")
+    assert "history.replaceState" in html[strip:strip + 800]
+    assert '<script defer data-domain="cite.example.com"' in html  # deferred: runs after the inline script
+    assert html.index("const PACK_ORDER") < html.index("document.addEventListener(\"DOMContentLoaded\"")

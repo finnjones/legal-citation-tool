@@ -183,6 +183,19 @@ def test_the_sample_essay_is_never_seen(seen):
     assert len(fp.hashes) >= fingerprint.MIN_MATCHES and billing.seen_before(fp, visitor) is None
 
 
+def test_a_seen_409_sets_the_browser_cookie_so_its_limits_apply(seen, monkeypatch, tmp_path):
+    """Regression: the 409 was raised, so the new browser's cookie set on the response was
+    dropped and every probe looked like a new browser."""
+    monkeypatch.setenv("AGLC_FREE_PER_DAY", "2")
+    monkeypatch.setenv("AGLC_FREE_PER_IP_PER_DAY", "100")
+    _upload()
+    prober = TestClient(api.app)
+    first = _upload(ip="2.2.2.2", client=prober)[1]
+    assert _seen(first) == "elsewhere" and billing.ANON_COOKIE in first.headers.get("set-cookie", "")
+    assert _seen(_upload(ip="2.2.2.2", client=prober)[1]) == "elsewhere"
+    assert _upload(ip="2.2.2.2", client=prober)[1].status_code == 429  # the same browser, at its limit
+
+
 def test_seen_uploads_count_against_the_free_limits(seen, monkeypatch):
     """So the check can't be used as an unlimited lookup service."""
     monkeypatch.setenv("AGLC_FREE_PER_DAY", "2")
