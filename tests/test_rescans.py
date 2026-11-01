@@ -65,7 +65,7 @@ def test_paying_creates_an_entitlement_with_the_documents_fingerprint(paid, clie
 
 
 def test_credits_create_an_entitlement_too(paid, client, fake):
-    r = client.post("/api/checkout", json={"product": "pack3"})
+    r = client.post("/api/checkout", json={"product": "pack10"})
     poid = _provider_order_id(r.json()["order_id"])
     fake.pay(poid)
     _webhook(client, fake, poid)

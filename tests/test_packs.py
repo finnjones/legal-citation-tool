@@ -5,16 +5,19 @@ from __future__ import annotations
 
 import logging
 import re
+import secrets
 import shutil
 import sqlite3
 import threading
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 
 from aglc import api, billing, credits, guards, mailer, retention
-from aglc.store import get_store
+from aglc.payments import Product
+from aglc.store import get_store, now
 
 from test_billing import _checkout, _process, _provider_order_id, _webhook, client, fake, paid  # noqa: F401
 
@@ -24,7 +27,7 @@ def _set_footnotes(sid, n):
         conn.execute("UPDATE documents SET footnote_count = ? WHERE session_id = ?", (n, sid))
 
 
-def _buy_pack(client, fake, product="pack3", session_id=None, email=None, deliver=True):
+def _buy_pack(client, fake, product="pack10", session_id=None, email=None, deliver=True):
     body = {"product": product} | ({"session_id": session_id} if session_id else {})
     r = client.post("/api/checkout", json=body)
     assert r.status_code == 200, r.text
@@ -66,15 +69,15 @@ def test_a_long_document_is_charged_as_long_whatever_the_page_asks(paid, client)
     _set_footnotes(sid, 200)
     r = client.post("/api/checkout", json={"session_id": sid, "product": "essay"})  # asking for the cheaper tier
     order = get_store().order(r.json()["order_id"])
-    assert (order["product"], order["amount"]) == ("long", 900)
+    assert (order["product"], order["amount"]) == ("long", billing.PRODUCTS["long"].amount)
     preview = client.get(f"/api/results/{sid}").json()
-    assert client.get(f"/api/download/{sid}").json()["detail"] == "Unlock this document (A$9) to download it."
+    assert client.get(f"/api/download/{sid}").json()["detail"] == "Unlock this document (A$2) to download it."
     assert preview["tier"] == "essay"  # the preview's own count: 10 footnotes (the row was edited above)
 
 
 def test_preview_shows_its_tier_and_price(paid, client):
     data = _process(client).json()
-    assert (data["tier"], data["credits_needed"], data["price"]["display"]) == ("essay", 1, "A$5")
+    assert (data["tier"], data["credits_needed"], data["price"]["display"]) == ("essay", 1, "A$1")
 
 
 def test_unknown_product_and_pack_without_document(paid, client):
@@ -82,7 +85,7 @@ def test_unknown_product_and_pack_without_document(paid, client):
     assert client.post("/api/checkout", json={}).status_code == 422
     r = client.post("/api/checkout", json={"product": "pack10"})
     order = get_store().order(r.json()["order_id"])
-    assert (order["session_id"], order["product"], order["amount"]) == (None, "pack10", 3500)
+    assert (order["session_id"], order["product"], order["amount"]) == (None, "pack10", billing.PRODUCTS["pack10"].amount)
 
 
 # ---- packs ---------------------------------------------------------------------- #
@@ -92,7 +95,7 @@ def test_buying_a_pack_shows_its_code_once_and_keeps_only_a_hash(paid, client, f
     order_id, poid, outcome = _buy_pack(client, fake)
     assert outcome == "pack_granted"
     first = _code(client, order_id)
-    assert first["status"] == "paid" and first["credits"] == 3 and first["credits_remaining"] == 3
+    assert first["status"] == "paid" and first["credits"] == 10 and first["credits_remaining"] == 10
     code = first["code"]
     assert re.fullmatch(r"AFC-[23456789ABCDEFGHJKMNPQRSTWXYZ]{4}(-[23456789ABCDEFGHJKMNPQRSTWXYZ]{4}){2}", code)
     assert "code" not in _code(client, order_id)  # forgotten once the page said it had it
@@ -102,8 +105,8 @@ def test_buying_a_pack_shows_its_code_once_and_keeps_only_a_hash(paid, client, f
     with sqlite3.connect(get_store().path) as conn:
         assert conn.execute("SELECT COUNT(*) FROM code_pickup").fetchone()[0] == 0
         ledger = conn.execute("SELECT delta, reason, payment_id, order_id FROM credit_ledger").fetchall()
-    assert ledger == [(3, "grant", fake.checkouts[poid].payment_id, order_id)]
-    assert client.post("/api/credits", json={"code": code.lower().replace("-", " ")}).json()["credits_remaining"] == 3
+    assert ledger == [(10, "grant", fake.checkouts[poid].payment_id, order_id)]
+    assert client.post("/api/credits", json={"code": code.lower().replace("-", " ")}).json()["credits_remaining"] == 10
 
 
 def test_replayed_pack_webhook_grants_once(paid, client, fake):
@@ -113,7 +116,7 @@ def test_replayed_pack_webhook_grants_once(paid, client, fake):
     assert client.post("/api/webhooks/fake", content=body, headers=headers).json()["outcome"] == "duplicate"
     with sqlite3.connect(get_store().path) as conn:
         assert conn.execute("SELECT COUNT(*) FROM credit_codes").fetchone()[0] == 1
-        assert conn.execute("SELECT SUM(delta) FROM credit_ledger").fetchone()[0] == 3
+        assert conn.execute("SELECT SUM(delta) FROM credit_ledger").fetchone()[0] == 10
 
 
 def test_late_pack_webhook_is_reconciled_by_the_success_page(paid, client, fake):
@@ -130,28 +133,38 @@ def test_unknown_pack_order_is_404(paid, client):
     assert client.get(f"/api/pack/{_checkout(client, sid)['order_id']}").status_code == 404  # a document's order
 
 
-def test_redeeming_unlocks_and_spends_by_tier(paid, client, fake):
-    order_id, _, _ = _buy_pack(client, fake)
+def test_redeeming_unlocks_and_spends_by_tier(paid, client, fake, monkeypatch):
+    monkeypatch.setenv("AGLC_FREE_PER_DAY", "10")
+    order_id, _, _ = _buy_pack(client, fake)  # 10 credits
     code = _code(client, order_id)["code"]
     sid = _process(client).json()["id"]
     assert client.get(f"/api/download/{sid}").status_code == 402
     r = client.post("/api/redeem", json={"session_id": sid, "code": code})
-    assert r.json() == {"unlocked": True, "credits_spent": 1, "credits_remaining": 2}
+    assert r.json() == {"unlocked": True, "credits_spent": 1, "credits_remaining": 9}
     assert client.get(f"/api/results/{sid}").json()["locked"] is False
     assert client.get(f"/api/download/{sid}").status_code == 200
     again = client.post("/api/redeem", json={"session_id": sid, "code": code}).json()
-    assert again == {"unlocked": True, "credits_spent": 0, "credits_remaining": 2}  # already unlocked: free
+    assert again == {"unlocked": True, "credits_spent": 0, "credits_remaining": 9}  # already unlocked: free
 
-    long_sid = _process(client).json()["id"]
-    _set_footnotes(long_sid, 300)
-    assert client.post("/api/redeem", json={"session_id": long_sid, "code": code}).json()["credits_spent"] == 2
-    third = _process(client).json()["id"]
-    r = client.post("/api/redeem", json={"session_id": third, "code": code})
+    long_sids = []
+    for left in (7, 5, 3, 1):
+        long_sids.append(_process(client).json()["id"])
+        _set_footnotes(long_sids[-1], 300)
+        r = client.post("/api/redeem", json={"session_id": long_sids[-1], "code": code}).json()
+        assert (r["credits_spent"], r["credits_remaining"]) == (2, left)
+    too_long = _process(client).json()["id"]
+    _set_footnotes(too_long, 300)
+    r = client.post("/api/redeem", json={"session_id": too_long, "code": code})
+    assert r.status_code == 402 and "2 credits" in r.json()["detail"]
+    last = _process(client).json()["id"]  # an essay still fits in the last credit
+    assert client.post("/api/redeem", json={"session_id": last, "code": code}).json()["credits_remaining"] == 0
+    after = _process(client).json()["id"]
+    r = client.post("/api/redeem", json={"session_id": after, "code": code})
     assert r.status_code == 402 and "1 credit" in r.json()["detail"]
-    assert get_store().document(third)["unlocked_at"] is None
+    assert get_store().document(too_long)["unlocked_at"] is None and get_store().document(after)["unlocked_at"] is None
     with sqlite3.connect(get_store().path) as conn:
         spends = conn.execute("SELECT delta, session_id FROM credit_ledger WHERE reason = 'spend' ORDER BY id").fetchall()
-    assert spends == [(-1, sid), (-2, long_sid)]
+    assert spends == [(-1, sid), *((-2, s) for s in long_sids), (-1, last)]
 
 
 def test_bad_codes_are_refused(paid, client):
@@ -172,9 +185,9 @@ def test_code_normalising():
 
 def test_concurrent_spends_never_overspend(paid, client, fake, monkeypatch):
     monkeypatch.setenv("AGLC_FREE_PER_DAY", "50")
-    order_id, _, _ = _buy_pack(client, fake)  # 3 credits
+    order_id, _, _ = _buy_pack(client, fake)  # 10 credits
     code = _code(client, order_id)["code"]
-    sids = [_process(client).json()["id"] for _ in range(6)]
+    sids = [_process(client).json()["id"] for _ in range(12)]
     results, barrier = [], threading.Barrier(len(sids) + 2)
 
     def spend(sid):
@@ -184,30 +197,30 @@ def test_concurrent_spends_never_overspend(paid, client, fake, monkeypatch):
         except billing.HTTPException as e:
             results.append(e.status_code)
 
-    # six documents, and the first one twice more at the same moment
+    # twelve documents, and the first two once more at the same moment
     threads = [threading.Thread(target=spend, args=(sid,)) for sid in sids + sids[:2]]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-    assert sum(1 for r in results if r == 1) == 3
+    assert sum(1 for r in results if r == 1) == 10
     assert all(r in (0, 1, 402) for r in results)
     with sqlite3.connect(get_store().path) as conn:
         assert conn.execute("SELECT credits_remaining FROM credit_codes").fetchone()[0] == 0
         assert conn.execute("SELECT SUM(delta) FROM credit_ledger").fetchone()[0] == 0
         unlocked = conn.execute("SELECT COUNT(*) FROM documents WHERE unlocked_at IS NOT NULL").fetchone()[0]
-    assert unlocked == 3
+    assert unlocked == 10
 
 
 def test_a_pack_bought_from_the_unlock_screen_unlocks_that_document(paid, client, fake):
     sid = _process(client).json()["id"]
-    r = client.post("/api/checkout", json={"session_id": sid, "product": "pack3"})
+    r = client.post("/api/checkout", json={"session_id": sid, "product": "pack10"})
     poid = _provider_order_id(r.json()["order_id"])
     assert get_payment_redirect(fake, poid).endswith(f"/?paid=1&session={sid}&pack={r.json()['order_id']}")
     fake.pay(poid)
     assert _webhook(client, fake, poid)[0].json()["outcome"] == "pack_unlocked"
     data = _code(client, r.json()["order_id"])
-    assert data["unlocked"] is True and data["credits_remaining"] == 2 and data["session_id"] == sid
+    assert data["unlocked"] is True and data["credits_remaining"] == 9 and data["session_id"] == sid
     assert client.get(f"/api/download/{sid}").status_code == 200
 
 
@@ -217,12 +230,12 @@ def get_payment_redirect(fake, poid):
 
 def test_a_pack_for_a_deleted_document_keeps_all_its_credits(paid, client, fake):
     sid = _process(client).json()["id"]
-    r = client.post("/api/checkout", json={"session_id": sid, "product": "pack3"})
+    r = client.post("/api/checkout", json={"session_id": sid, "product": "pack10"})
     poid = _provider_order_id(r.json()["order_id"])
     shutil.rmtree(billing.sessions_dir() / sid)
     fake.pay(poid)
     assert _webhook(client, fake, poid)[0].json()["outcome"] == "pack_granted"
-    assert _code(client, r.json()["order_id"])["credits_remaining"] == 3
+    assert _code(client, r.json()["order_id"])["credits_remaining"] == 10
     assert fake.checkouts[poid].refunds == []  # nothing to refund: the credits are kept
 
 
@@ -233,7 +246,7 @@ def test_credits_come_back_when_an_unlocked_documents_files_are_gone(paid, clien
     client.post("/api/redeem", json={"session_id": sid, "code": code})
     (billing.sessions_dir() / sid / "output.docx").unlink()
     assert client.get(f"/api/download/{sid}").status_code == 410
-    assert client.post("/api/credits", json={"code": code}).json()["credits_remaining"] == 3
+    assert client.post("/api/credits", json={"code": code}).json()["credits_remaining"] == 10
     assert client.get(f"/api/download/{sid}").status_code == 402
 
 
@@ -253,7 +266,7 @@ def test_refunding_a_pack_removes_its_unspent_credits(paid, client, fake):
     assert r.status_code == 402 and "refunded" in r.json()["detail"]
     with sqlite3.connect(get_store().path) as conn:
         rows = conn.execute("SELECT delta, reason FROM credit_ledger ORDER BY id").fetchall()
-    assert rows == [(3, "grant"), (-1, "spend"), (-2, "refund")]
+    assert rows == [(10, "grant"), (-1, "spend"), (-9, "refund")]
     assert get_store().order(order_id)["status"] == "refunded"
     assert _webhook(client, fake, poid, status="refunded")[0].json()["outcome"] == "already_refunded"
 
@@ -333,7 +346,7 @@ def test_uncollected_codes_are_forgotten_after_the_retention_window(paid, client
     order_id, _, _ = _buy_pack(client, fake)
     retention.sweep(None, at=datetime.now(timezone.utc) + timedelta(hours=25))
     data = _code(client, order_id)
-    assert "code" not in data and data["credits_remaining"] == 3  # the credits are kept, the code isn't shown
+    assert "code" not in data and data["credits_remaining"] == 10  # the credits are kept, the code isn't shown
 
 
 def test_order_ids_are_redacted_in_the_access_log():
@@ -347,7 +360,7 @@ def test_pages_show_every_price_from_the_server(monkeypatch):
     for product in billing.PRODUCTS.values():
         assert product.display in home
     terms = client.get("/terms").text
-    assert "A$12 for 3" in terms and "A$35 for 10" in terms and "nothing renews" in terms
+    assert "A$8 for a pack of 10" in terms and "nothing renews" in terms
     refunds = client.get("/refunds").text
     assert "no refunds" not in refunds.lower() and "Australian Consumer Law" in refunds
     assert "unused credits" in refunds
@@ -426,7 +439,7 @@ def test_an_operator_can_reissue_a_lost_code(paid, client, fake):
     new = result.output.split()[0]
     assert new != old and credits.normalise(new)
     assert client.post("/api/credits", json={"code": old}).status_code == 404
-    assert client.post("/api/credits", json={"code": new}).json()["credits_remaining"] == 2
+    assert client.post("/api/credits", json={"code": new}).json()["credits_remaining"] == 9
     assert CliRunner().invoke(cli, ["reissue-code", "0" * 32]).exit_code == 1
 
 
@@ -445,19 +458,20 @@ def test_giving_credits_back_to_a_refunded_pack_writes_no_ledger_row(paid, clien
 
 
 def test_the_return_page_asks_about_the_pack_that_was_paid_not_an_abandoned_one(paid, client, fake):
-    """Regression: /api/pack/latest picked the newest order, so paying a 3-pack after opening
-    (and abandoning) a 10-pack showed "payment not confirmed" and left the code uncollected."""
-    three = client.post("/api/checkout", json={"product": "pack3"}).json()
+    """Regression: /api/pack/latest picked the newest order, so paying for a pack after opening
+    (and abandoning) another pack's checkout showed "payment not confirmed" and left the code
+    uncollected."""
+    bought = client.post("/api/checkout", json={"product": "pack10"}).json()
     client.post("/api/checkout", json={"product": "pack10"})  # opened, then abandoned
-    poid = _provider_order_id(three["order_id"])
-    assert fake.checkouts[poid].redirect_url.endswith(f"/?paid=1&pack={three['order_id']}")
+    poid = _provider_order_id(bought["order_id"])
+    assert fake.checkouts[poid].redirect_url.endswith(f"/?paid=1&pack={bought['order_id']}")
     fake.pay(poid)
     _webhook(client, fake, poid)
-    assert client.get(f"/api/pack/{three['order_id']}").json()["code"]
+    assert client.get(f"/api/pack/{bought['order_id']}").json()["code"]
     latest = client.get("/api/pack/latest").json()  # the fallback prefers a waiting code, then a paid pack
-    assert latest["order_id"] == three["order_id"] and latest["code"]
-    client.post(f"/api/pack/{three['order_id']}/received")
-    assert client.get("/api/pack/latest").json()["order_id"] == three["order_id"]  # paid beats pending
+    assert latest["order_id"] == bought["order_id"] and latest["code"]
+    client.post(f"/api/pack/{bought['order_id']}/received")
+    assert client.get("/api/pack/latest").json()["order_id"] == bought["order_id"]  # paid beats pending
 
 
 def test_the_page_takes_the_order_id_out_of_the_address_before_analytics(monkeypatch):
@@ -467,3 +481,107 @@ def test_the_page_takes_the_order_id_out_of_the_address_before_analytics(monkeyp
     assert "history.replaceState" in html[strip:strip + 800]
     assert '<script defer data-domain="cite.example.com"' in html  # deferred: runs after the inline script
     assert html.index("const PACK_ORDER") < html.index("document.addEventListener(\"DOMContentLoaded\"")
+
+
+# ---- prices from November 2026, and the 3-credit pack no longer sold ------------------ #
+
+#: The 3-credit pack as it was sold before it was withdrawn (no longer in billing.PRODUCTS).
+OLD_PACK3 = Product(id="pack3", name="AGLC4 citation check: 3 credits", amount=1200, currency="AUD")
+
+
+def _old_pack3_order(client, fake, session_id=None):
+    """A pack3 order made before the pack was withdrawn, as its row and its (fake) provider
+    checkout were left then: pending, its buyer's cookie on it, waiting for the payment."""
+    anon = secrets.token_hex(16)
+    client.cookies.set(billing.ANON_COOKIE, anon)
+    order_id = uuid.uuid4().hex
+    session = fake.create_checkout(order_id=order_id, product=OLD_PACK3,
+                                   redirect_url=f"http://testserver/?paid=1&pack={order_id}")
+    with get_store().transaction() as conn:
+        conn.execute(
+            "INSERT INTO orders (id, session_id, product, amount, currency, provider, status, checkout_id,"
+            " checkout_url, provider_order_id, created_at, updated_at, buyer_anon)"
+            " VALUES (?, ?, 'pack3', 1200, 'AUD', 'fake', 'pending', ?, ?, ?, ?, ?, ?)",
+            (order_id, session_id, session.checkout_id, session.url, session.provider_order_id, now(), now(), anon),
+        )
+    return order_id, session.provider_order_id
+
+
+def test_the_prices():
+    assert {k: (p.amount, p.currency, p.display) for k, p in billing.PRODUCTS.items()} == {
+        "essay": (100, "AUD", "A$1"), "long": (200, "AUD", "A$2"), "pack10": (800, "AUD", "A$8")}
+    assert billing.PACK_CREDITS == {"pack3": 3, "pack10": 10}  # pack3 kept for packs already sold
+    assert billing.TIER_CREDITS == {"essay": 1, "long": 2}
+
+
+def test_the_3_credit_pack_is_no_longer_sold(paid, client):
+    assert client.post("/api/checkout", json={"product": "pack3"}).status_code == 422
+    sid = _process(client).json()["id"]
+    assert client.post("/api/checkout", json={"session_id": sid, "product": "pack3"}).status_code == 422
+    with sqlite3.connect(get_store().path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
+    cfg = client.get("/api/config").json()
+    assert set(cfg["prices"]) == {"essay", "long", "pack10"}
+    for path in ("/", "/terms", "/refunds", "/privacy", "/llms.txt"):
+        page = client.get(path).text
+        assert "pack3" not in page and "3 credits" not in page and "{{" not in page, path
+        assert not re.search(r"A\$(5|9|12|35)\b", page), path  # the old prices
+
+
+def test_an_old_pack3_order_still_settles_shows_its_code_redeems_and_refunds(paid, client, fake):
+    order_id, poid = _old_pack3_order(client, fake)
+    fake.pay(poid)
+    assert _webhook(client, fake, poid)[0].json()["outcome"] == "pack_granted"
+    data = _code(client, order_id)
+    assert (data["status"], data["credits"], data["credits_remaining"]) == ("paid", 3, 3)
+    code = data["code"]
+    assert "code" not in TestClient(api.app).get(f"/api/pack/{order_id}").json()  # only to its buyer
+
+    sid = _process(client).json()["id"]
+    r = client.post("/api/redeem", json={"session_id": sid, "code": code})
+    assert r.json() == {"unlocked": True, "credits_spent": 1, "credits_remaining": 2}
+    assert client.get(f"/api/download/{sid}").status_code == 200
+
+    assert _webhook(client, fake, poid, status="refunded")[0].json()["outcome"] == "pack_refunded"
+    assert client.post("/api/credits", json={"code": code}).json() == {"credits_remaining": 0, "refunded": True}
+    assert client.get(f"/api/download/{sid}").status_code == 200  # already unlocked: stays unlocked
+    with sqlite3.connect(get_store().path) as conn:
+        rows = conn.execute("SELECT delta, reason FROM credit_ledger ORDER BY id").fetchall()
+    assert rows == [(3, "grant"), (-1, "spend"), (-2, "refund")]
+    assert get_store().order(order_id)["status"] == "refunded"
+
+
+def test_an_old_pack3_order_with_a_late_webhook_is_reconciled_and_can_be_reissued(paid, client, fake):
+    from typer.testing import CliRunner
+    from aglc.cli import app as cli
+
+    sid = _process(client).json()["id"]
+    order_id, poid = _old_pack3_order(client, fake, session_id=sid)  # bought from this document's unlock screen
+    fake.pay(poid)  # no webhook: the return page asks the provider
+    data = _code(client, order_id)
+    assert data["status"] == "paid" and data["code"] and data["unlocked"] is True and data["credits_remaining"] == 2
+    assert client.get(f"/api/download/{sid}").status_code == 200
+    assert client.get("/api/pack/latest").json()["order_id"] == order_id
+    assert _webhook(client, fake, poid)[0].json()["outcome"] == "already_paid"  # the webhook, at last
+
+    result = CliRunner().invoke(cli, ["reissue-code", order_id])
+    assert result.exit_code == 0, result.output
+    new = result.output.split()[0]
+    assert client.post("/api/credits", json={"code": data["code"]}).status_code == 404
+    assert client.post("/api/credits", json={"code": new}).json()["credits_remaining"] == 2
+    other = _process(client).json()["id"]
+    assert client.post("/api/redeem", json={"session_id": other, "code": new}).json()["credits_remaining"] == 1
+
+
+def test_the_pages_show_the_new_prices(paid, client):
+    home = client.get("/").text
+    assert "Free preview, then A$1 per essay." in home  # meta description
+    assert "A$1 <span>per essay</span>" in home and "is A$2." in home
+    assert "A$8 <span>for 10 credits</span>" in home and 'data-buy-pack="pack10"' in home
+    assert home.count('data-buy-pack="pack') == 1  # one pack on the pricing card
+    assert "A$1 per essay (A$2 over 150 footnotes)" in home
+    terms = client.get("/terms").text
+    assert "costs A$1 for an essay" in terms and "or A$2 for a longer document" in terms
+    assert "A$8 for a pack of 10" in terms
+    llms = client.get("/llms.txt").text
+    assert "A$1 per essay" in llms and "A$2 for a long document" in llms and "10-credit pack for A$8" in llms

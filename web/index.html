@@ -665,14 +665,13 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
                             <a class="btn btn-primary" href="#main" data-start>Check my footnotes</a>
                         </div>
                         <div class="pricing-card packs">
-                            <p class="price">{{price_pack3}} <span>for 3 credits</span></p>
-                            <p class="sub">Or {{price_pack10}} for 10. An essay uses 1 credit, a longer document 2.</p>
+                            <p class="price">{{price_pack10}} <span>for 10 credits</span></p>
+                            <p class="sub">An essay uses 1 credit, a longer document 2.</p>
                             <ul>
                                 <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>You get a code to unlock documents with. Keep it: it's shown once, and we only keep a scrambled copy.</span></li>
                                 <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10.5 8 14l8-8.5"/></svg><span>Credits never expire, and nothing renews.</span></li>
                             </ul>
                             <div class="pack-buttons">
-                                <button type="button" class="btn btn-secondary" data-buy-pack="pack3">Buy 3 credits</button>
                                 <button type="button" class="btn btn-secondary" data-buy-pack="pack10">Buy 10 credits</button>
                             </div>
                         </div>
@@ -2208,7 +2207,7 @@ FORM: Editorial legal register, pinned by the brief (no roll). Staging: preview 
             }));
             const usable = saved.map((c, i) => ({ ...c, left: balances[i] })).filter(c => c.left === null || c.left > 0);
             const savedHtml = usable.map(c => `<button type="button" class="btn btn-primary" data-use-code="${escapeHtml(c.code)}">Use ${escapeHtml(c.code.slice(0, 4))}…${escapeHtml(c.code.slice(-4))}${c.left !== null ? ` (${plural(c.left, "credit")} left)` : ""}</button>`).join("");
-            const packs = ["pack3", "pack10"].filter(p => prices[p]).map(p =>
+            const packs = Object.keys(prices).filter(p => p.startsWith("pack")).map(p =>
                 `<button type="button" class="btn btn-secondary" data-buy-pack="${p}" data-for-document>Buy ${prices[p].credits} credits — ${escapeHtml(prices[p].display)}</button>`).join("");
             setBanner("credits", banner("", `Unlock with ${need === 1 ? "a credit" : `${need} credits`}`,
                 `This document uses ${plural(need, "credit")}${result?.tier === "long" ? " because it has more than " + (config.essay_max_footnotes ?? 150) + " footnotes" : ""}. `
