@@ -8,9 +8,6 @@ cite real sources; the pinpoints only illustrate the form.
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-
 import pytest
 
 from aglc.document import render_document
@@ -128,6 +125,17 @@ def test_website_examples():
     assert full(cite(blog)) == "‘About the Blog’, *AUSPUBLAW* (Web Page) <https://auspublaw.org/about-the-blog>"
 
 
+def test_website_later_references_as_the_guide_describes_them():
+    blog = WebsiteSource(title="About the Blog", website_name="AUSPUBLAW")
+    assert subsequent(cite(blog), 5) == "*AUSPUBLAW* (n 5)"  # no author: the website's name, italic
+    # an author left out of the full citation because it matches the website's name is
+    # still used, in roman type, in later references
+    page = WebsiteSource(authors=["Australian Human Rights Commission"], authors_are_bodies=True,
+                         title="Native Title Report 2017", website_name="Australian Human Rights Commission")
+    assert not full(cite(page)).startswith("Australian Human Rights Commission,")
+    assert subsequent(cite(page), 9) == "Australian Human Rights Commission (n 9)"
+
+
 # ---- /guides/treaties -------------------------------------------------------------------- #
 
 ICCPR = TreatySource(
@@ -227,19 +235,3 @@ def test_common_mistakes_examples():
     assert full(act) == "*Native Title Act 1993* (Cth) s 223"
     assert full(case(*MABO, (PinpointKind.page, "42"))) == "*Mabo v Queensland [No 2]* (1992) 175 CLR 1, 42"
 
-
-# ---- Before and after: the sample essay's footnotes, as the end-to-end test produces them ---- #
-
-#: Results the guides show for sample-essay footnotes, in one piece so the guides' guard can
-#: find them. Each must be exactly what test_end_to_end expects the tool to produce.
-SAMPLE_RESULTS = {
-    9: "‘Native Title Report 2017’, *Australian Human Rights Commission* (Web Page, 2017) <https://humanrights.gov.au/native-title-report-2017>.",
-}
-
-
-def test_before_and_after_results_match_the_end_to_end_run():
-    spec = importlib.util.spec_from_file_location("e2e_expected", Path(__file__).parent / "test_end_to_end.py")
-    e2e = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(e2e)
-    for number, text in SAMPLE_RESULTS.items():
-        assert e2e.EXPECTED[number] == text

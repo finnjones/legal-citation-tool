@@ -55,15 +55,16 @@ BRAND = "Aforecite"
 #: When the policy pages (privacy, terms, refunds) last changed: update it with them.
 POLICY_DATE = "23 October 2026"
 
-#: When the home page, the about page and the guides index last changed (ISO date, for the
-#: sitemap's <lastmod>): update it with them.
-SITE_DATE = "2026-11-01"
+#: When the pages that aren't guides or policy pages last changed (ISO dates, for the
+#: sitemap's <lastmod>): update each with its page.
+PAGE_DATES = {"/": "2026-11-01", "/about": "2026-10-18", "/guides": "2026-11-01"}
 
 #: What the tool is and isn't, in two sentences: the home page's structured data and llms.txt.
 SITE_DESCRIPTION = (
     "Aforecite fixes the footnotes in an Australian law essay to the Australian Guide to Legal "
-    "Citation (4th ed, AGLC4): upload a Word .docx and every citation is rewritten to AGLC4, "
-    "with Ibid, (n x), short titles and an optional bibliography, returned as Word tracked changes."
+    "Citation (4th ed, AGLC4): upload a Word .docx and each citation it recognises is rewritten to "
+    "AGLC4, with Ibid, (n x), short titles and an optional bibliography. Every change is listed for "
+    "review before download and, by default, shown in the .docx as Word tracked changes."
 )
 
 #: Who runs the site: placeholder -> (environment variable, what to set)
@@ -527,7 +528,7 @@ def lastmod(path: str) -> str:
         return GUIDES[path.removeprefix("/guides/")].updated
     if path in ("/privacy", "/terms", "/refunds"):
         return datetime.strptime(POLICY_DATE, "%d %B %Y").date().isoformat()
-    return SITE_DATE
+    return PAGE_DATES[path]
 
 
 def sitemap(request: Request) -> Response:
@@ -592,8 +593,9 @@ def llms_txt(request: Request) -> PlainTextResponse:
         "",
         "- It formats citations. It writes no essay content: it doesn't change the student's argument, "
         "quotations or choice of sources.",
-        "- Every change is a Word tracked change that the student can accept or reject in Word. "
-        "Nothing is changed silently.",
+        "- Every change is listed for the student to review before they download. By default (an "
+        "option they can turn off) each change is also a Word tracked change they can accept or "
+        "reject in Word.",
         "- An AI model only reads each footnote and pulls out its parts (names, years, report series, "
         "pinpoints). Ordinary, tested code builds every AGLC4 citation and decides where Ibid, (n x) "
         "and short titles go.",

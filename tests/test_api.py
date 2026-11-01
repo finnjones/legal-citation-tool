@@ -865,6 +865,7 @@ def test_sitemap_has_a_lastmod_for_every_url():
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", lastmod) and lastmod == site.lastmod(path)
     assert site.lastmod("/guides/ibid") == site.GUIDES["ibid"].updated
     assert site.lastmod("/privacy") == "2026-10-23"  # from POLICY_DATE
+    assert site.lastmod("/about") == "2026-10-18"  # unchanged by this work: its real last change
     assert not any("/api/" in el.text for el in root.iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc"))
 
 
@@ -903,7 +904,7 @@ def test_llms_txt_describes_the_tool_and_lists_every_guide(monkeypatch):
     assert response.headers["content-type"].startswith("text/plain")
     text = response.text
     assert text.startswith(f"# {site.BRAND}\n\n> ")
-    assert "It writes no essay content" in text and "Every change is a Word tracked change" in text
+    assert "It writes no essay content" in text and "Every change is listed for the student to review" in text and "By default (an option they can turn off)" in text
     assert "isn't affiliated" in text and "{{" not in text
     for slug, guide in site.GUIDES.items():
         assert f"- [{guide.name}](https://cite.example.com/guides/{slug}): {guide.summary}" in text
