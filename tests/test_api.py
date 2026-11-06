@@ -1067,3 +1067,15 @@ def test_guide_before_and_after_examples_are_real_and_consistent(path):
             # the redline, read without its insertions, is the line above it
             assert examples[i - 1]["kind"] == "was"
             assert _flat(ex["with_del"]) == _flat(examples[i - 1]["with_del"])
+
+
+@pytest.mark.parametrize("path", [*site.PUBLIC_PATHS, "/sitemap.xml", "/robots.txt", "/llms.txt"])
+def test_public_pages_answer_head(path):
+    """Some crawlers and link checkers send HEAD first; a 405 reads to them as a broken page."""
+    r = client.head(path)
+    assert r.status_code == 200
+    assert r.content == b""
+
+
+def test_head_on_an_unknown_guide_is_404():
+    assert client.head("/guides/no-such-guide").status_code == 404

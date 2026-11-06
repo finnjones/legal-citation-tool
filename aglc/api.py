@@ -118,49 +118,53 @@ def _clean_provider(spec: str | None) -> str | None:
 
 # ---- Static files ---------------------------------------------------------- #
 
+#: The public pages answer HEAD as well as GET: some crawlers, link checkers and uptime
+#: monitors send HEAD first and treat a 405 as a broken page. Uvicorn drops the body.
+PAGE_METHODS = ["GET", "HEAD"]
 
-@app.get("/")
+
+@app.api_route("/", methods=PAGE_METHODS)
 async def root(request: Request) -> HTMLResponse:
     """Serve the web UI (the landing page and the tool are one page)."""
     return site.index(request)
 
 
-@app.get("/favicon.ico", include_in_schema=False)
+@app.api_route("/favicon.ico", methods=PAGE_METHODS, include_in_schema=False)
 async def favicon() -> FileResponse:
     """Browsers ask for this whatever the page says; the icon is an SVG."""
     return FileResponse(site.WEB_DIR / "assets" / "favicon.svg", media_type="image/svg+xml")
 
 
-@app.get("/privacy")
-@app.get("/terms")
-@app.get("/refunds")
-@app.get("/about")
+@app.api_route("/privacy", methods=PAGE_METHODS)
+@app.api_route("/terms", methods=PAGE_METHODS)
+@app.api_route("/refunds", methods=PAGE_METHODS)
+@app.api_route("/about", methods=PAGE_METHODS)
 async def static_page(request: Request) -> HTMLResponse:
     return site.page(request.url.path.strip("/"), request)
 
 
-@app.get("/guides")
+@app.api_route("/guides", methods=PAGE_METHODS)
 async def guides_index(request: Request) -> HTMLResponse:
     return site.guides_index(request)
 
 
-@app.get("/guides/{slug}")
+@app.api_route("/guides/{slug}", methods=PAGE_METHODS)
 async def guide_page(slug: str, request: Request) -> HTMLResponse:
     """One AGLC4 guide page; an unknown slug is a 404."""
     return site.guide(slug, request)
 
 
-@app.get("/sitemap.xml", include_in_schema=False)
+@app.api_route("/sitemap.xml", methods=PAGE_METHODS, include_in_schema=False)
 async def sitemap(request: Request) -> Response:
     return site.sitemap(request)
 
 
-@app.get("/robots.txt", include_in_schema=False)
+@app.api_route("/robots.txt", methods=PAGE_METHODS, include_in_schema=False)
 async def robots(request: Request) -> Response:
     return site.robots(request)
 
 
-@app.get("/llms.txt", include_in_schema=False)
+@app.api_route("/llms.txt", methods=PAGE_METHODS, include_in_schema=False)
 async def llms_txt(request: Request) -> Response:
     """What the site is, in plain words for AI models, with every guide."""
     return site.llms_txt(request)
