@@ -17,7 +17,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from lxml.etree import XMLSyntaxError
@@ -91,7 +91,27 @@ async def _lifespan(app: FastAPI):
         sweeper.cancel()
 
 
+class CanonicalRedirectMiddleware:
+    """301 a page asked for over http, or with a trailing slash, to its one canonical URL
+    (site.canonical_redirect), so search engines see each page at a single address."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http":
+            target = site.canonical_redirect(
+                scope["method"], scope["path"], scope.get("raw_path") or scope["path"].encode(),
+                scope.get("query_string", b""), dict(scope.get("headers", [])),
+            )
+            if target is not None:
+                await RedirectResponse(target, status_code=301)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 app = FastAPI(title="Aforecite API", lifespan=_lifespan)
+app.add_middleware(CanonicalRedirectMiddleware)
 app.add_middleware(guards.GuardMiddleware)  # 413 over $AGLC_MAX_UPLOAD_MB, security headers
 app.include_router(billing.router)  # every route 404s unless AGLC_PAYMENTS is set
 app.mount("/assets", StaticFiles(directory=site.WEB_DIR / "assets", check_dir=False), name="assets")
