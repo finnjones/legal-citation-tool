@@ -187,6 +187,34 @@ GUIDES_INDEX_DESCRIPTION = (
 _PARTIAL = re.compile(r"\{\{>\s*([a-z_-]+)\s*\}\}")
 
 
+def canonical_redirect(method: str, path: str, raw_path: bytes, query: bytes, headers: dict[bytes, bytes]) -> str | None:
+    """Where a page request should be sent permanently (301), or None to serve it.
+
+    - Over http, when the public URL is https: Cloudflare's Cf-Visitor header names the
+      scheme the visitor used (behind the tunnel the app itself only ever sees http). Without
+      the header nothing is redirected, so a local server is never sent anywhere.
+    - A trailing slash (/guides/ -> /guides), which Starlette would otherwise answer with a
+      temporary 307. The API and the assets keep their own behaviour.
+    Only GET and HEAD are redirected: a POST (a webhook, an upload) is never bounced."""
+    if method not in ("GET", "HEAD") or path.startswith("//"):
+        return None
+    public = (os.environ.get("AGLC_PUBLIC_URL") or "").rstrip("/")
+    try:
+        scheme = json.loads(headers.get(b"cf-visitor", b"{}")).get("scheme")
+    except (ValueError, AttributeError):
+        scheme = None
+    to_https = public.startswith("https://") and scheme == "http"
+    slash = path != "/" and path.endswith("/") and not path.startswith(("/api/", "/assets/"))
+    if not (to_https or slash):
+        return None
+    target = raw_path.decode("latin-1") or "/"
+    if slash:
+        target = target.rstrip("/") or "/"
+    if query:
+        target += "?" + query.decode("latin-1")
+    return (public if public.startswith("https://") else "") + target
+
+
 def base_url(request: Request) -> str:
     return (os.environ.get("AGLC_PUBLIC_URL") or str(request.base_url)).rstrip("/")
 

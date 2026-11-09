@@ -1079,3 +1079,60 @@ def test_public_pages_answer_head(path):
 
 def test_head_on_an_unknown_guide_is_404():
     assert client.head("/guides/no-such-guide").status_code == 404
+
+
+# ---- One address per page: http -> https and trailing slashes, as permanent redirects ---- #
+
+HTTP_VISITOR = {"cf-visitor": '{"scheme":"http"}'}
+
+
+@pytest.mark.parametrize("path", ["/", "/guides", "/guides/hansard", "/terms", "/refunds"])
+def test_a_page_asked_for_over_http_moves_permanently_to_https(path, monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://aforecite.com.au")
+    r = client.get(path, headers=HTTP_VISITOR, follow_redirects=False)
+    assert r.status_code == 301
+    assert r.headers["location"] == f"https://aforecite.com.au{path}"
+    assert client.head(path, headers=HTTP_VISITOR, follow_redirects=False).status_code == 301
+
+
+def test_the_https_redirect_keeps_the_query_string(monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://aforecite.com.au")
+    r = client.get("/?paid=1&session=abc", headers=HTTP_VISITOR, follow_redirects=False)
+    assert r.headers["location"] == "https://aforecite.com.au/?paid=1&session=abc"
+
+
+def test_https_visitors_and_local_servers_are_served_not_redirected(monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://aforecite.com.au")
+    assert client.get("/guides", headers={"cf-visitor": '{"scheme":"https"}'}).status_code == 200
+    assert client.get("/guides").status_code == 200  # no Cf-Visitor: not behind Cloudflare
+    monkeypatch.delenv("AGLC_PUBLIC_URL")
+    assert client.get("/guides", headers=HTTP_VISITOR).status_code == 200  # no https URL to send to
+
+
+def test_a_post_over_http_is_never_redirected(monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://aforecite.com.au")
+    r = client.post("/api/redeem", headers=HTTP_VISITOR, json={}, follow_redirects=False)
+    assert r.status_code != 301
+
+
+def test_a_bad_cf_visitor_header_is_ignored(monkeypatch):
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://aforecite.com.au")
+    assert client.get("/guides", headers={"cf-visitor": "not json"}).status_code == 200
+    assert client.get("/guides", headers={"cf-visitor": "[1]"}).status_code == 200
+
+
+@pytest.mark.parametrize("path,target", [("/guides/", "/guides"), ("/guides/ibid/", "/guides/ibid"), ("/about/", "/about")])
+def test_a_trailing_slash_moves_permanently(path, target, monkeypatch):
+    monkeypatch.delenv("AGLC_PUBLIC_URL", raising=False)
+    r = client.get(path, follow_redirects=False)
+    assert (r.status_code, r.headers["location"]) == (301, target)
+    monkeypatch.setenv("AGLC_PUBLIC_URL", "https://aforecite.com.au")
+    r = client.get(path + "?utm_source=x", follow_redirects=False)
+    assert r.headers["location"] == f"https://aforecite.com.au{target}?utm_source=x"
+
+
+def test_the_slash_redirect_cannot_send_anyone_off_site(monkeypatch):
+    monkeypatch.delenv("AGLC_PUBLIC_URL", raising=False)
+    r = client.get("//evil.example/", follow_redirects=False)
+    assert not r.headers.get("location", "").startswith("//")
+    assert site.canonical_redirect("GET", "//evil.example/", b"//evil.example/", b"", {}) is None
