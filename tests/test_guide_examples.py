@@ -160,6 +160,34 @@ def test_treaty_examples():
     )
 
 
+#: The "Common treaties, ready to cite" list. Each was checked against the UN Treaty
+#: Collection record or several independent sources (volume, first page, signature and
+#: entry-into-force dates); treaties whose details the sources disagreed on were left out.
+#: The expected text is written out in full so the guides' guard test can find it.
+COMMON_TREATIES = [
+    ("International Covenant on Civil and Political Rights", "16 December 1966", "999 UNTS 171", "23 March 1976",
+     "*International Covenant on Civil and Political Rights*, opened for signature 16 December 1966, 999 UNTS 171 (entered into force 23 March 1976)"),
+    ("International Covenant on Economic, Social and Cultural Rights", "16 December 1966", "993 UNTS 3", "3 January 1976",
+     "*International Covenant on Economic, Social and Cultural Rights*, opened for signature 16 December 1966, 993 UNTS 3 (entered into force 3 January 1976)"),
+    ("Convention on the Rights of the Child", "20 November 1989", "1577 UNTS 3", "2 September 1990",
+     "*Convention on the Rights of the Child*, opened for signature 20 November 1989, 1577 UNTS 3 (entered into force 2 September 1990)"),
+    ("Convention relating to the Status of Refugees", "28 July 1951", "189 UNTS 150", "22 April 1954",
+     "*Convention relating to the Status of Refugees*, opened for signature 28 July 1951, 189 UNTS 150 (entered into force 22 April 1954)"),
+    ("Convention on the Elimination of All Forms of Discrimination against Women", "18 December 1979", "1249 UNTS 13", "3 September 1981",
+     "*Convention on the Elimination of All Forms of Discrimination against Women*, opened for signature 18 December 1979, 1249 UNTS 13 (entered into force 3 September 1981)"),
+    ("Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment", "10 December 1984", "1465 UNTS 85", "26 June 1987",
+     "*Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment*, opened for signature 10 December 1984, 1465 UNTS 85 (entered into force 26 June 1987)"),
+    ("Vienna Convention on the Law of Treaties", "23 May 1969", "1155 UNTS 331", "27 January 1980",
+     "*Vienna Convention on the Law of Treaties*, opened for signature 23 May 1969, 1155 UNTS 331 (entered into force 27 January 1980)"),
+]
+
+
+@pytest.mark.parametrize(("title", "signed", "series", "in_force", "expected"), COMMON_TREATIES)
+def test_common_treaty_citations(title, signed, series, in_force, expected):
+    treaty = TreatySource(title=title, opened_for_signature=signed, treaty_series=series, entry_into_force=in_force)
+    assert full(cite(treaty)) == expected
+    assert bibliography(cite(treaty)) == expected
+
 def test_treaty_later_reference_and_bibliography():
     assert subsequent(cite(ICCPR, (PinpointKind.article, "14(3)"), short_title="ICCPR"), 2) == "*ICCPR* (n 2) art 14(3)"
     assert bibliography(cite(ICCPR, (PinpointKind.article, "14(3)"))) == (

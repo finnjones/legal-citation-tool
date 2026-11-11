@@ -151,7 +151,7 @@ GUIDES: dict[str, Guide] = {g.slug: g for g in (
     Guide("treaties", "How to cite a treaty in AGLC4, with examples", "Citing treaties",
           "Title, parties, signature, treaty series and entry into force, with article pinpoints.",
           "How to cite a treaty such as the ICCPR in AGLC4 (ch 8): title, parties, signature date, treaty series, entry into force and article pinpoints. Examples.",
-          "2026-11-08"),
+          "2026-11-11"),
     Guide("journal-articles", "How to cite a journal article in AGLC4", "Journal articles",
           "Author, title, year, volume, issue, journal and pages, in print or online.",
           "How to cite a journal article in AGLC4: author, title in quotation marks, year, volume and issue, journal in italics, first page and pinpoint. Examples.",
